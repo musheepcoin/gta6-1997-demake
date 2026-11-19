@@ -51,6 +51,8 @@ class LeonidaGame {
 
         this.trafficManager = new TrafficManager(this);
 
+        this.creationEngine = typeof ViceCreationEngine !== "undefined" ? new ViceCreationEngine(this) : null;
+
         this.net = null;
 
 
@@ -1512,6 +1514,9 @@ class LeonidaGame {
 
         this.worldReady = true;
         this._resetLoopClock = true;
+        if (this.creationEngine && typeof this.creationEngine.loadFromLocalStorage === "function") {
+            this.creationEngine.loadFromLocalStorage();
+        }
         if (this.net && typeof this.net.onWorldReady === "function") {
             this.net.onWorldReady();
         }
@@ -2497,6 +2502,10 @@ class LeonidaGame {
 
             if (code === "KeyD" || code === "ArrowRight") this.input.right = true;
 
+            if (this.creationEngine && this.creationEngine.handleKeyDown(e)) {
+                return;
+            }
+
             if (code === "Space") {
 
                 this.input.handbrake = true;
@@ -2786,6 +2795,11 @@ class LeonidaGame {
 
             if (document.body && document.body.classList.contains("touch-enabled")) return;
 
+            if (this.creationEngine && this.creationEngine.studioActive && this.creationEngine.handleMouseDown(e.clientX, e.clientY, e.button)) {
+                e.preventDefault();
+                return;
+            }
+
             if (e.button === 0) {
 
                 this.audio.resume();
@@ -2805,6 +2819,12 @@ class LeonidaGame {
         });
 
 
+
+        this.canvas.addEventListener("contextmenu", (e) => {
+            if (this.creationEngine && this.creationEngine.studioActive) {
+                e.preventDefault();
+            }
+        });
 
         window.addEventListener("mouseup", (e) => {
 
@@ -11689,6 +11709,10 @@ class LeonidaGame {
         }
 
 
+
+        if (this.creationEngine) {
+            this.creationEngine.update(dt);
+        }
 
         // If Lucia is currently inside a Venue Interior, update the interior room while keeping the full exterior persistent world ticking at 60 FPS!
         if (this.activeInterior) {

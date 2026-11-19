@@ -121,7 +121,7 @@ function createGameInstance(cmpBuf) {
     const scripts = [
         "js/audio.js", "js/interiors.js", "js/object_engine.js", "js/map.js",
         "js/entities.js", "js/pednav.js", "js/missions.js", "js/renderer.js",
-        "js/net.js", "js/world_director.js", "js/game.js"
+        "js/net.js", "js/world_director.js", "js/creation_engine.js", "js/game.js"
     ];
     for (const rel of scripts) {
         let code = fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -1481,9 +1481,82 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 35: VC26 CREATION ENGINE FULL LIFECYCLE & BLUEPRINT AUDIT
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 35: VC26 CREATION ENGINE FULL LIFECYCLE & BLUEPRINT AUDIT ---");
+    {
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const ce = g.creationEngine;
+        assert(Boolean(ce && ce.version === "101_221"), "ViceCreationEngine (v101_221) initialized and attached to LeonidaGame");
+
+        // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
+        const testC = 212, testR = 148;
+        const origGround = g.map.getSurfaceGroundType(testC, testR);
+        const paintRes = ce.paintVoxelTile(testC, testR, "BLDG_SKYSCRAPER_6F", { storeys: 4, style: 10 });
+        assert(paintRes.ok && g.map.getSurfaceGroundType(testC, testR) === sandbox.GROUND_TYPE.BUILDING, "CreationEngine.paintVoxelTile sculpts 6-storey 3D Voxel Skyscraper and updates surfaceGround/surfaceLayer");
+        ce.undo();
+        assert(g.map.getSurfaceGroundType(testC, testR) === origGround, "CreationEngine.undo() restores exact pre-edit 6-layer voxel column and surface lookup tables");
+        ce.redo();
+        assert(g.map.getSurfaceGroundType(testC, testR) === sandbox.GROUND_TYPE.BUILDING, "CreationEngine.redo() reapplies 3D Voxel Skyscraper edit cleanly");
+        ce.undo(); // leave tile clean
+
+        // 2. Pillar 2A: Custom Vehicle Archetype Factory + Placement Safety Oracle Auto-Snap
+        const customSpec = ce.defineVehicle("LEONIDA_HYPER_GT", {
+            name: "LEONIDA HYPER GT",
+            baseSpec: "VICE_CHEETAH",
+            maxSpeed: 510,
+            accel: 340,
+            color: "#ff2a85"
+        });
+        assert(Boolean(customSpec && sandbox.VEHICLE_SPECS.LEONIDA_HYPER_GT), "CreationEngine.defineVehicle registers custom vehicle archetype into VEHICLE_SPECS");
+        const spawnedCar = ce.spawnVehicle("LEONIDA_HYPER_GT", 443.5 * 64, 284.5 * 64, 0);
+        assert(Boolean(spawnedCar && g.vehicles.includes(spawnedCar) && !g.map.isWaterAtPixel(spawnedCar.x, spawnedCar.y)), "CreationEngine.spawnVehicle validates dry ground and spawns drivable custom vehicle");
+
+        // 3. Pillar 2B: 3D Prefab, Destructible Street Prop, Flora & Enterable 3D Interior Factory
+        const customPrefab = ce.definePrefab3D("CUSTOM_NEON_VILLA", {
+            label: "Custom Neon Villa 3D",
+            footprintTiles: [2, 2],
+            boxes: [{ dx: 0, dy: 0, z0: 0, z1: 1.2, w: 72, h: 64, mat: "STUCCO_WALL", rgb: [0.96, 0.92, 0.88] }]
+        });
+        const placedVilla = ce.placePrefab3D("CUSTOM_NEON_VILLA", 443.5 * 64, 286.5 * 64, 0);
+        assert(Boolean(customPrefab && placedVilla && g.map.objectEngine.instances.includes(placedVilla)), "CreationEngine.definePrefab3D & placePrefab3D instantiate 3D volumetric architecture and OBB collision hulls");
+
+        const placedProp = ce.placePropOrFlora("HYDRANT", 443.5 * 64, 285.5 * 64, 0);
+        const placedPalm = ce.placePropOrFlora("palm_tree", 448.5 * 64, 285.5 * 64, 0);
+        assert(Boolean(placedProp && g.map.objectEngine.streetProps.includes(placedProp) && placedPalm && g.map.vicePalms.includes(placedPalm)), "CreationEngine.placePropOrFlora spawns 3D destructible street furniture and tropical flora with spatial grid registration");
+
+        const placedShop = ce.placeEstablishment({ tpl: "SHOP_BAR", name: "CLUB LEONIDA 26", x: 443.5 * 64, y: 284.5 * 64 });
+        assert(Boolean(placedShop && g.map.interiors.includes(placedShop) && ["S", "N", "E", "W"].includes(placedShop.facing)), `CreationEngine.placeEstablishment auto-snaps enterable 3D interior '${placedShop ? placedShop.name : ""}' onto building facade (facing '${placedShop ? placedShop.facing : ""}')`);
+
+        // 4. Pillar 3: Declarative Mission Composer & Live Launch
+        const customMission = ce.launchCustomMission({
+            id: "CE_TEST_HEIST",
+            type: "CONTRABAND_DROP",
+            title: "VICE BEACH CONTRABAND RUN",
+            reward: 50000,
+            wantedStars: 2,
+            startX: 448.5 * 64,
+            startY: 284.5 * 64
+        });
+        assert(Boolean(customMission && g.missions.activeMission === customMission && Array.isArray(customMission.crates) && customMission.crates.length === 3), "CreationEngine.launchCustomMission composes and activates playable multi-crate mission in MissionManager");
+        g.missions.abortMission();
+
+        // 5. Pillar 4: Blueprint JSON Export, Clear & Round-Trip Import
+        const exportedJson = ce.exportBlueprintJSON();
+        const parsedBp = JSON.parse(exportedJson);
+        assert(Boolean(parsedBp && parsedBp.engine === "VC26_CREATION_ENGINE" && parsedBp.entities.length >= 5), `CreationEngine.exportBlueprintJSON serializes ${parsedBp ? parsedBp.entities.length : 0} created entities and custom definitions`);
+        ce.clearAllCreations();
+        assert(ce.createdEntities.length === 0, "CreationEngine.clearAllCreations cleanly removes all custom entities and resets history");
+        const importRes = ce.importBlueprintJSON(exportedJson);
+        assert(Boolean(importRes && importRes.ok && ce.createdEntities.length >= 5), `CreationEngine.importBlueprintJSON round-trip restores ${ce.createdEntities.length} entities and custom archetypes`);
+        ce.clearAllCreations();
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 34 FULL-GAME AUDIT, PRODUCTION CONTROLLER & ENGINE SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 35 FULL-GAME AUDIT, PRODUCTION CONTROLLER & CREATION ENGINE SCENARIOS PASSED 100%!");
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
         process.exit(1);

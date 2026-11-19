@@ -1,0 +1,1995 @@
+/* ============================================================================
+   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_221)
+   ----------------------------------------------------------------------------
+   Provides both:
+   1. A Declarative Programmatic Creation API (`game.creationEngine.*`) with
+      automatic Spatial Safety Oracle (`validatePlacement`, `findSafePlacement`),
+      3D Voxel Map Sculpting (`paintVoxelTile`), Custom Vehicle/3D Prefab/Prop/
+      Flora/Interior Factory, Declarative Mission Composer, and JSON Blueprint
+      Export/Import + Undo/Redo History Stack.
+   2. An Interactive In-Game 3D Visual World & Asset Studio (`[F10]`) with
+      Screen-to-3D-World Ray Projection, Live 3D Ghost Preview, Free Camera
+      Panning, Grid/Curb Snapping, Rotation (`[R]`), and 1-Click Placement.
+   ============================================================================ */
+
+(function () {
+    "use strict";
+
+    const STORAGE_KEY = "vc26_creation_blueprint_v1";
+
+    class ViceCreationEngine {
+        constructor(game) {
+            this.game = game;
+            this.version = "101_221";
+            this.studioActive = false;
+            this.freeCamActive = true;
+            this.gridSnap = false;
+            this.autoSafeSnap = true;
+            this.camX = 0;
+            this.camY = 0;
+            this.placementAngle = 0; // radians
+            this.buildingStoreys = 2; // 1..4 storeys above ground z=2
+            this.buildingStyle = 0;   // 0..11 GTA 6 facade style
+
+            // Active Studio UI state
+            this.categories = ["TERRAIN", "VEHICLES", "PREFABS_3D", "PROPS_FLORA", "INTERIORS", "MISSIONS"];
+            this.categoryLabels = {
+                TERRAIN: "1. VOXEL & 3D BLDG",
+                VEHICLES: "2. VEHICLES (43+)",
+                PREFABS_3D: "3. 3D PREFABS",
+                PROPS_FLORA: "4. PROPS & FLORA",
+                INTERIORS: "5. 3D INTERIORS",
+                MISSIONS: "6. MISSIONS"
+            };
+            this.activeCategoryIdx = 0;
+            this.selectedItemIdxByCat = {
+                TERRAIN: 0,
+                VEHICLES: 0,
+                PREFABS_3D: 0,
+                PROPS_FLORA: 0,
+                INTERIORS: 0,
+                MISSIONS: 0
+            };
+            this.paletteScrollByCat = {
+                TERRAIN: 0,
+                VEHICLES: 0,
+                PREFABS_3D: 0,
+                PROPS_FLORA: 0,
+                INTERIORS: 0,
+                MISSIONS: 0
+            };
+
+            // Undo / Redo & Blueprint State
+            this.undoStack = [];
+            this.redoStack = [];
+            this.createdEntities = [];
+            this.customVehicles = {};
+            this.customPrefabs = {};
+            this.customMissions = {};
+            this.studioButtons = [];
+            this.statusMessage = "READY — PRESS [F10] TO TOGGLE CREATION STUDIO • LEFT-CLICK TO PLACE • RIGHT-CLICK TO DELETE";
+            this.statusTimer = 0;
+
+            // Cached canonical voxel block templates extracted once map is loaded
+            this._voxelTemplatesReady = false;
+            this._tplBlocks = null;
+            if (this.game && this.game.map && typeof this.game.map.getSurfaceGroundType !== "function") {
+                this.game.map.getSurfaceGroundType = function (c, r) {
+                    if (!this.surfaceGround || c < 0 || c >= MAP_COLS || r < 0 || r >= MAP_ROWS) return 0;
+                    return this.surfaceGround[r * MAP_COLS + c];
+                };
+            }
+        }
+
+        getSurfaceGroundAtTile(c, r) {
+            const map = this.game && this.game.map;
+            if (!map || !map.surfaceGround || c < 0 || c >= MAP_COLS || r < 0 || r >= MAP_ROWS) return 0;
+            return map.surfaceGround[r * MAP_COLS + c];
+        }
+
+        /* ====================================================================
+           1. UNIFIED CATALOG & PALETTE REGISTRY
+           ==================================================================== */
+        getActiveCategory() {
+            return this.categories[this.activeCategoryIdx] || "TERRAIN";
+        }
+
+        getCatalogForCategory(cat) {
+            if (cat === "TERRAIN") {
+                return [
+                    { key: "ROAD_NS", label: "Asphalt Road (N-S)", icon: "🛣️", groundType: 2 },
+                    { key: "ROAD_EW", label: "Asphalt Road (E-W)", icon: "🛣️", groundType: 2 },
+                    { key: "ROAD_CROSS", label: "4-Way Intersection", icon: "✚", groundType: 2 },
+                    { key: "SIDEWALK", label: "Coral Sidewalk Paver", icon: "⬜", groundType: 3 },
+                    { key: "WOOD_BOARDWALK", label: "Teak Pier Boardwalk", icon: "🪵", groundType: 3 },
+                    { key: "BEACH_SAND", label: "Golden Beach Sand", icon: "🏖️", groundType: 3 },
+                    { key: "TROPICAL_LAWN", label: "Tropical Park Lawn", icon: "🌿", groundType: 4 },
+                    { key: "OCEAN_WATER", label: "Atlantic Ocean Water", icon: "🌊", groundType: 1 },
+                    { key: "BLDG_ART_DECO_3F", label: "3D Art Deco Hotel (3F)", icon: "🏨", groundType: 5, storeys: 1, style: 0 },
+                    { key: "BLDG_HOTEL_4F", label: "3D Neon Resort (4F)", icon: "🏢", groundType: 5, storeys: 2, style: 1 },
+                    { key: "BLDG_TOWER_5F", label: "3D Vice Highrise (5F)", icon: "🏙️", groundType: 5, storeys: 3, style: 3 },
+                    { key: "BLDG_SKYSCRAPER_6F", label: "3D Glass Tower (6F)", icon: "🌆", groundType: 5, storeys: 4, style: 10 },
+                    { key: "DEMOLISH_TO_PAVE", label: "Demolish to Plaza", icon: "🧨", groundType: 3 }
+                ];
+            }
+            if (cat === "VEHICLES") {
+                const items = [];
+                const specs = (typeof VEHICLE_SPECS !== "undefined" && VEHICLE_SPECS) ? VEHICLE_SPECS : {};
+                for (const [k, s] of Object.entries(specs)) {
+                    const icon = s.waterOnly ? "🚤" : (s.isTank ? "🪖" : (s.isPolice ? "🚓" : (s.isMotorcycle ? "🏍️" : "🚗")));
+                    items.push({
+                        key: k,
+                        label: s.name || k,
+                        icon,
+                        waterOnly: Boolean(s.waterOnly),
+                        amphibious: Boolean(s.amphibious)
+                    });
+                }
+                return items;
+            }
+            if (cat === "PREFABS_3D") {
+                const items = [];
+                const cat3D = (window.PREFAB_CATALOG && typeof window.PREFAB_CATALOG === "object") ? window.PREFAB_CATALOG : {};
+                for (const [k, p] of Object.entries(cat3D)) {
+                    items.push({
+                        key: k,
+                        label: p.label || k,
+                        icon: "🏛️",
+                        isEstatePrefab: true,
+                        footprintW: (p.footprintTiles ? p.footprintTiles[0] : 2) * 64,
+                        footprintH: (p.footprintTiles ? p.footprintTiles[1] : 2) * 64
+                    });
+                }
+                items.push(
+                    { key: "TIKI_BAR_3D", label: "3D Thatch Beach Tiki Bar", icon: "🍹", isInteractiveEncounter: true },
+                    { key: "VOLLEYBALL_COURT_3D", label: "3D Beach Volleyball Court", icon: "🏐", isInteractiveEncounter: true },
+                    { key: "STREET_TAKEOVER_RING", label: "3D Drift Takeover Ring", icon: "🍩", isInteractiveEncounter: true },
+                    { key: "SMUGGLER_CRATE_3D", label: "3D Smuggler Contraband Drop", icon: "📦", isInteractiveEncounter: true },
+                    { key: "SODA_ECOLA_3D", label: "3D eCola Vending Machine", icon: "🥤", isInteractiveEncounter: true },
+                    { key: "SODA_SPRUNK_3D", label: "3D Sprunk Vending Machine", icon: "🟢", isInteractiveEncounter: true }
+                );
+                return items;
+            }
+            if (cat === "PROPS_FLORA") {
+                return [
+                    { key: "HYDRANT", label: "3D Pressurized Fire Hydrant", icon: "🚒", isStreetProp: true },
+                    { key: "STREETLAMP", label: "3D Twin-Arm Neon Streetlamp", icon: "💡", isStreetProp: true },
+                    { key: "PAYPHONE", label: "3D Vice Payphone Kiosk", icon: "☎️", isStreetProp: true },
+                    { key: "NEWS_STAND", label: "3D Miami News Dispenser", icon: "📰", isStreetProp: true },
+                    { key: "palm_tree", label: "Royal Miami Coconut Palm", icon: "🌴", isFlora: true },
+                    { key: "coconut_palm_cluster", label: "Twin Resort Palm Cluster", icon: "🌴", isFlora: true },
+                    { key: "banyan_tree", label: "Giant Coral Gables Banyan", icon: "🌳", isFlora: true },
+                    { key: "live_oak", label: "Southern Live Oak Canopy", icon: "🌳", isFlora: true },
+                    { key: "swamp_cypress", label: "Grassrivers Bald Cypress", icon: "🌲", isFlora: true },
+                    { key: "slash_pine", label: "Mount Kalaga Slash Pine", icon: "🌲", isFlora: true },
+                    { key: "bougainvillea_bush", label: "Neon Pink Bougainvillea", icon: "🌺", isFlora: true }
+                ];
+            }
+            if (cat === "INTERIORS") {
+                return [
+                    { key: "SHOP_RESTAURANT", label: "3D Vice Diner & Restaurant", icon: "🍔" },
+                    { key: "SHOP_CLOTHES", label: "3D Ocean Drive Fashion Boutique", icon: "👗" },
+                    { key: "SHOP_BAR", label: "3D Neon Cocktail Lounge & Bar", icon: "🍸" },
+                    { key: "SHOP_CONVENIENCE", label: "3D 24/7 Vice Bodega & ATM", icon: "🏪" },
+                    { key: "SHOP_GUN_SHOP", label: "3D Ammu-Nation & Firing Range", icon: "🔫" },
+                    { key: "SHOP_HOTEL", label: "3D Art Deco Hotel & Spa Suite", icon: "🛎️" }
+                ];
+            }
+            if (cat === "MISSIONS") {
+                const items = [
+                    { key: "HIJACK_VEHICLE", label: "Hijack & Deliver Exotic Car", icon: "🏎️" },
+                    { key: "CONTRABAND_DROP", label: "Collect 3 Contraband Drops", icon: "📦" },
+                    { key: "ARMORED_AMBUSH", label: "Intercept Armored Bank Van", icon: "🚐" },
+                    { key: "VIP_ELIMINATION", label: "Eliminate Cartel Hit Squad", icon: "🎯" }
+                ];
+                for (const [mId, mSpec] of Object.entries(this.customMissions)) {
+                    items.push({
+                        key: mId,
+                        label: mSpec.title || mId,
+                        icon: "⭐",
+                        isCustomBlueprint: true
+                    });
+                }
+                return items;
+            }
+            return [];
+        }
+
+        getSelectedItem() {
+            const cat = this.getActiveCategory();
+            const list = this.getCatalogForCategory(cat);
+            if (!list.length) return null;
+            const idx = Math.max(0, Math.min(list.length - 1, this.selectedItemIdxByCat[cat] || 0));
+            return list[idx];
+        }
+
+        /* ====================================================================
+           2. 3D SCREEN-TO-WORLD RAY PROJECTION & SPATIAL SAFETY ORACLE
+           ==================================================================== */
+        screenToWorld(sx, sy, zBlocks = 2.0) {
+            const r = this.game && this.game.renderer;
+            if (!r || !r.canvas) {
+                const px = this.game && this.game.player ? this.game.player.x : 16384;
+                const py = this.game && this.game.player ? this.game.player.y : 16384;
+                return { x: px, y: py, c: Math.floor(px / 64), r: Math.floor(py / 64), z: zBlocks };
+            }
+            const W = Math.max(1, r.canvas.width);
+            const H = Math.max(1, r.canvas.height);
+            const aspect = W / H;
+            const f = 1.0 / Math.tan((55.0 * Math.PI) / 360.0);
+
+            const camXBlocks = r.camX / TILE_SIZE;
+            const camYBlocks = r.camY / TILE_SIZE;
+            const camElev = r.currentCamElev || ((r.camZBlocks || 2.0) + (r.followHeightBlocks || 5.0));
+            const w = Math.max(0.25, camElev - zBlocks);
+
+            const ndcX = (sx / W - 0.5) * 2.0;
+            const ndcY = (0.5 - sy / H) * 2.0;
+
+            const xBlocks = camXBlocks + (ndcX * w * aspect) / f;
+            const yBlocks = camYBlocks - (ndcY * w) / f;
+
+            const rawX = Math.max(128, Math.min((MAP_COLS - 2) * TILE_SIZE, xBlocks * TILE_SIZE));
+            const rawY = Math.max(128, Math.min((MAP_ROWS - 2) * TILE_SIZE, yBlocks * TILE_SIZE));
+            const c = Math.max(2, Math.min(MAP_COLS - 3, Math.floor(rawX / TILE_SIZE)));
+            const row = Math.max(2, Math.min(MAP_ROWS - 3, Math.floor(rawY / TILE_SIZE)));
+
+            const finalX = this.gridSnap ? (c + 0.5) * TILE_SIZE : rawX;
+            const finalY = this.gridSnap ? (row + 0.5) * TILE_SIZE : rawY;
+
+            return {
+                x: finalX,
+                y: finalY,
+                c,
+                r: row,
+                z: zBlocks
+            };
+        }
+
+        validatePlacement(category, itemKey, x, y, angle = 0, opts = {}) {
+            const map = this.game && this.game.map;
+            if (!map || !map.cmpLoaded) {
+                return { ok: false, reason: "MAP_NOT_LOADED", snappedX: x, snappedY: y, snappedAngle: angle };
+            }
+            const c = Math.max(2, Math.min(MAP_COLS - 3, Math.floor(x / TILE_SIZE)));
+            const r = Math.max(2, Math.min(MAP_ROWS - 3, Math.floor(y / TILE_SIZE)));
+            const gt = this.getSurfaceGroundAtTile(c, r);
+            const isWater = map.isWaterAtPixel ? map.isWaterAtPixel(x, y) : (gt === GROUND_TYPE.WATER);
+            const isBuilding = gt === GROUND_TYPE.BUILDING || (map.isSolidBuildingAtPixel && map.isSolidBuildingAtPixel(x, y, 2.0));
+
+            if (category === "TERRAIN") {
+                return {
+                    ok: true,
+                    reason: "VALID_VOXEL_TILE",
+                    snappedX: (c + 0.5) * TILE_SIZE,
+                    snappedY: (r + 0.5) * TILE_SIZE,
+                    snappedAngle: 0,
+                    tileC: c,
+                    tileR: r,
+                    groundType: gt
+                };
+            }
+
+            if (category === "VEHICLES") {
+                const spec = (typeof VEHICLE_SPECS !== "undefined" && VEHICLE_SPECS[itemKey]) || {};
+                const needsWater = Boolean(spec.waterOnly);
+                const canWater = Boolean(spec.waterOnly || spec.amphibious);
+                if (needsWater && !isWater) {
+                    if (opts.autoSnap !== false && this.autoSafeSnap) {
+                        const safe = this.findSafePlacement(category, itemKey, x, y, angle);
+                        if (safe.ok) return safe;
+                    }
+                    return { ok: false, reason: "BOAT_REQUIRES_WATER", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                if (!canWater && isWater) {
+                    if (opts.autoSnap !== false && this.autoSafeSnap) {
+                        const safe = this.findSafePlacement(category, itemKey, x, y, angle);
+                        if (safe.ok) return safe;
+                    }
+                    return { ok: false, reason: "VEHICLE_IN_WATER", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                if (isBuilding) {
+                    if (opts.autoSnap !== false && this.autoSafeSnap) {
+                        const safe = this.findSafePlacement(category, itemKey, x, y, angle);
+                        if (safe.ok) return safe;
+                    }
+                    return { ok: false, reason: "BLOCKED_BY_3D_BUILDING", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                return { ok: true, reason: "VALID_VEHICLE_SPOT", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+            }
+
+            if (category === "PREFABS_3D" || category === "PROPS_FLORA") {
+                if (isWater) {
+                    if (opts.autoSnap !== false && this.autoSafeSnap) {
+                        const safe = this.findSafePlacement(category, itemKey, x, y, angle);
+                        if (safe.ok) return safe;
+                    }
+                    return { ok: false, reason: "CANNOT_PLACE_ON_WATER", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                if (isBuilding) {
+                    if (opts.autoSnap !== false && this.autoSafeSnap) {
+                        const safe = this.findSafePlacement(category, itemKey, x, y, angle);
+                        if (safe.ok) return safe;
+                    }
+                    return { ok: false, reason: "INSIDE_SOLID_BUILDING", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                // 3D Estate Prefabs and Street Props should not sit in the middle of an active road tile unless forced
+                if (gt === GROUND_TYPE.ROAD && itemKey !== "STREET_TAKEOVER_RING" && !opts.allowRoad) {
+                    if (opts.autoSnap !== false && this.autoSafeSnap) {
+                        const safe = this.findSafePlacement(category, itemKey, x, y, angle);
+                        if (safe.ok) return safe;
+                    }
+                    return { ok: false, reason: "BLOCKS_ACTIVE_ROAD_LANE", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                return { ok: true, reason: "VALID_DRY_GROUND", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+            }
+
+            if (category === "INTERIORS") {
+                // Find nearest building-to-sidewalk facade wall within 8 tiles
+                const wall = this.findNearestBuildingFacadeDoor(c, r);
+                if (!wall) {
+                    return { ok: false, reason: "NO_NEARBY_BUILDING_FACADE", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+                }
+                return {
+                    ok: true,
+                    reason: wall.autoSnapped ? "AUTO_SNAPPED_TO_FACADE" : "VALID_FACADE_DOOR",
+                    snappedX: wall.doorX,
+                    snappedY: wall.doorY,
+                    snappedAngle: wall.angle,
+                    facing: wall.facing,
+                    tileC: wall.c,
+                    tileR: wall.r,
+                    groundType: gt
+                };
+            }
+
+            if (category === "MISSIONS") {
+                if (isBuilding || isWater) {
+                    const safe = this.findSafePlacement("PROPS_FLORA", "PAYPHONE", x, y, angle);
+                    if (safe.ok) return safe;
+                }
+                return { ok: true, reason: "VALID_MISSION_TRIGGER", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+            }
+
+            return { ok: true, reason: "VALID", snappedX: x, snappedY: y, snappedAngle: angle, tileC: c, tileR: r, groundType: gt };
+        }
+
+        findSafePlacement(category, itemKey, x, y, angle = 0) {
+            const map = this.game && this.game.map;
+            if (!map) return { ok: false, reason: "NO_MAP", snappedX: x, snappedY: y, snappedAngle: angle };
+            const baseC = Math.floor(x / TILE_SIZE);
+            const baseR = Math.floor(y / TILE_SIZE);
+            const spec = (category === "VEHICLES" && typeof VEHICLE_SPECS !== "undefined" && VEHICLE_SPECS[itemKey]) || {};
+            const needsWater = Boolean(spec.waterOnly);
+
+            for (let rad = 1; rad <= 10; rad++) {
+                for (let dr = -rad; dr <= rad; dr++) {
+                    for (let dc = -rad; dc <= rad; dc++) {
+                        if (Math.abs(dc) !== rad && Math.abs(dr) !== rad) continue;
+                        const nc = baseC + dc;
+                        const nr = baseR + dr;
+                        if (nc < 3 || nc >= MAP_COLS - 3 || nr < 3 || nr >= MAP_ROWS - 3) continue;
+                        const gt = this.getSurfaceGroundAtTile(nc, nr);
+                        const px = (nc + 0.5) * TILE_SIZE;
+                        const py = (nr + 0.5) * TILE_SIZE;
+                        const isW = map.isWaterAtPixel ? map.isWaterAtPixel(px, py) : (gt === GROUND_TYPE.WATER);
+                        const isB = gt === GROUND_TYPE.BUILDING || (map.isSolidBuildingAtPixel && map.isSolidBuildingAtPixel(px, py, 2.0));
+
+                        if (needsWater) {
+                            if (isW && !isB) {
+                                return {
+                                    ok: true,
+                                    reason: "AUTO_SNAPPED_TO_WATER",
+                                    autoSnapped: true,
+                                    snappedX: px,
+                                    snappedY: py,
+                                    snappedAngle: angle,
+                                    tileC: nc,
+                                    tileR: nr,
+                                    groundType: gt
+                                };
+                            }
+                        } else if (category === "VEHICLES") {
+                            if (!isW && !isB && (gt === GROUND_TYPE.ROAD || gt === GROUND_TYPE.PAWEMENT || gt === GROUND_TYPE.FIELD)) {
+                                return {
+                                    ok: true,
+                                    reason: "AUTO_SNAPPED_TO_ROAD",
+                                    autoSnapped: true,
+                                    snappedX: px,
+                                    snappedY: py,
+                                    snappedAngle: angle,
+                                    tileC: nc,
+                                    tileR: nr,
+                                    groundType: gt
+                                };
+                            }
+                        } else {
+                            if (!isW && !isB && (gt === GROUND_TYPE.PAWEMENT || gt === GROUND_TYPE.FIELD)) {
+                                return {
+                                    ok: true,
+                                    reason: "AUTO_SNAPPED_TO_CURB",
+                                    autoSnapped: true,
+                                    snappedX: px,
+                                    snappedY: py,
+                                    snappedAngle: angle,
+                                    tileC: nc,
+                                    tileR: nr,
+                                    groundType: gt
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            return { ok: false, reason: "NO_SAFE_SPOT_NEARBY", snappedX: x, snappedY: y, snappedAngle: angle };
+        }
+
+        findNearestBuildingFacadeDoor(c, r) {
+            const map = this.game && this.game.map;
+            if (!map) return null;
+            const dirs = [
+                { facing: "S", dc: 0, dr: 1, offX: 32, offY: 16, angle: Math.PI * 0.5 },
+                { facing: "N", dc: 0, dr: -1, offX: 32, offY: 48, angle: -Math.PI * 0.5 },
+                { facing: "E", dc: 1, dr: 0, offX: 16, offY: 32, angle: 0 },
+                { facing: "W", dc: -1, dr: 0, offX: 48, offY: 32, angle: Math.PI }
+            ];
+            for (let rad = 0; rad <= 10; rad++) {
+                for (let dr = -rad; dr <= rad; dr++) {
+                    for (let dc = -rad; dc <= rad; dc++) {
+                        if (rad > 0 && Math.abs(dc) !== rad && Math.abs(dr) !== rad) continue;
+                        const bc = c + dc;
+                        const br = r + dr;
+                        if (bc < 3 || bc >= MAP_COLS - 3 || br < 3 || br >= MAP_ROWS - 3) continue;
+                        if (this.getSurfaceGroundAtTile(bc, br) !== GROUND_TYPE.BUILDING) continue;
+                        for (const d of dirs) {
+                            const sc = bc + d.dc;
+                            const sr = br + d.dr;
+                            const sgt = this.getSurfaceGroundAtTile(sc, sr);
+                            if (sgt === GROUND_TYPE.PAWEMENT || sgt === GROUND_TYPE.FIELD) {
+                                return {
+                                    c: sc,
+                                    r: sr,
+                                    bldgC: bc,
+                                    bldgR: br,
+                                    facing: d.facing,
+                                    doorX: sc * TILE_SIZE + d.offX,
+                                    doorY: sr * TILE_SIZE + d.offY,
+                                    angle: d.angle,
+                                    autoSnapped: rad > 0
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        /* ====================================================================
+           3. PILLAR 1: REAL-TIME 3D VOXEL & ARCHITECTURAL TERRAIN SCULPTOR
+           ==================================================================== */
+        _ensureVoxelTemplates() {
+            if (this._voxelTemplatesReady && this._tplBlocks) return;
+            const map = this.game && this.game.map;
+            if (!map || !map.cmpLoaded || !Array.isArray(map.blocksData)) return;
+
+            const findOrAddBlock = (spec) => {
+                for (let i = 1; i < map.blocksData.length; i++) {
+                    const b = map.blocksData[i];
+                    if (!b) continue;
+                    if (
+                        b.groundType === spec.groundType &&
+                        (b.slopeType || 0) === 0 &&
+                        Boolean(b.isFlat) === Boolean(spec.isFlat) &&
+                        b.faces[0] === spec.faces[0] &&
+                        b.faces[1] === spec.faces[1] &&
+                        b.faces[2] === spec.faces[2] &&
+                        b.faces[3] === spec.faces[3] &&
+                        b.faces[4] === spec.faces[4]
+                    ) {
+                        return i;
+                    }
+                }
+                const newIdx = map.blocksData.length;
+                map.blocksData.push({
+                    w: spec.faces[0],
+                    e: spec.faces[1],
+                    n: spec.faces[2],
+                    s: spec.faces[3],
+                    lid: spec.faces[4],
+                    faces: spec.faces.slice(),
+                    arrows: spec.arrows || 0,
+                    groundType: spec.groundType,
+                    slopeType: 0,
+                    lidRotation: spec.lidRotation || 0,
+                    isFlat: Boolean(spec.isFlat),
+                    remap: 0,
+                    flipLR: false,
+                    flipTB: false
+                });
+                return newIdx;
+            };
+
+            this._tplBlocks = {
+                roadNS_z1: findOrAddBlock({ faces: [0, 0, 0, 0, 74], groundType: GROUND_TYPE.ROAD, arrows: 3 }),
+                roadEW_z1: findOrAddBlock({ faces: [0, 0, 0, 0, 81], groundType: GROUND_TYPE.ROAD, arrows: 12 }),
+                roadCross_z1: findOrAddBlock({ faces: [0, 0, 0, 0, 25], groundType: GROUND_TYPE.ROAD, arrows: 15 }),
+                roadNav_z2: findOrAddBlock({ faces: [0, 0, 0, 0, 0], groundType: GROUND_TYPE.ROAD, arrows: 15 }),
+
+                pave_z1: findOrAddBlock({ faces: [8, 8, 8, 8, 8], groundType: GROUND_TYPE.PAWEMENT }),
+                boardwalk_z1: findOrAddBlock({ faces: [8, 8, 8, 8, 77], groundType: GROUND_TYPE.PAWEMENT }),
+                sand_z1: findOrAddBlock({ faces: [8, 8, 8, 8, 98], groundType: GROUND_TYPE.PAWEMENT }),
+                paveNav_z2: findOrAddBlock({ faces: [0, 0, 0, 0, 0], groundType: GROUND_TYPE.PAWEMENT }),
+
+                lawn_z1: findOrAddBlock({ faces: [8, 8, 8, 8, 10], groundType: GROUND_TYPE.FIELD }),
+                lawnNav_z2: findOrAddBlock({ faces: [0, 0, 0, 0, 0], groundType: GROUND_TYPE.FIELD }),
+
+                water_z1: findOrAddBlock({ faces: [0, 0, 0, 0, 41], groundType: GROUND_TYPE.WATER, isFlat: true }),
+                waterNav_z2: findOrAddBlock({ faces: [0, 0, 0, 0, 0], groundType: GROUND_TYPE.WATER }),
+
+                bldgWall_z: findOrAddBlock({ faces: [32, 32, 32, 32, 0], groundType: GROUND_TYPE.BUILDING }),
+                bldgTop_z: findOrAddBlock({ faces: [32, 32, 32, 32, 46], groundType: GROUND_TYPE.BUILDING })
+            };
+            this._voxelTemplatesReady = true;
+        }
+
+        captureVoxelColumnSnapshot(c, r) {
+            const map = this.game && this.game.map;
+            if (!map || !map.voxelGrid) return null;
+            const col = new Uint16Array(MAP_LAYERS);
+            for (let z = 0; z < MAP_LAYERS; z++) {
+                col[z] = map.voxelGrid[(z * MAP_ROWS + r) * MAP_COLS + c];
+            }
+            const idx = r * MAP_COLS + c;
+            return {
+                c,
+                r,
+                voxels: Array.from(col),
+                surfaceGround: map.surfaceGround ? map.surfaceGround[idx] : 0,
+                surfaceLayer: map.surfaceLayer ? map.surfaceLayer[idx] : 1,
+                bldgId: map.bldgIdGrid ? map.bldgIdGrid[idx] : 0,
+                bldgStyle: map.bldgStyleGrid ? map.bldgStyleGrid[idx] : 0,
+                bldgTopZ: map.bldgTopZGrid ? map.bldgTopZGrid[idx] : 2,
+                coastalSand: map.coastalSandMask ? map.coastalSandMask[idx] : 0
+            };
+        }
+
+        restoreVoxelColumnSnapshot(snap, rebuildMesh = true) {
+            const map = this.game && this.game.map;
+            if (!map || !snap) return;
+            const { c, r } = snap;
+            for (let z = 0; z < MAP_LAYERS; z++) {
+                map.voxelGrid[(z * MAP_ROWS + r) * MAP_COLS + c] = snap.voxels[z] || 0;
+            }
+            const idx = r * MAP_COLS + c;
+            if (map.surfaceGround) map.surfaceGround[idx] = snap.surfaceGround;
+            if (map.surfaceLayer) map.surfaceLayer[idx] = snap.surfaceLayer;
+            if (map.bldgIdGrid) map.bldgIdGrid[idx] = snap.bldgId;
+            if (map.bldgStyleGrid) map.bldgStyleGrid[idx] = snap.bldgStyle;
+            if (map.bldgTopZGrid) map.bldgTopZGrid[idx] = snap.bldgTopZ;
+            if (map.coastalSandMask) map.coastalSandMask[idx] = snap.coastalSand;
+            if (rebuildMesh) this.rebuildWorldMeshes(true);
+        }
+
+        paintVoxelTile(c, r, presetKey, opts = {}) {
+            const map = this.game && this.game.map;
+            if (!map || !map.cmpLoaded) return { ok: false, reason: "MAP_NOT_LOADED" };
+            c = Math.max(2, Math.min(MAP_COLS - 3, Math.floor(c)));
+            r = Math.max(2, Math.min(MAP_ROWS - 3, Math.floor(r)));
+            this._ensureVoxelTemplates();
+            const T = this._tplBlocks;
+            if (!T) return { ok: false, reason: "TEMPLATES_UNAVAILABLE" };
+
+            const beforeSnap = this.captureVoxelColumnSnapshot(c, r);
+            const idx = r * MAP_COLS + c;
+
+            // Clear column layers 1..5 first
+            for (let z = 1; z < MAP_LAYERS; z++) {
+                map.voxelGrid[(z * MAP_ROWS + r) * MAP_COLS + c] = 0;
+            }
+            if (map.bldgIdGrid) map.bldgIdGrid[idx] = 0;
+            if (map.bldgStyleGrid) map.bldgStyleGrid[idx] = 0;
+            if (map.bldgTopZGrid) map.bldgTopZGrid[idx] = 2;
+            if (map.coastalSandMask) map.coastalSandMask[idx] = 0;
+
+            let newGround = GROUND_TYPE.PAWEMENT;
+            let newLayer = 2;
+
+            if (presetKey === "ROAD_NS" || presetKey === "ROAD_EW" || presetKey === "ROAD_CROSS") {
+                const z1Blk = presetKey === "ROAD_EW" ? T.roadEW_z1 : (presetKey === "ROAD_CROSS" ? T.roadCross_z1 : T.roadNS_z1);
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = z1Blk;
+                map.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = T.roadNav_z2;
+                newGround = GROUND_TYPE.ROAD;
+            } else if (presetKey === "SIDEWALK" || presetKey === "DEMOLISH_TO_PAVE") {
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = T.pave_z1;
+                map.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = T.paveNav_z2;
+                newGround = GROUND_TYPE.PAWEMENT;
+            } else if (presetKey === "WOOD_BOARDWALK") {
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = T.boardwalk_z1;
+                map.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = T.paveNav_z2;
+                newGround = GROUND_TYPE.PAWEMENT;
+            } else if (presetKey === "BEACH_SAND") {
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = T.sand_z1;
+                map.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = T.paveNav_z2;
+                if (map.coastalSandMask) map.coastalSandMask[idx] = 1;
+                newGround = GROUND_TYPE.PAWEMENT;
+            } else if (presetKey === "TROPICAL_LAWN") {
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = T.lawn_z1;
+                map.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = T.lawnNav_z2;
+                newGround = GROUND_TYPE.FIELD;
+            } else if (presetKey === "OCEAN_WATER") {
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = T.water_z1;
+                map.voxelGrid[(2 * MAP_ROWS + r) * MAP_COLS + c] = T.waterNav_z2;
+                newGround = GROUND_TYPE.WATER;
+            } else if (presetKey.startsWith("BLDG_")) {
+                let storeys = opts.storeys || this.buildingStoreys || 2;
+                let style = opts.style !== undefined ? opts.style : this.buildingStyle;
+                if (presetKey === "BLDG_ART_DECO_3F") { storeys = opts.storeys || 1; style = opts.style !== undefined ? opts.style : 0; }
+                else if (presetKey === "BLDG_HOTEL_4F") { storeys = opts.storeys || 2; style = opts.style !== undefined ? opts.style : 1; }
+                else if (presetKey === "BLDG_TOWER_5F") { storeys = opts.storeys || 3; style = opts.style !== undefined ? opts.style : 3; }
+                else if (presetKey === "BLDG_SKYSCRAPER_6F") { storeys = opts.storeys || 4; style = opts.style !== undefined ? opts.style : 10; }
+
+                storeys = Math.max(1, Math.min(4, storeys));
+                const topZ = Math.min(5, 1 + storeys); // z=2..topZ
+                map.voxelGrid[(1 * MAP_ROWS + r) * MAP_COLS + c] = T.pave_z1;
+                for (let z = 2; z < topZ; z++) {
+                    map.voxelGrid[(z * MAP_ROWS + r) * MAP_COLS + c] = T.bldgWall_z;
+                }
+                map.voxelGrid[(topZ * MAP_ROWS + r) * MAP_COLS + c] = T.bldgTop_z;
+                newGround = GROUND_TYPE.BUILDING;
+                newLayer = topZ;
+                if (map.bldgIdGrid) map.bldgIdGrid[idx] = 9000 + ((c * 31 + r * 17) & 0xfff);
+                if (map.bldgStyleGrid) map.bldgStyleGrid[idx] = style % 12;
+                if (map.bldgTopZGrid) map.bldgTopZGrid[idx] = topZ + 1;
+            }
+
+            if (map.surfaceGround) map.surfaceGround[idx] = newGround;
+            if (map.surfaceLayer) map.surfaceLayer[idx] = newLayer;
+
+            const afterSnap = this.captureVoxelColumnSnapshot(c, r);
+
+            if (!opts.skipHistory) {
+                this._pushHistory({
+                    type: "VOXEL_TILE",
+                    c,
+                    r,
+                    presetKey,
+                    opts: { storeys: opts.storeys, style: opts.style },
+                    beforeSnap,
+                    afterSnap
+                });
+            }
+
+            if (opts.rebuildMesh !== false) {
+                this.rebuildWorldMeshes(true);
+            }
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`PAINTED VOXEL [${presetKey}] AT TILE (${c}, ${r})`);
+            return { ok: true, c, r, presetKey, groundType: newGround };
+        }
+
+        rebuildWorldMeshes(fast = true) {
+            const r = this.game && this.game.renderer;
+            if (!r) return;
+            if (typeof r.buildCityMesh === "function" && r.gl) {
+                r.buildCityMesh(Boolean(fast));
+            }
+            if (!fast && r.map && r.map.objectEngine && typeof r.map.objectEngine.buildStatic3DMesh === "function" && r.gl) {
+                r.map.objectEngine.buildStatic3DMesh(r.gl, r);
+            }
+            if (typeof r.bakeRadarBackground === "function") {
+                r.bakeRadarBackground();
+            }
+        }
+
+        /* ====================================================================
+           4. PILLAR 2: UNIFIED VEHICLE, 3D PREFAB, PROP, FLORA & INTERIOR FACTORY
+           ==================================================================== */
+        defineVehicle(specKey, config = {}) {
+            if (!specKey || typeof VEHICLE_SPECS === "undefined") return null;
+            const key = String(specKey).toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+            const base = VEHICLE_SPECS[config.baseSpec || "BANSHEE_GT"] || VEHICLE_SPECS.MINT_STALLION || {};
+            const merged = Object.assign({}, base, {
+                name: config.name || key.replace(/_/g, " "),
+                w: config.w || base.w || 50,
+                h: config.h || base.h || 24,
+                maxSpeed: config.maxSpeed || base.maxSpeed || 420,
+                accel: config.accel || base.accel || 270,
+                handling: config.handling || base.handling || 3.4,
+                mass: config.mass || base.mass || 1.25,
+                hp: config.hp || base.hp || 130,
+                color: config.color || base.color || "#00f0ff",
+                stripe: config.stripe !== undefined ? config.stripe : (base.stripe || "#ff2a85"),
+                roof: config.roof || base.roof || "#0f172a",
+                sprId: String(config.sprId || base.sprId || "66"),
+                remapIdx: config.remapIdx !== undefined ? config.remapIdx : (base.remapIdx || 0),
+                isPolice: Boolean(config.isPolice),
+                isEmergency: Boolean(config.isEmergency || config.isPolice),
+                isMotorcycle: Boolean(config.isMotorcycle),
+                isConvertible: Boolean(config.isConvertible),
+                isTank: Boolean(config.isTank),
+                waterOnly: Boolean(config.waterOnly),
+                amphibious: Boolean(config.amphibious)
+            });
+            VEHICLE_SPECS[key] = merged;
+            this.customVehicles[key] = Object.assign({ baseSpec: config.baseSpec || "BANSHEE_GT" }, config);
+            this.setStatus(`DEFINED CUSTOM VEHICLE ARCHETYPE [${key}] (${merged.name})`);
+            return merged;
+        }
+
+        spawnVehicle(specKey, x, y, angle = 0, opts = {}) {
+            if (!this.game || typeof Vehicle === "undefined") return null;
+            const key = (typeof VEHICLE_SPECS !== "undefined" && VEHICLE_SPECS[specKey]) ? specKey : "MINT_STALLION";
+            const check = this.validatePlacement("VEHICLES", key, x, y, angle, opts);
+            const sx = check.snappedX !== undefined ? check.snappedX : x;
+            const sy = check.snappedY !== undefined ? check.snappedY : y;
+            const sa = check.snappedAngle !== undefined ? check.snappedAngle : angle;
+
+            const id = opts.id || `ce_veh_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+            const v = new Vehicle(id, key, sx, sy, sa);
+            v.z = this.game.map ? this.game.map.getHeightAtPixel(sx, sy, 2.0, !v.waterOnly) : 2.0;
+            if (v.waterOnly) v.z = Math.max(2.0, v.z);
+            v.driver = opts.driver || null;
+            v.createdByEngine = true;
+            this.game.vehicles.push(v);
+            if (typeof this.game.rebuildVehicleSpatialGrid === "function") {
+                this.game.rebuildVehicleSpatialGrid();
+            }
+
+            const record = {
+                type: "VEHICLE",
+                id,
+                specKey: key,
+                x: sx,
+                y: sy,
+                angle: sa,
+                entityRef: v
+            };
+            this.createdEntities.push(record);
+            if (!opts.skipHistory) this._pushHistory(record);
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`SPAWNED VEHICLE [${v.name}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
+            return v;
+        }
+
+        definePrefab3D(prefabId, config = {}) {
+            if (!prefabId) return null;
+            const key = String(prefabId).toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+            const cat = window.PREFAB_CATALOG || (window.PREFAB_CATALOG = {});
+            const base = cat[config.basePrefab || "OCEAN_DECO_BOUTIQUE"] || {
+                footprintTiles: [2, 2],
+                clearPaddingPx: 68,
+                lotBase: { w: 112, h: 112, dz: 0.015, mat: "CORAL_PAVER", rgb: [0.95, 0.89, 0.80] },
+                boxes: [
+                    { dx: 0, dy: 0, z0: 0.0, z1: 1.05, w: 78, h: 66, mat: "STUCCO_WALL", rgb: [0.97, 0.95, 0.90], winRows: 2, winCols: 4 }
+                ],
+                props: []
+            };
+            const spec = {
+                id: key,
+                label: config.label || key.replace(/_/g, " "),
+                footprintTiles: config.footprintTiles || base.footprintTiles || [2, 2],
+                clearPaddingPx: config.clearPaddingPx || base.clearPaddingPx || 68,
+                lotBase: config.lotBase || Object.assign({}, base.lotBase),
+                boxes: Array.isArray(config.boxes) ? config.boxes : base.boxes.map((b) => Object.assign({}, b)),
+                props: Array.isArray(config.props) ? config.props : (base.props ? base.props.map((p) => Object.assign({}, p)) : []),
+                vehicle: config.vehicle || null
+            };
+            cat[key] = spec;
+            this.customPrefabs[key] = config;
+            this.setStatus(`DEFINED 3D ARCHITECTURAL PREFAB [${key}]`);
+            return spec;
+        }
+
+        placePrefab3D(prefabId, x, y, angle = 0, opts = {}) {
+            const map = this.game && this.game.map;
+            if (!map) return null;
+            const check = this.validatePlacement("PREFABS_3D", prefabId, x, y, angle, opts);
+            const sx = check.snappedX !== undefined ? check.snappedX : x;
+            const sy = check.snappedY !== undefined ? check.snappedY : y;
+            const sa = check.snappedAngle !== undefined ? check.snappedAngle : angle;
+            const id = opts.id || `ce_prefab_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+
+            // Case A: Interactive 3D Encounter / World Activity Prefab
+            if (prefabId === "TIKI_BAR_3D") {
+                const tb = { id, x: sx, y: sy, z: 2.0, angle: sa, seed: Math.random() * 10, createdByEngine: true };
+                if (!Array.isArray(map.tikiBars)) map.tikiBars = [];
+                map.tikiBars.push(tb);
+                const rec = { type: "PREFAB_3D", subtype: "TIKI_BAR_3D", id, prefabId, x: sx, y: sy, angle: sa, entityRef: tb };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this.setStatus(`PLACED 3D TIKI BAR AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                return tb;
+            }
+            if (prefabId === "VOLLEYBALL_COURT_3D") {
+                const vc = { id, x: sx, y: sy, z: 2.0, seed: Math.random() * 10, createdByEngine: true };
+                if (!Array.isArray(map.beachVolleyballCourts)) map.beachVolleyballCourts = [];
+                map.beachVolleyballCourts.push(vc);
+                const rec = { type: "PREFAB_3D", subtype: "VOLLEYBALL_COURT_3D", id, prefabId, x: sx, y: sy, angle: sa, entityRef: vc };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this.setStatus(`PLACED 3D BEACH VOLLEYBALL COURT AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                return vc;
+            }
+            if (prefabId === "STREET_TAKEOVER_RING") {
+                const st = { id, x: sx, y: sy, z: 2.0, radius: 74, carSpec: "BANSHEE_GT", seed: Math.random() * 10, createdByEngine: true };
+                if (!Array.isArray(map.streetTakeovers)) map.streetTakeovers = [];
+                map.streetTakeovers.push(st);
+                const rec = { type: "PREFAB_3D", subtype: "STREET_TAKEOVER_RING", id, prefabId, x: sx, y: sy, angle: sa, entityRef: st };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this.setStatus(`PLACED 3D STREET TAKEOVER RING AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                return st;
+            }
+            if (prefabId === "SMUGGLER_CRATE_3D") {
+                const oe = map.objectEngine;
+                const drop = { id, x: sx, y: sy, z: 2.0, angle: sa, reward: 5000, weapon: "ROCKET", collected: false, respawnTimer: 0, createdByEngine: true };
+                if (oe && Array.isArray(oe.smugglerDrops)) oe.smugglerDrops.push(drop);
+                const rec = { type: "PREFAB_3D", subtype: "SMUGGLER_CRATE_3D", id, prefabId, x: sx, y: sy, angle: sa, entityRef: drop };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this.setStatus(`PLACED 3D SMUGGLER CONTRABAND CRATE AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                return drop;
+            }
+            if (prefabId === "SODA_ECOLA_3D" || prefabId === "SODA_SPRUNK_3D") {
+                const oe = map.objectEngine;
+                const brand = prefabId === "SODA_SPRUNK_3D" ? "SPRUNK" : "eCOLA";
+                const sm = { id, x: sx, y: sy, z: 2.0, angle: sa, brand, cooldown: 0, broken: false, spr: "soda_machine", createdByEngine: true };
+                if (oe && Array.isArray(oe.sodaMachines)) oe.sodaMachines.push(sm);
+                if (oe && Array.isArray(oe.interactiveProps)) {
+                    oe.interactiveProps.push(sm);
+                    oe._usableInteractProps = null;
+                }
+                const rec = { type: "PREFAB_3D", subtype: prefabId, id, prefabId, x: sx, y: sy, angle: sa, entityRef: sm };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this.setStatus(`PLACED 3D ${brand} MACHINE AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                return sm;
+            }
+
+            // Case B: Full 3D Volumetric Architectural Estate / Landmark Prefab (`PREFAB_CATALOG`)
+            const cat = window.PREFAB_CATALOG || {};
+            const spec = cat[prefabId] || cat.OCEAN_DECO_BOUTIQUE;
+            const oe = map.objectEngine;
+            if (!spec || !oe) return null;
+
+            const inst = {
+                id,
+                prefabId,
+                spec,
+                x: sx,
+                y: sy,
+                z: 2.0,
+                angle: sa,
+                district: map.getDistrictName ? map.getDistrictName(sx, sy) : "VICE CITY",
+                worldProps: [],
+                dockBoat: null,
+                createdByEngine: true
+            };
+
+            const cosA = Math.cos(sa);
+            const sinA = Math.sin(sa);
+            for (const p of (spec.props || [])) {
+                const wx = sx + p.dx * cosA - p.dy * sinA;
+                const wy = sy + p.dx * sinA + p.dy * cosA;
+                const wp = {
+                    spr: p.spr,
+                    x: wx,
+                    y: wy,
+                    z: 2.0,
+                    scale: p.scale || 1.0,
+                    rot: sa + (p.rot || 0),
+                    solid: Boolean(p.solid),
+                    radius: p.radius || 10,
+                    interact: p.interact || null,
+                    estateId: id
+                };
+                inst.worldProps.push(wp);
+                if (wp.interact) {
+                    oe.interactiveProps.push(wp);
+                    oe._usableInteractProps = null;
+                }
+            }
+
+            oe.instances.push(inst);
+
+            // Register 3D OBB collision boxes for solid building volumes into map.securityBarrierBoxes
+            if (Array.isArray(spec.boxes)) {
+                if (!Array.isArray(map.securityBarrierBoxes)) map.securityBarrierBoxes = [];
+                for (const b of spec.boxes) {
+                    if ((b.z1 - b.z0) < 0.35 || b.mat === "POOL_WATER") continue;
+                    const bx = sx + b.dx * cosA - b.dy * sinA;
+                    const by = sy + b.dx * sinA + b.dy * cosA;
+                    const hw = b.w * 0.5;
+                    const hh = b.h * 0.5;
+                    const bAng = sa + (b.rot || 0);
+                    const bCos = Math.cos(bAng);
+                    const bSin = Math.sin(bAng);
+                    const ex = Math.abs(bCos) * hw + Math.abs(bSin) * hh;
+                    const ey = Math.abs(bSin) * hw + Math.abs(bCos) * hh;
+                    map.securityBarrierBoxes.push({
+                        cx: bx,
+                        cy: by,
+                        hw,
+                        hh,
+                        cosA: bCos,
+                        sinA: bSin,
+                        minX: bx - ex,
+                        maxX: bx + ex,
+                        minY: by - ey,
+                        maxY: by + ey,
+                        estateId: id
+                    });
+                }
+                map.barrierBoxGrid = null;
+                if (typeof map.ensureBarrierSpatialGrids === "function") {
+                    map.ensureBarrierSpatialGrids();
+                }
+            }
+
+            if (opts.rebuildMesh !== false && this.game.renderer && this.game.renderer.gl) {
+                oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                if (typeof this.game.renderer.bakeRadarBackground === "function") {
+                    this.game.renderer.bakeRadarBackground();
+                }
+            }
+
+            const rec = {
+                type: "PREFAB_3D",
+                subtype: "ESTATE",
+                id,
+                prefabId,
+                x: sx,
+                y: sy,
+                angle: sa,
+                entityRef: inst
+            };
+            this.createdEntities.push(rec);
+            if (!opts.skipHistory) this._pushHistory(rec);
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`PLACED 3D PREFAB [${spec.label || prefabId}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
+            return inst;
+        }
+
+        placePropOrFlora(kind, x, y, angle = 0, opts = {}) {
+            const map = this.game && this.game.map;
+            if (!map) return null;
+            const check = this.validatePlacement("PROPS_FLORA", kind, x, y, angle, opts);
+            const sx = check.snappedX !== undefined ? check.snappedX : x;
+            const sy = check.snappedY !== undefined ? check.snappedY : y;
+            const sa = check.snappedAngle !== undefined ? check.snappedAngle : angle;
+            const id = opts.id || `ce_prop_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+
+            const isStreetProp = (kind === "HYDRANT" || kind === "STREETLAMP" || kind === "PAYPHONE" || kind === "NEWS_STAND");
+            if (isStreetProp) {
+                const oe = map.objectEngine;
+                if (!oe || !Array.isArray(oe.streetProps)) return null;
+                const prop = {
+                    id,
+                    kind,
+                    x: sx,
+                    y: sy,
+                    z: 2.0,
+                    angle: sa,
+                    state: 0,
+                    fallAngle: 0,
+                    fallProgress: 0,
+                    geyserTimer: 0,
+                    sparkTimer: 0,
+                    respawnTimer: 0,
+                    accent: kind === "NEWS_STAND" ? [0.95, 0.22, 0.28] : [0.0, 0.94, 1.0],
+                    createdByEngine: true
+                };
+                oe.streetProps.push(prop);
+                const rec = { type: "PROP_FLORA", subtype: "STREET_PROP", id, kind, x: sx, y: sy, angle: sa, entityRef: prop };
+                this.createdEntities.push(rec);
+                if (!opts.skipHistory) this._pushHistory(rec);
+                if (!opts.skipSave) this.saveToLocalStorage();
+                this.setStatus(`PLACED 3D STREET PROP [${kind}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
+                return prop;
+            }
+
+            // Tropical Flora / Tree
+            const flora = {
+                id,
+                x: sx,
+                y: sy,
+                z: 2.0,
+                kind,
+                scale: opts.scale || 1.04,
+                height: opts.height || 1.15,
+                angle: sa,
+                solid: kind !== "bougainvillea_bush",
+                trunkRadius: kind === "banyan_tree" ? 11.0 : 6.0,
+                createdByEngine: true
+            };
+            if (!Array.isArray(map.vicePalms)) map.vicePalms = [];
+            map.vicePalms.push(flora);
+            if (flora.solid && map.floraGrid instanceof Map) {
+                const fc = Math.floor(sx / TILE_SIZE);
+                const fr = Math.floor(sy / TILE_SIZE);
+                if (fc >= 0 && fc < MAP_COLS && fr >= 0 && fr < MAP_ROWS) {
+                    const key = (fr << 16) | (fc & 0xffff);
+                    let cell = map.floraGrid.get(key);
+                    if (!cell) {
+                        cell = [];
+                        map.floraGrid.set(key, cell);
+                    }
+                    cell.push(flora);
+                }
+            }
+            // Reset static chunk grid cache on renderer so new flora appears immediately
+            if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                this.game.renderer._staticChunkGridMap.delete(map.vicePalms);
+            }
+
+            const rec = { type: "PROP_FLORA", subtype: "FLORA", id, kind, x: sx, y: sy, angle: sa, entityRef: flora };
+            this.createdEntities.push(rec);
+            if (!opts.skipHistory) this._pushHistory(rec);
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`PLANTED 3D FLORA [${kind}] AT (${Math.round(sx)}, ${Math.round(sy)})`);
+            return flora;
+        }
+
+        placeEstablishment(config = {}, opts = {}) {
+            const map = this.game && this.game.map;
+            if (!map || !window.ShopInteriors) return null;
+            const tplKey = config.tpl || config.theme || "SHOP_BAR";
+            const rawX = config.x !== undefined ? config.x : ((config.c || 200) + 0.5) * TILE_SIZE;
+            const rawY = config.y !== undefined ? config.y : ((config.r || 200) + 0.5) * TILE_SIZE;
+
+            const check = this.validatePlacement("INTERIORS", tplKey, rawX, rawY, 0, opts);
+            const c = check.tileC !== undefined ? check.tileC : Math.floor(rawX / TILE_SIZE);
+            const r = check.tileR !== undefined ? check.tileR : Math.floor(rawY / TILE_SIZE);
+            const facing = config.facing || check.facing || "S";
+            const id = config.id || `ce_shop_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+
+            const T = window.ShopInteriors.SHOP_TEMPLATES || {};
+            const base = T[tplKey] || T.SHOP_BAR;
+            if (!base) return null;
+
+            const cloneStations = (arr) => (arr || []).map((s) => Object.assign({}, s, { cooldown: 0 }));
+            const cloneNpcs = (arr) => (arr || []).map((n) => Object.assign({}, n));
+
+            const off = { S: [32, 16], N: [32, 48], E: [16, 32], W: [48, 32] }[facing] || [32, 16];
+            const doorX = check.snappedX !== undefined ? check.snappedX : (c * TILE_SIZE + off[0]);
+            const doorY = check.snappedY !== undefined ? check.snappedY : (r * TILE_SIZE + off[1]);
+
+            const intr = {
+                id,
+                name: config.name || `CUSTOM ${tplKey.replace("SHOP_", "")}`,
+                subtitle: config.subtitle || `${map.getDistrictName ? map.getDistrictName(doorX, doorY) : "VICE CITY"} • ENTERABLE 3D VENUE`,
+                district: config.district || (map.getDistrictName ? map.getDistrictName(doorX, doorY) : "VICE CITY"),
+                doorX,
+                doorY,
+                facing,
+                theme: base.theme,
+                accent: config.accent || base.accent,
+                matRGB: base.matRGB,
+                floorColor: base.floorColor,
+                floorGridColor: base.floorGridColor,
+                w: base.w,
+                h: base.h,
+                stations: cloneStations(base.stations),
+                npcs: cloneNpcs(base.npcs),
+                createdByEngine: true
+            };
+
+            if (!Array.isArray(map.interiors)) map.interiors = [];
+            map.interiors.push(intr);
+            if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                this.game.renderer._staticChunkGridMap.delete(map.interiors);
+            }
+
+            const rec = {
+                type: "INTERIOR",
+                id,
+                tpl: tplKey,
+                name: intr.name,
+                c,
+                r,
+                facing,
+                x: doorX,
+                y: doorY,
+                entityRef: intr
+            };
+            this.createdEntities.push(rec);
+            if (!opts.skipHistory) this._pushHistory(rec);
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`CREATED 3D ENTERABLE VENUE [${intr.name}] FACING [${facing}] AT (${c}, ${r})`);
+            return intr;
+        }
+
+        /* ====================================================================
+           5. PILLAR 3: DECLARATIVE MISSION & ENCOUNTER COMPOSER
+           ==================================================================== */
+        createCustomMission(blueprint = {}, opts = {}) {
+            const id = blueprint.id || `ce_mission_${Date.now()}_${Math.floor(Math.random() * 999)}`;
+            const type = blueprint.type || "HIJACK_VEHICLE";
+            const px = this.game && this.game.player ? this.game.player.x : 16384;
+            const py = this.game && this.game.player ? this.game.player.y : 16384;
+            const spec = {
+                id,
+                type,
+                title: blueprint.title || `CUSTOM ${type.replace(/_/g, " ")}`,
+                pagerText: blueprint.pagerText || "JASON [5G DM]: Custom contract live on your GPS! Hit the target and secure the payout!",
+                reward: blueprint.reward || 25000,
+                wantedStars: blueprint.wantedStars !== undefined ? blueprint.wantedStars : 2,
+                timer: blueprint.timer || 180,
+                startX: blueprint.startX !== undefined ? blueprint.startX : px + 160,
+                startY: blueprint.startY !== undefined ? blueprint.startY : py,
+                dropoffX: blueprint.dropoffX !== undefined ? blueprint.dropoffX : px + 512,
+                dropoffY: blueprint.dropoffY !== undefined ? blueprint.dropoffY : py - 256,
+                vehicleSpec: blueprint.vehicleSpec || "VICE_CHEETAH"
+            };
+            this.customMissions[id] = spec;
+            const rec = { type: "MISSION_BLUEPRINT", id, blueprint: spec };
+            this.createdEntities.push(rec);
+            if (!opts.skipHistory) this._pushHistory(rec);
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`COMPOSED CUSTOM MISSION [${spec.title}] ($${spec.reward.toLocaleString()})`);
+            return spec;
+        }
+
+        launchCustomMission(idOrBlueprint) {
+            if (!this.game || !this.game.missions) return null;
+            const spec = (typeof idOrBlueprint === "string")
+                ? (this.customMissions[idOrBlueprint] || this.createCustomMission({ type: idOrBlueprint }))
+                : this.createCustomMission(idOrBlueprint);
+            if (!spec) return null;
+
+            const mm = this.game.missions;
+            if (mm.activeMission && typeof mm.abortMission === "function") {
+                mm.abortMission();
+            }
+
+            const check = this.validatePlacement("VEHICLES", spec.vehicleSpec || "VICE_CHEETAH", spec.startX, spec.startY, 0);
+            const tx = check.snappedX || spec.startX;
+            const ty = check.snappedY || spec.startY;
+
+            const m = {
+                id: spec.id,
+                title: spec.title,
+                reward: spec.reward,
+                timer: spec.timer,
+                stage: 0,
+                objectiveLabel: spec.title,
+                targetX: tx,
+                targetY: ty,
+                isCustomEngineMission: true
+            };
+
+            if (spec.type === "CONTRABAND_DROP") {
+                m.crates = [
+                    { x: tx, y: ty },
+                    { x: tx + 140, y: ty - 90 },
+                    { x: tx - 120, y: ty + 110 }
+                ];
+                m.objectiveLabel = `${spec.title} (3 CRATES LEFT)`;
+                m.update = (g) => {
+                    const p = g.player.inVehicle || g.player;
+                    m.crates = m.crates.filter((c) => {
+                        if (Math.hypot(p.x - c.x, p.y - c.y) < 46) {
+                            g.audio.playPickup();
+                            g.addFloatingText("📦 CONTRABAND SECURED!", c.x, c.y, "#39ff14");
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (m.crates.length > 0) {
+                        m.targetX = m.crates[0].x;
+                        m.targetY = m.crates[0].y;
+                        m.objectiveLabel = `${spec.title} (${m.crates.length} LEFT)`;
+                    } else {
+                        mm.completeMission(g, m);
+                    }
+                };
+            } else if (spec.type === "ARMORED_AMBUSH") {
+                const van = this.spawnVehicle("ARMORED_VAN", tx, ty, 0, { skipHistory: true, skipSave: true });
+                van.driver = "AI_TRAFFIC";
+                van.hp = 180;
+                m.armoredVan = van;
+                m.briefcase = null;
+                m.update = (g) => {
+                    if (!m.briefcase) {
+                        m.targetX = van.x;
+                        m.targetY = van.y;
+                        m.objectiveLabel = "DESTROY ARMORED VAN";
+                        if (van.destroyed) {
+                            m.briefcase = { x: van.x, y: van.y };
+                            m.targetX = van.x;
+                            m.targetY = van.y;
+                            m.objectiveLabel = "COLLECT ARMORED PAYOUT";
+                        }
+                    } else {
+                        const p = g.player.inVehicle || g.player;
+                        if (Math.hypot(p.x - m.briefcase.x, p.y - m.briefcase.y) < 48) {
+                            mm.completeMission(g, m);
+                        }
+                    }
+                };
+            } else if (spec.type === "VIP_ELIMINATION") {
+                const targets = [];
+                for (let i = 0; i < 3; i++) {
+                    const ped = new Pedestrian({
+                        id: `ce_vip_${Date.now()}_${i}`,
+                        x: tx + (i - 1) * 28,
+                        y: ty,
+                        z: 2.0,
+                        kind: "HOSTILE",
+                        archetype: "CARTEL",
+                        weapon: "UZI"
+                    });
+                    this.game.peds.push(ped);
+                    targets.push(ped);
+                }
+                m.targets = targets;
+                m.update = (g) => {
+                    const alive = m.targets.filter((t) => !t.dead);
+                    if (alive.length > 0) {
+                        m.targetX = alive[0].x;
+                        m.targetY = alive[0].y;
+                        m.objectiveLabel = `ELIMINATE VIP SQUAD (${alive.length} LEFT)`;
+                    } else {
+                        mm.completeMission(g, m);
+                    }
+                };
+            } else {
+                // Default: HIJACK_VEHICLE & deliver to dropoff
+                const car = this.spawnVehicle(spec.vehicleSpec || "VICE_CHEETAH", tx, ty, 0, { skipHistory: true, skipSave: true });
+                m.targetCar = car;
+                m.dropoff = { x: spec.dropoffX, y: spec.dropoffY };
+                m.update = (g) => {
+                    if (car.destroyed) {
+                        mm.failMission(g, "TARGET VEHICLE DESTROYED!");
+                        return;
+                    }
+                    if (g.player.inVehicle !== car) {
+                        m.targetX = car.x;
+                        m.targetY = car.y;
+                        m.objectiveLabel = `STEAL ${car.name}`;
+                    } else {
+                        m.targetX = m.dropoff.x;
+                        m.targetY = m.dropoff.y;
+                        m.objectiveLabel = "DELIVER TO DROP-OFF ZONE";
+                        if (Math.hypot(car.x - m.dropoff.x, car.y - m.dropoff.y) < 76) {
+                            mm.completeMission(g, m);
+                        }
+                    }
+                };
+            }
+
+            mm.activeMission = m;
+            if (spec.wantedStars > 0 && typeof this.game.raiseWanted === "function") {
+                this.game.raiseWanted(spec.wantedStars);
+            }
+            if (typeof mm.setPagerMessage === "function") {
+                mm.setPagerMessage(spec.pagerText);
+            } else if (typeof mm.setPager === "function") {
+                mm.setPager(spec.pagerText);
+            }
+            if (typeof this.game.updateHud === "function") this.game.updateHud();
+            this.setStatus(`LAUNCHED CUSTOM MISSION [${spec.title}]!`);
+            return m;
+        }
+
+        /* ====================================================================
+           6. PILLAR 4: UNDO / REDO HISTORY STACK, DELETION & BLUEPRINT JSON I/O
+           ==================================================================== */
+        _pushHistory(action) {
+            this.undoStack.push(action);
+            if (this.undoStack.length > 250) this.undoStack.shift();
+            this.redoStack.length = 0;
+        }
+
+        removeCreatedRecord(rec) {
+            if (!rec || !this.game) return false;
+            const map = this.game.map;
+            const oe = map && map.objectEngine;
+
+            if (rec.type === "VOXEL_TILE" && rec.beforeSnap) {
+                this.restoreVoxelColumnSnapshot(rec.beforeSnap, true);
+                return true;
+            }
+            if (rec.type === "VEHICLE") {
+                this.game.vehicles = this.game.vehicles.filter((v) => v !== rec.entityRef && v.id !== rec.id);
+                if (typeof this.game.rebuildVehicleSpatialGrid === "function") this.game.rebuildVehicleSpatialGrid();
+                return true;
+            }
+            if (rec.type === "PREFAB_3D") {
+                if (rec.subtype === "TIKI_BAR_3D" && Array.isArray(map.tikiBars)) {
+                    map.tikiBars = map.tikiBars.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                } else if (rec.subtype === "VOLLEYBALL_COURT_3D" && Array.isArray(map.beachVolleyballCourts)) {
+                    map.beachVolleyballCourts = map.beachVolleyballCourts.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                } else if (rec.subtype === "STREET_TAKEOVER_RING" && Array.isArray(map.streetTakeovers)) {
+                    map.streetTakeovers = map.streetTakeovers.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                } else if (rec.subtype === "SMUGGLER_CRATE_3D" && oe && Array.isArray(oe.smugglerDrops)) {
+                    oe.smugglerDrops = oe.smugglerDrops.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                } else if ((rec.subtype === "SODA_ECOLA_3D" || rec.subtype === "SODA_SPRUNK_3D") && oe) {
+                    if (Array.isArray(oe.sodaMachines)) oe.sodaMachines = oe.sodaMachines.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    if (Array.isArray(oe.interactiveProps)) oe.interactiveProps = oe.interactiveProps.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                } else if (oe && Array.isArray(oe.instances)) {
+                    oe.instances = oe.instances.filter((x) => x !== rec.entityRef && x.id !== rec.id);
+                    if (Array.isArray(map.securityBarrierBoxes)) {
+                        map.securityBarrierBoxes = map.securityBarrierBoxes.filter((b) => b.estateId !== rec.id);
+                        map.barrierBoxGrid = null;
+                        if (typeof map.ensureBarrierSpatialGrids === "function") {
+                            map.ensureBarrierSpatialGrids();
+                        }
+                    }
+                    if (this.game.renderer && this.game.renderer.gl) {
+                        oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                    }
+                }
+                return true;
+            }
+            if (rec.type === "PROP_FLORA") {
+                if (rec.subtype === "STREET_PROP" && oe && Array.isArray(oe.streetProps)) {
+                    oe.streetProps = oe.streetProps.filter((p) => p !== rec.entityRef && p.id !== rec.id);
+                } else if (Array.isArray(map.vicePalms)) {
+                    map.vicePalms = map.vicePalms.filter((p) => p !== rec.entityRef && p.id !== rec.id);
+                    if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                        this.game.renderer._staticChunkGridMap.delete(map.vicePalms);
+                    }
+                }
+                return true;
+            }
+            if (rec.type === "INTERIOR" && Array.isArray(map.interiors)) {
+                map.interiors = map.interiors.filter((i) => i !== rec.entityRef && i.id !== rec.id);
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(map.interiors);
+                }
+                return true;
+            }
+            if (rec.type === "MISSION_BLUEPRINT" && rec.id) {
+                delete this.customMissions[rec.id];
+                return true;
+            }
+            return false;
+        }
+
+        reapplyCreatedRecord(rec) {
+            if (!rec) return false;
+            if (rec.type === "VOXEL_TILE" && rec.afterSnap) {
+                this.restoreVoxelColumnSnapshot(rec.afterSnap, true);
+                return true;
+            }
+            if (rec.type === "VEHICLE") {
+                const v = this.spawnVehicle(rec.specKey, rec.x, rec.y, rec.angle, { id: rec.id, skipHistory: true, skipSave: true });
+                rec.entityRef = v;
+                return Boolean(v);
+            }
+            if (rec.type === "PREFAB_3D") {
+                const inst = this.placePrefab3D(rec.prefabId, rec.x, rec.y, rec.angle, { id: rec.id, skipHistory: true, skipSave: true });
+                rec.entityRef = inst;
+                return Boolean(inst);
+            }
+            if (rec.type === "PROP_FLORA") {
+                const p = this.placePropOrFlora(rec.kind, rec.x, rec.y, rec.angle, { id: rec.id, skipHistory: true, skipSave: true });
+                rec.entityRef = p;
+                return Boolean(p);
+            }
+            if (rec.type === "INTERIOR") {
+                const intr = this.placeEstablishment({ id: rec.id, tpl: rec.tpl, name: rec.name, c: rec.c, r: rec.r, facing: rec.facing, x: rec.x, y: rec.y }, { skipHistory: true, skipSave: true });
+                rec.entityRef = intr;
+                return Boolean(intr);
+            }
+            if (rec.type === "MISSION_BLUEPRINT" && rec.blueprint) {
+                this.createCustomMission(rec.blueprint, { skipHistory: true, skipSave: true });
+                return true;
+            }
+            return false;
+        }
+
+        undo() {
+            if (this.undoStack.length === 0) {
+                this.setStatus("UNDO STACK EMPTY");
+                return false;
+            }
+            const act = this.undoStack.pop();
+            this.removeCreatedRecord(act);
+            this.createdEntities = this.createdEntities.filter((e) => e !== act && (e.id === undefined || e.id !== act.id));
+            this.redoStack.push(act);
+            this.saveToLocalStorage();
+            this.setStatus(`UNDID [${act.type}]`);
+            return true;
+        }
+
+        redo() {
+            if (this.redoStack.length === 0) {
+                this.setStatus("REDO STACK EMPTY");
+                return false;
+            }
+            const act = this.redoStack.pop();
+            this.reapplyCreatedRecord(act);
+            this.undoStack.push(act);
+            this.saveToLocalStorage();
+            this.setStatus(`REDID [${act.type}]`);
+            return true;
+        }
+
+        removeNearestCreatedEntity(x, y, maxRadius = 110) {
+            let bestIdx = -1;
+            let bestDist = maxRadius;
+            for (let i = this.createdEntities.length - 1; i >= 0; i--) {
+                const e = this.createdEntities[i];
+                if (!e || typeof e.x !== "number" || typeof e.y !== "number") continue;
+                const d = Math.hypot(e.x - x, e.y - y);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = i;
+                }
+            }
+            if (bestIdx >= 0) {
+                const rec = this.createdEntities.splice(bestIdx, 1)[0];
+                this.removeCreatedRecord(rec);
+                this.saveToLocalStorage();
+                this.setStatus(`DELETED [${rec.type}: ${rec.prefabId || rec.specKey || rec.kind || rec.name || rec.id}]`);
+                return rec;
+            }
+            this.setStatus("NO CREATED ENTITY WITHIN RANGE TO DELETE");
+            return null;
+        }
+
+        clearAllCreations() {
+            while (this.undoStack.length > 0) {
+                const act = this.undoStack.pop();
+                this.removeCreatedRecord(act);
+            }
+            for (const rec of this.createdEntities) {
+                this.removeCreatedRecord(rec);
+            }
+            this.createdEntities.length = 0;
+            this.redoStack.length = 0;
+            this.rebuildWorldMeshes(true);
+            this.saveToLocalStorage();
+            this.setStatus("CLEARED ALL CUSTOM CREATIONS");
+            return true;
+        }
+
+        exportBlueprintJSON() {
+            const voxelEdits = [];
+            for (const act of this.undoStack) {
+                if (act.type === "VOXEL_TILE") {
+                    voxelEdits.push({
+                        c: act.c,
+                        r: act.r,
+                        presetKey: act.presetKey,
+                        opts: act.opts || {}
+                    });
+                }
+            }
+            const entities = this.createdEntities.map((e) => ({
+                type: e.type,
+                subtype: e.subtype,
+                id: e.id,
+                specKey: e.specKey,
+                prefabId: e.prefabId,
+                kind: e.kind,
+                tpl: e.tpl,
+                name: e.name,
+                c: e.c,
+                r: e.r,
+                facing: e.facing,
+                x: e.x,
+                y: e.y,
+                angle: e.angle,
+                blueprint: e.blueprint
+            }));
+
+            const payload = {
+                engine: "VC26_CREATION_ENGINE",
+                version: this.version,
+                timestamp: new Date().toISOString(),
+                customVehicles: this.customVehicles,
+                customPrefabs: this.customPrefabs,
+                customMissions: this.customMissions,
+                voxelEdits,
+                entities
+            };
+            return JSON.stringify(payload, null, 2);
+        }
+
+        importBlueprintJSON(jsonOrObj, opts = {}) {
+            let data = jsonOrObj;
+            if (typeof jsonOrObj === "string") {
+                try {
+                    data = JSON.parse(jsonOrObj);
+                } catch (err) {
+                    console.error("Invalid VC26 Blueprint JSON:", err);
+                    return { ok: false, reason: "INVALID_JSON" };
+                }
+            }
+            if (!data || typeof data !== "object") return { ok: false, reason: "EMPTY_BLUEPRINT" };
+
+            if (opts.clearExisting) {
+                this.clearAllCreations();
+            }
+
+            let count = 0;
+            if (data.customVehicles && typeof data.customVehicles === "object") {
+                for (const [k, cfg] of Object.entries(data.customVehicles)) {
+                    this.defineVehicle(k, cfg);
+                    count++;
+                }
+            }
+            if (data.customPrefabs && typeof data.customPrefabs === "object") {
+                for (const [k, cfg] of Object.entries(data.customPrefabs)) {
+                    this.definePrefab3D(k, cfg);
+                    count++;
+                }
+            }
+            if (Array.isArray(data.voxelEdits)) {
+                for (const ve of data.voxelEdits) {
+                    this.paintVoxelTile(ve.c, ve.r, ve.presetKey, Object.assign({}, ve.opts, { rebuildMesh: false, skipSave: true }));
+                    count++;
+                }
+            }
+            if (Array.isArray(data.entities)) {
+                for (const ent of data.entities) {
+                    if (ent.type === "VEHICLE") {
+                        this.spawnVehicle(ent.specKey, ent.x, ent.y, ent.angle || 0, { id: ent.id, skipSave: true });
+                        count++;
+                    } else if (ent.type === "PREFAB_3D") {
+                        this.placePrefab3D(ent.prefabId, ent.x, ent.y, ent.angle || 0, { id: ent.id, rebuildMesh: false, skipSave: true });
+                        count++;
+                    } else if (ent.type === "PROP_FLORA") {
+                        this.placePropOrFlora(ent.kind, ent.x, ent.y, ent.angle || 0, { id: ent.id, skipSave: true });
+                        count++;
+                    } else if (ent.type === "INTERIOR") {
+                        this.placeEstablishment(ent, { skipSave: true });
+                        count++;
+                    } else if (ent.type === "MISSION_BLUEPRINT" && ent.blueprint) {
+                        this.createCustomMission(ent.blueprint, { skipSave: true });
+                        count++;
+                    }
+                }
+            }
+
+            this.rebuildWorldMeshes(false);
+            if (!opts.skipSave) this.saveToLocalStorage();
+            this.setStatus(`IMPORTED BLUEPRINT (${count} ITEMS APPLIED)`);
+            return { ok: true, count };
+        }
+
+        saveToLocalStorage() {
+            if (typeof localStorage === "undefined") return false;
+            try {
+                localStorage.setItem(STORAGE_KEY, this.exportBlueprintJSON());
+                return true;
+            } catch (_e) {
+                return false;
+            }
+        }
+
+        loadFromLocalStorage() {
+            if (typeof localStorage === "undefined") return false;
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return false;
+                const res = this.importBlueprintJSON(raw, { skipSave: true });
+                return Boolean(res && res.ok);
+            } catch (_e) {
+                return false;
+            }
+        }
+
+        /* ====================================================================
+           7. INTERACTIVE IN-GAME VISUAL STUDIO ([F10] UI, INPUT & 3D GHOST CURSOR)
+           ==================================================================== */
+        setStatus(msg) {
+            this.statusMessage = String(msg || "");
+            this.statusTimer = 5.0;
+        }
+
+        toggleStudio(force) {
+            this.studioActive = typeof force === "boolean" ? force : !this.studioActive;
+            if (this.studioActive && this.game) {
+                const target = this.game.player.inVehicle || this.game.player;
+                this.camX = (this.game.renderer && this.game.renderer.camX) || target.x;
+                this.camY = (this.game.renderer && this.game.renderer.camY) || target.y;
+                this.setStatus("VC26 CREATION STUDIO ACTIVE — [1..6] TABS • [R] ROTATE • [G] GRID SNAP • [CTRL+Z] UNDO");
+            }
+            return this.studioActive;
+        }
+
+        update(dt) {
+            if (this.statusTimer > 0) {
+                this.statusTimer = Math.max(0, this.statusTimer - dt);
+            }
+            if (!this.studioActive || !this.game) return;
+
+            if (this.freeCamActive) {
+                const panSpeed = (this.game.input.sprint ? 1150 : 540) * dt;
+                if (this.game.input.up) this.camY -= panSpeed;
+                if (this.game.input.down) this.camY += panSpeed;
+                if (this.game.input.left) this.camX -= panSpeed;
+                if (this.game.input.right) this.camX += panSpeed;
+                this.camX = Math.max(128, Math.min((MAP_COLS - 2) * TILE_SIZE, this.camX));
+                this.camY = Math.max(128, Math.min((MAP_ROWS - 2) * TILE_SIZE, this.camY));
+            }
+        }
+
+        handleKeyDown(e) {
+            const code = e.code;
+            if (code === "F10") {
+                e.preventDefault();
+                this.toggleStudio();
+                return true;
+            }
+            if (!this.studioActive) return false;
+
+            if ((e.ctrlKey || e.metaKey) && code === "KeyZ") {
+                e.preventDefault();
+                this.undo();
+                return true;
+            }
+            if ((e.ctrlKey || e.metaKey) && code === "KeyY") {
+                e.preventDefault();
+                this.redo();
+                return true;
+            }
+            if (code === "Digit1" || code === "Digit2" || code === "Digit3" || code === "Digit4" || code === "Digit5" || code === "Digit6") {
+                const idx = parseInt(code.replace("Digit", ""), 10) - 1;
+                if (idx >= 0 && idx < this.categories.length) {
+                    this.activeCategoryIdx = idx;
+                    this.setStatus(`CATEGORY: ${this.categoryLabels[this.getActiveCategory()]}`);
+                }
+                return true;
+            }
+            if (code === "BracketLeft") {
+                const cat = this.getActiveCategory();
+                const list = this.getCatalogForCategory(cat);
+                if (list.length > 0) {
+                    this.selectedItemIdxByCat[cat] = ((this.selectedItemIdxByCat[cat] || 0) - 1 + list.length) % list.length;
+                }
+                return true;
+            }
+            if (code === "BracketRight") {
+                const cat = this.getActiveCategory();
+                const list = this.getCatalogForCategory(cat);
+                if (list.length > 0) {
+                    this.selectedItemIdxByCat[cat] = ((this.selectedItemIdxByCat[cat] || 0) + 1) % list.length;
+                }
+                return true;
+            }
+            if (code === "KeyR") {
+                this.placementAngle = (this.placementAngle + Math.PI * 0.25) % (Math.PI * 2);
+                this.setStatus(`ROTATION: ${Math.round((this.placementAngle * 180) / Math.PI)}°`);
+                return true;
+            }
+            if (code === "KeyG") {
+                this.gridSnap = !this.gridSnap;
+                this.setStatus(`64PX TILE GRID SNAP: ${this.gridSnap ? "ON" : "OFF"}`);
+                return true;
+            }
+            if (code === "KeyF") {
+                this.freeCamActive = !this.freeCamActive;
+                this.setStatus(`STUDIO FREE CAMERA: ${this.freeCamActive ? "ON (WASD PANS CAMERA)" : "FOLLOW PLAYER"}`);
+                return true;
+            }
+            if (code === "Delete" || code === "Backspace") {
+                const cur = this.screenToWorld(this.game.input.mouseX || 0, this.game.input.mouseY || 0, 2.0);
+                this.removeNearestCreatedEntity(cur.x, cur.y, 140);
+                return true;
+            }
+            if (code === "KeyX") {
+                const json = this.exportBlueprintJSON();
+                if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(json).catch(() => {});
+                }
+                this.setStatus(`EXPORTED BLUEPRINT JSON (${this.createdEntities.length} ENTITIES, ${this.undoStack.length} ACTIONS)`);
+                return true;
+            }
+            return false;
+        }
+
+        handleMouseDown(screenX, screenY, button = 0) {
+            if (!this.studioActive) return false;
+
+            // Check Studio HUD Panel buttons first
+            for (const b of this.studioButtons) {
+                if (screenX >= b.x && screenX <= b.x + b.w && screenY >= b.y && screenY <= b.y + b.h) {
+                    if (b.id === "STUDIO_CLOSE") {
+                        this.toggleStudio(false);
+                    } else if (b.id === "STUDIO_CAT" && typeof b.catIdx === "number") {
+                        this.activeCategoryIdx = b.catIdx;
+                    } else if (b.id === "STUDIO_ITEM" && typeof b.itemIdx === "number") {
+                        this.selectedItemIdxByCat[this.getActiveCategory()] = b.itemIdx;
+                    } else if (b.id === "STUDIO_SCROLL_UP") {
+                        const cat = this.getActiveCategory();
+                        this.paletteScrollByCat[cat] = Math.max(0, (this.paletteScrollByCat[cat] || 0) - 5);
+                    } else if (b.id === "STUDIO_SCROLL_DOWN") {
+                        const cat = this.getActiveCategory();
+                        const list = this.getCatalogForCategory(cat);
+                        this.paletteScrollByCat[cat] = Math.min(Math.max(0, list.length - 8), (this.paletteScrollByCat[cat] || 0) + 5);
+                    } else if (b.id === "STUDIO_UNDO") {
+                        this.undo();
+                    } else if (b.id === "STUDIO_REDO") {
+                        this.redo();
+                    } else if (b.id === "STUDIO_ROTATE") {
+                        this.placementAngle = (this.placementAngle + Math.PI * 0.25) % (Math.PI * 2);
+                    } else if (b.id === "STUDIO_GRID") {
+                        this.gridSnap = !this.gridSnap;
+                    } else if (b.id === "STUDIO_FREECAM") {
+                        this.freeCamActive = !this.freeCamActive;
+                    } else if (b.id === "STUDIO_EXPORT") {
+                        const json = this.exportBlueprintJSON();
+                        if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(json).catch(() => {});
+                        }
+                        this.setStatus("BLUEPRINT JSON COPIED TO CLIPBOARD!");
+                    } else if (b.id === "STUDIO_CLEAR") {
+                        this.clearAllCreations();
+                    }
+                    return true;
+                }
+            }
+
+            // Avoid placing in world if clicking inside left dock rectangle
+            if (screenX <= 292 && screenY >= 56 && screenY <= 585) {
+                return true;
+            }
+
+            const cur = this.screenToWorld(screenX, screenY, 2.0);
+            if (button === 2) {
+                this.removeNearestCreatedEntity(cur.x, cur.y, 140);
+                return true;
+            }
+
+            this.placeSelectedItemAt(cur.x, cur.y, this.placementAngle);
+            return true;
+        }
+
+        placeSelectedItemAt(x, y, angle = 0) {
+            const cat = this.getActiveCategory();
+            const item = this.getSelectedItem();
+            if (!item) return null;
+
+            if (cat === "TERRAIN") {
+                const c = Math.floor(x / TILE_SIZE);
+                const r = Math.floor(y / TILE_SIZE);
+                return this.paintVoxelTile(c, r, item.key, { storeys: item.storeys, style: item.style });
+            }
+            if (cat === "VEHICLES") {
+                return this.spawnVehicle(item.key, x, y, angle);
+            }
+            if (cat === "PREFABS_3D") {
+                return this.placePrefab3D(item.key, x, y, angle);
+            }
+            if (cat === "PROPS_FLORA") {
+                return this.placePropOrFlora(item.key, x, y, angle);
+            }
+            if (cat === "INTERIORS") {
+                return this.placeEstablishment({ tpl: item.key, x, y });
+            }
+            if (cat === "MISSIONS") {
+                return this.launchCustomMission({ type: item.key, startX: x, startY: y });
+            }
+            return null;
+        }
+
+        renderStudioOverlay(ctx, renderer) {
+            if (!ctx || !renderer) return;
+            this.studioButtons = [];
+
+            const W = renderer.canvas.width;
+            const H = renderer.canvas.height;
+
+            // Always render a subtle top-right [🛠️ F10 STUDIO] badge when closed so user can click it or press F10
+            if (!this.studioActive) {
+                return;
+            }
+
+            ctx.save();
+            const cat = this.getActiveCategory();
+            const item = this.getSelectedItem();
+            const mx = this.game.input.mouseX || W * 0.5;
+            const my = this.game.input.mouseY || H * 0.5;
+            const cur = this.screenToWorld(mx, my, 2.0);
+            const safety = item
+                ? this.validatePlacement(cat, item.key, cur.x, cur.y, this.placementAngle)
+                : { ok: true, reason: "READY", snappedX: cur.x, snappedY: cur.y, snappedAngle: this.placementAngle };
+
+            // 1. 3D World Ghost Wireframe Preview at Cursor / Snapped Spot
+            const gx = safety.snappedX !== undefined ? safety.snappedX : cur.x;
+            const gy = safety.snappedY !== undefined ? safety.snappedY : cur.y;
+            const gAng = safety.snappedAngle !== undefined ? safety.snappedAngle : this.placementAngle;
+            const sc = renderer.worldToScreen(gx, gy, 2.05);
+
+            const col = !safety.ok ? "#ef4444" : (safety.autoSnapped ? "#00f0ff" : "#39ff14");
+            const boxW = (item && item.footprintW) ? item.footprintW : (cat === "TERRAIN" ? 64 : (cat === "VEHICLES" ? 54 : 38));
+            const boxH = (item && item.footprintH) ? item.footprintH : (cat === "TERRAIN" ? 64 : (cat === "VEHICLES" ? 26 : 38));
+            const hw = boxW * 0.5;
+            const hh = boxH * 0.5;
+            const ca = Math.cos(gAng);
+            const sa = Math.sin(gAng);
+            const corners = [
+                { x: gx + (-hw * ca - -hh * sa), y: gy + (-hw * sa + -hh * ca) },
+                { x: gx + ( hw * ca - -hh * sa), y: gy + ( hw * sa + -hh * ca) },
+                { x: gx + ( hw * ca -  hh * sa), y: gy + ( hw * sa +  hh * ca) },
+                { x: gx + (-hw * ca -  hh * sa), y: gy + (-hw * sa +  hh * ca) }
+            ];
+
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            for (let i = 0; i < 4; i++) {
+                const p = renderer.worldToScreen(corners[i].x, corners[i].y, 2.04);
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = !safety.ok ? "rgba(239, 68, 68, 0.22)" : (safety.autoSnapped ? "rgba(0, 240, 255, 0.20)" : "rgba(57, 255, 20, 0.20)");
+            ctx.fill();
+            ctx.stroke();
+
+            // Heading arrow on ghost box
+            const tip = renderer.worldToScreen(gx + ca * (hw + 14), gy + sa * (hw + 14), 2.05);
+            ctx.beginPath();
+            ctx.moveTo(sc.x, sc.y);
+            ctx.lineTo(tip.x, tip.y);
+            ctx.stroke();
+
+            // Cursor floating coordinates + safety oracle pill
+            const badgeTxt = `${item ? item.icon + " " + item.label : ""} • (${cur.c}, ${cur.r}) • ${safety.reason}`;
+            ctx.font = "bold 10px Consolas, 'Courier New', monospace";
+            const bw = Math.max(180, ctx.measureText(badgeTxt).width + 18);
+            const bx = Math.round(sc.x - bw * 0.5);
+            const by = Math.round(sc.y - 38);
+            ctx.fillStyle = "rgba(8, 12, 24, 0.92)";
+            ctx.fillRect(bx, by, bw, 20);
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 19);
+            ctx.fillStyle = col;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(badgeTxt, sc.x, by + 10);
+
+            // 2. Left Dock Studio Panel
+            const px = 12;
+            const py = 68;
+            const pw = 274;
+            const ph = Math.min(510, H - 84);
+
+            ctx.fillStyle = "rgba(9, 14, 28, 0.95)";
+            ctx.fillRect(px, py, pw, ph);
+            ctx.strokeStyle = "#00f0ff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+
+            // Header bar
+            ctx.fillStyle = "#1e1b4b";
+            ctx.fillRect(px + 2, py + 2, pw - 4, 26);
+            ctx.fillStyle = "#fde047";
+            ctx.textAlign = "left";
+            ctx.font = "bold 11px Consolas, 'Courier New', monospace";
+            ctx.fillText("🛠️ VC26 CREATION ENGINE [F10]", px + 8, py + 15);
+
+            const closeX = px + pw - 26;
+            ctx.fillStyle = "#7f1d1d";
+            ctx.fillRect(closeX, py + 5, 20, 19);
+            ctx.fillStyle = "#ffffff";
+            ctx.textAlign = "center";
+            ctx.fillText("✖", closeX + 10, py + 14.5);
+            this.studioButtons.push({ id: "STUDIO_CLOSE", x: closeX, y: py + 5, w: 20, h: 19 });
+
+            // Category Tabs (2x3 grid)
+            const tabW = Math.floor((pw - 16) / 2);
+            const tabH = 22;
+            for (let i = 0; i < this.categories.length; i++) {
+                const colIdx = i % 2;
+                const rowIdx = Math.floor(i / 2);
+                const tx = px + 6 + colIdx * (tabW + 4);
+                const ty = py + 33 + rowIdx * (tabH + 3);
+                const active = i === this.activeCategoryIdx;
+                ctx.fillStyle = active ? "#be185d" : "#1e293b";
+                ctx.fillRect(tx, ty, tabW, tabH);
+                ctx.strokeStyle = active ? "#ff2a85" : "#475569";
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(tx + 0.5, ty + 0.5, tabW - 1, tabH - 1);
+                ctx.fillStyle = active ? "#ffffff" : "#cbd5e1";
+                ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "left";
+                ctx.fillText(this.categoryLabels[this.categories[i]], tx + 5, ty + 11);
+                this.studioButtons.push({ id: "STUDIO_CAT", catIdx: i, x: tx, y: ty, w: tabW, h: tabH });
+            }
+
+            // Item Palette List (8 visible rows + scroll buttons)
+            const list = this.getCatalogForCategory(cat);
+            const selIdx = this.selectedItemIdxByCat[cat] || 0;
+            const scroll = Math.max(0, Math.min(Math.max(0, list.length - 8), this.paletteScrollByCat[cat] || 0));
+            const listY0 = py + 112;
+            const rowH = 25;
+
+            for (let row = 0; row < 8; row++) {
+                const idx = scroll + row;
+                if (idx >= list.length) break;
+                const it = list[idx];
+                const ry = listY0 + row * (rowH + 3);
+                const isSel = idx === selIdx;
+                ctx.fillStyle = isSel ? "#065f46" : "#0f172a";
+                ctx.fillRect(px + 6, ry, pw - 38, rowH);
+                ctx.strokeStyle = isSel ? "#39ff14" : "#334155";
+                ctx.lineWidth = isSel ? 1.6 : 1;
+                ctx.strokeRect(px + 6.5, ry + 0.5, pw - 39, rowH - 1);
+                ctx.fillStyle = isSel ? "#fde047" : "#f8fafc";
+                ctx.font = "bold 9.5px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "left";
+                ctx.fillText(`${it.icon} ${it.label}`.slice(0, 29), px + 11, ry + rowH * 0.5);
+                this.studioButtons.push({ id: "STUDIO_ITEM", itemIdx: idx, x: px + 6, y: ry, w: pw - 38, h: rowH });
+            }
+
+            // Scroll Up / Down buttons on right edge of palette list
+            const sbX = px + pw - 28;
+            ctx.fillStyle = "#1e293b";
+            ctx.fillRect(sbX, listY0, 22, 108);
+            ctx.strokeStyle = "#38bdf8";
+            ctx.strokeRect(sbX + 0.5, listY0 + 0.5, 21, 107);
+            ctx.fillStyle = "#ffffff";
+            ctx.textAlign = "center";
+            ctx.fillText("▲", sbX + 11, listY0 + 54);
+            this.studioButtons.push({ id: "STUDIO_SCROLL_UP", x: sbX, y: listY0, w: 22, h: 108 });
+
+            ctx.fillStyle = "#1e293b";
+            ctx.fillRect(sbX, listY0 + 113, 22, 108);
+            ctx.strokeStyle = "#38bdf8";
+            ctx.strokeRect(sbX + 0.5, listY0 + 113.5, 21, 107);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("▼", sbX + 11, listY0 + 167);
+            this.studioButtons.push({ id: "STUDIO_SCROLL_DOWN", x: sbX, y: listY0 + 113, w: 22, h: 108 });
+
+            // Bottom Action Toolbar Buttons (UNDO | REDO | ROTATE [R] | GRID [G] | CAM [F] | EXPORT [X] | CLEAR)
+            const actY = listY0 + 8 * (rowH + 3) + 8;
+            const drawActBtn = (id, label, bx, by, bw, bh, fill, border) => {
+                ctx.fillStyle = fill;
+                ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = border;
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(label, bx + bw * 0.5, by + bh * 0.5);
+                this.studioButtons.push({ id, x: bx, y: by, w: bw, h: bh });
+            };
+
+            const b3W = Math.floor((pw - 18) / 3);
+            drawActBtn("STUDIO_UNDO", `↶ UNDO (${this.undoStack.length})`, px + 6, actY, b3W, 24, "#1e293b", "#38bdf8");
+            drawActBtn("STUDIO_REDO", `↷ REDO (${this.redoStack.length})`, px + 9 + b3W, actY, b3W, 24, "#1e293b", "#38bdf8");
+            drawActBtn("STUDIO_ROTATE", `⟳ ROT ${Math.round((this.placementAngle * 180) / Math.PI)}° [R]`, px + 12 + b3W * 2, actY, b3W, 24, "#31102f", "#ff2a85");
+
+            const actY2 = actY + 28;
+            drawActBtn("STUDIO_GRID", `GRID: ${this.gridSnap ? "ON" : "OFF"} [G]`, px + 6, actY2, b3W, 24, this.gridSnap ? "#065f46" : "#1e293b", "#39ff14");
+            drawActBtn("STUDIO_FREECAM", `CAM: ${this.freeCamActive ? "FREE" : "PLAY"} [F]`, px + 9 + b3W, actY2, b3W, 24, this.freeCamActive ? "#0369a1" : "#1e293b", "#00f0ff");
+            drawActBtn("STUDIO_EXPORT", "📋 JSON [X]", px + 12 + b3W * 2, actY2, b3W, 24, "#3b0764", "#fde047");
+
+            const actY3 = actY2 + 28;
+            drawActBtn("STUDIO_CLEAR", `🗑️ CLEAR ALL (${this.createdEntities.length} ENTITIES)`, px + 6, actY3, pw - 12, 22, "#450a0a", "#ef4444");
+
+            // Bottom status bar banner
+            const stW = Math.min(760, W - 320);
+            const stX = Math.max(296, Math.round((W - stW) * 0.5));
+            const stY = H - 36;
+            ctx.fillStyle = "rgba(8, 13, 26, 0.92)";
+            ctx.fillRect(stX, stY, stW, 24);
+            ctx.strokeStyle = "#fde047";
+            ctx.lineWidth = 1.4;
+            ctx.strokeRect(stX + 0.5, stY + 0.5, stW - 1, 23);
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 10px Consolas, 'Courier New', monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(this.statusMessage.slice(0, 96), stX + stW * 0.5, stY + 12);
+
+            ctx.restore();
+        }
+    }
+
+    window.ViceCreationEngine = ViceCreationEngine;
+})();

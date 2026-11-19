@@ -7526,6 +7526,11 @@ class RetroRenderer {
             this.camX += (target.x + leadX - this.camX) * Math.min(1, dt * 8.5);
             this.camY += (target.y + leadY - this.camY) * Math.min(1, dt * 8.5);
 
+            if (game.creationEngine && game.creationEngine.studioActive && game.creationEngine.freeCamActive) {
+                this.camX = game.creationEngine.camX;
+                this.camY = game.creationEngine.camY;
+            }
+
             const rawTargetZ = target.z !== undefined
                 ? target.z
                 : this.map.getHeightAtPixel(target.x, target.y, this.camZBlocks);
@@ -7651,6 +7656,11 @@ class RetroRenderer {
 
         // Vice City Neon GPS Express Drawer (below HUD/Pager, toggle with [C])
         this.renderViceCityTourPanel(ctx, game);
+
+        // VC26 Creation Engine Visual Studio Overlay ([F10])
+        if (game.creationEngine && typeof game.creationEngine.renderStudioOverlay === "function") {
+            game.creationEngine.renderStudioOverlay(ctx, this);
+        }
 
         ctx.restore();
     }
