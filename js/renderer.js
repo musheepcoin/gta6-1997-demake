@@ -454,19 +454,20 @@ class RetroRenderer {
             }
             vec3 styleBeachSand(vec3 baseSand) {
                 vec2 p = vWorldPos.xz;
-                float macroDune = aNoise(p * 0.55) * 0.62 + aNoise(p * 1.45 + 11.3) * 0.38;
-                float warp = sin(p.y * 1.73 + p.x * 0.89) * 0.85 + (macroDune - 0.5) * 1.4;
-                float r1 = sin(p.x * 5.83 + p.y * 2.91 + warp);
-                float r2 = cos(p.x * 14.37 - p.y * 8.19 + sin(p.x * 3.17) * 0.7);
-                float r3 = sin(p.x * 29.3 + p.y * 17.9);
-                float duneWave = r1 * 0.50 + r2 * 0.34 + r3 * 0.16;
-                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.058;
-                float shellSparkle = step(0.984, aHash(floor(p * 84.0) + 7.0)) * 0.068;
-                vec3 sandCrest = vec3(0.93, 0.82, 0.60);
-                vec3 sandTrough = vec3(0.79, 0.65, 0.44);
-                float duneMix = clamp(0.48 + duneWave * 0.28 + (macroDune - 0.5) * 0.24, 0.0, 1.0);
-                vec3 targetSand = mix(sandTrough, sandCrest, duneMix) + fineGrain + vec3(shellSparkle, shellSparkle * 0.92, shellSparkle * 0.76);
-                return clamp(targetSand, 0.0, 0.95);
+                // Authentic Real Miami Beach / South Beach White-Coral & Quartz Sand:
+                // Bright, silky, sun-bleached pale ivory-cream (#f7ebd2 .. #ecdec0) with delicate powdery wind ripples (zero dark brown mud stripes!)
+                float macroDune = aNoise(p * 0.45) * 0.65 + aNoise(p * 1.25 + 11.3) * 0.35;
+                float warp = sin(p.y * 1.65 + p.x * 0.82) * 0.75 + (macroDune - 0.5) * 1.1;
+                float r1 = sin(p.x * 5.20 + p.y * 2.65 + warp);
+                float r2 = cos(p.x * 13.10 - p.y * 7.40 + sin(p.x * 2.90) * 0.6);
+                float duneWave = r1 * 0.62 + r2 * 0.38;
+                float fineGrain = (aHash(floor(p * 56.0)) - 0.5) * 0.018;
+                float shellSparkle = step(0.985, aHash(floor(p * 84.0) + 7.0)) * 0.035;
+                vec3 sandCrest = vec3(0.97, 0.92, 0.82);
+                vec3 sandTrough = vec3(0.92, 0.86, 0.74);
+                float duneMix = clamp(0.55 + duneWave * 0.13 + (macroDune - 0.5) * 0.10, 0.0, 1.0);
+                vec3 targetSand = mix(sandTrough, sandCrest, duneMix) + fineGrain + vec3(shellSparkle, shellSparkle * 0.96, shellSparkle * 0.88);
+                return clamp(targetSand, 0.0, 0.98);
             }
             vec3 pavementSurface(vec3 src, vec2 p) {
                 if (uMobileFast > 0.5) return src;
@@ -802,10 +803,10 @@ class RetroRenderer {
                             dWater = min(dCard, dCorner) + stoneGrain;
 
                             if (waterSurType > 2.5) {
-                                // Natural beach & coastal shoreline: NO stone border! Smooth transition from dry golden sand to warm wet sand
+                                // Natural beach & coastal shoreline: NO stone border! Smooth transition from dry ivory coral sand to warm wet sand
                                 if (dWater < 0.24) {
                                     float wetMix = smoothstep(-0.04, 0.14, dWater);
-                                    vec3 wetSand = c.rgb * vec3(0.84, 0.77, 0.65);
+                                    vec3 wetSand = c.rgb * vec3(0.90, 0.85, 0.76);
                                     c.rgb = mix(c.rgb, wetSand, wetMix);
                                 }
                             } else {
@@ -840,9 +841,9 @@ class RetroRenderer {
                         vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                         float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
                         float sandMask = clamp(isSand, 0.0, 1.0);
-                        float bldAO = lm.g * onGround * (1.0 - sandMask * 0.40);
+                        float bldAO = lm.g * onGround * (1.0 - sandMask * 0.88);
                         float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
-                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.30);
+                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.85);
                         float totalShade = clamp(max(bldShadow * 0.98, bldAO * 0.85), 0.0, 1.0);
                         if (isRoad) {
                             // True 3D building cast shadows project with deep cinematic contrast across asphalt streets
@@ -850,8 +851,8 @@ class RetroRenderer {
                             totalShade = clamp(bldShadow * 0.92 + bldAO * 0.32, 0.0, 1.0);
                         }
 
-                        vec3 sunlitTint = mix(vec3(1.13, 1.07, 0.95), vec3(1.03, 1.00, 0.94), sandMask);
-                        vec3 shadowTint = mix(vec3(0.54, 0.65, 0.86), vec3(0.68, 0.72, 0.84), sandMask);
+                        vec3 sunlitTint = mix(vec3(1.13, 1.07, 0.95), vec3(1.01, 1.00, 0.98), sandMask);
+                        vec3 shadowTint = mix(vec3(0.54, 0.65, 0.86), vec3(0.82, 0.84, 0.90), sandMask);
                         if (isRoad) {
                             sunlitTint = vec3(1.11, 1.07, 0.98);
                             shadowTint = vec3(0.56, 0.66, 0.85);

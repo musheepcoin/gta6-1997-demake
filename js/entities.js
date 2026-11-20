@@ -4621,10 +4621,10 @@ class Vehicle {
         if (tile === TILE.SAND) {
             return {
                 surface: "SAND",
-                r: 0.54,
-                g: 0.42,
-                b: 0.23,
-                alpha: 0.56,
+                r: 0.74,
+                g: 0.67,
+                b: 0.54,
+                alpha: 0.44,
                 maxLife: 19.0
             };
         }
