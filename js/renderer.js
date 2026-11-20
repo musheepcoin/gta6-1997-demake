@@ -215,6 +215,27 @@ class RetroRenderer {
                            mix(aHash(i + vec2(0.0, 1.0)), aHash(i + vec2(1.0, 1.0)), u.x), u.y);
             }
 
+            // District "lived-in" level (0 = pristine/maintained, 1 = heavily worn). Mirrors the real city geography
+            // (tile coordinates): luxury Ocean Drive / Star & Venetian islands stay immaculate, mid-beach is lightly lived-in,
+            // Downtown is average, Little Havana / Wynwood / Little Haiti / the port & industrial belt are visibly older.
+            // Smooth transitions (15-20 tiles) so wear changes gradually, never as hard borders.
+            float districtWear(vec2 p) {
+                float w = 0.50;
+                w = mix(w, 1.00, 1.0 - smoothstep(150.0, 185.0, p.x));                                    // Port Gellhorn / west industrial belt
+                w = mix(w, 0.90, smoothstep(165.0, 185.0, p.x) * (1.0 - smoothstep(225.0, 245.0, p.x))); // Wynwood / Little Haiti
+                float dtn = smoothstep(225.0, 245.0, p.x) * (1.0 - smoothstep(315.0, 335.0, p.x));
+                w = mix(w, mix(0.50, 0.85, smoothstep(180.0, 210.0, p.y)), dtn);                         // Downtown (north) -> Little Havana (south)
+                float port = smoothstep(318.0, 330.0, p.x) * (1.0 - smoothstep(368.0, 380.0, p.x)) * smoothstep(290.0, 300.0, p.y) * (1.0 - smoothstep(342.0, 355.0, p.y));
+                w = mix(w, 1.00, port);                                                                   // Vice Port container yards
+                float isl = smoothstep(318.0, 335.0, p.x) * (1.0 - smoothstep(405.0, 420.0, p.x)) * smoothstep(105.0, 120.0, p.y) * (1.0 - smoothstep(225.0, 240.0, p.y));
+                w = mix(w, 0.06, isl);                                                                    // Star Island / Venetian Isles estates
+                w = mix(w, 0.30, smoothstep(400.0, 420.0, p.x));                                          // Collins / mid-beach
+                w = mix(w, 0.12, smoothstep(425.0, 440.0, p.x));                                          // Ocean Drive / South Beach strip
+                float keysMask = smoothstep(430.0, 442.0, p.y) * smoothstep(180.0, 195.0, p.x) * (1.0 - smoothstep(415.0, 425.0, p.x));
+                w = mix(w, 0.60, keysMask);                                                               // Leonida Keys: salt-air wear, relaxed upkeep
+                return clamp(w, 0.0, 1.0);
+            }
+
             // Organic Rotated Domain-Warped Cellular Caustic Network & Liquid Wave Swell (delicate filaments, zero grid alignment!)
             float evalWaterCaustics(vec2 p, float t, out vec2 waveGrad, out float swellOut) {
                 // Broad directional ocean swells (rotated off-axis for natural diagonal wave trains)
@@ -380,9 +401,13 @@ class RetroRenderer {
                 // cells a few % darker (fresh seal) or lighter (sun-faded old surface). Very low contrast, large scale, zero speckle.
                 vec2 patchCell = floor(p * vec2(0.30, 0.21) + 3.0);
                 float patchH = aHash(patchCell);
+                float dw = districtWear(p);
                 float patchEdge = smoothstep(0.0, 0.06, min(min(fract(p.x * 0.30 + 3.0), 1.0 - fract(p.x * 0.30 + 3.0)), min(fract(p.y * 0.21 + 3.0), 1.0 - fract(p.y * 0.21 + 3.0))));
-                col *= 1.0 + patchEdge * (step(0.80, patchH) * -0.075 + step(0.62, patchH) * step(patchH, 0.80) * 0.05);
-                col = mix(col, vec3(dot(col, vec3(0.333))), 0.10);                // sun-bleached: slightly less colourful
+                // Coherent with the district: pristine Ocean Drive/Star Island get almost no patches, Little Havana/Haiti/port streets get many
+                float patchDark  = step(1.0 - (0.04 + 0.24 * dw), patchH);
+                float patchLight = step(1.0 - (0.14 + 0.40 * dw), patchH) * (1.0 - patchDark);
+                col *= 1.0 + patchEdge * (patchDark * -(0.040 + 0.045 * dw) + patchLight * (0.024 + 0.030 * dw));
+                col = mix(col, vec3(dot(col, vec3(0.333))), 0.04 + 0.10 * dw);    // sun-bleached: older districts slightly less colourful
                 col *= 0.94 + grain * 0.05 + fine * 0.08;
                 col += vec3(0.055, 0.058, 0.062) * step(0.980, fine);           // light limestone aggregate stones
                 float tar = smoothstep(0.64, 0.80, aNoise(p * 0.65 + 31.0));
@@ -399,9 +424,9 @@ class RetroRenderer {
                 float paintChip = aNoise(p * 10.0 + 71.0) * 0.65 + fine * 0.35;
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.09, 0.0, 0.95));
                 if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.09, 0.0, 0.95) / max(mx, 0.01));
-                paintCol *= 0.84 + paintChip * 0.12;                                // chalky, sun-bleached thermoplastic (no longer showroom white)
-                paintCol = mix(paintCol, vec3(dot(paintCol, vec3(0.333))) * vec3(1.02, 1.0, 0.95), 0.18);
-                paint *= clamp(0.80 + paintChip * 0.17 - max(laneRutX, laneRutY) * 0.14, 0.50, 0.97);
+                paintCol *= (0.93 - 0.09 * dw) + paintChip * 0.12;                  // fresh bright paint on maintained roads, chalky in older districts
+                paintCol = mix(paintCol, vec3(dot(paintCol, vec3(0.333))) * vec3(1.02, 1.0, 0.95), 0.06 + 0.16 * dw);
+                paint *= clamp((0.92 - 0.28 * dw) + paintChip * 0.17 - max(laneRutX, laneRutY) * (0.06 + 0.10 * dw), 0.46, 0.98);
 
                 // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (vAnim in 5.50 .. 9.375)
                 float cwPaint = 0.0;
@@ -504,13 +529,14 @@ class RetroRenderer {
                 float slabHash = aHash(cellId);
                 float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.022;
                 float medMottle = (aNoise(p * 2.2 + 19.0) - 0.5) * 0.025;
-                float sunPatina = (aNoise(p * 0.36 + 7.3) - 0.5) * 0.032 + (aNoise(p * 0.13 + 41.0) - 0.5) * 0.07;
+                float dwP = districtWear(p);
+                float sunPatina = (aNoise(p * 0.36 + 7.3) - 0.5) * 0.032 + (aNoise(p * 0.13 + 41.0) - 0.5) * (0.035 + 0.060 * dwP);
 
-                // Subtle, natural slab-to-slab stone variation (±4%) + delicate hairline mineral vein on ~14% of slabs
-                // + broad "pressure-washed vs. weathered" zones: a few % duller/greyer over several tiles (aerial-photo mottling, never dirt specks)
-                float weatherZone = smoothstep(0.52, 0.78, aNoise(p * 0.19 + 5.0));
-                stonePalette = mix(stonePalette, vec3(dot(stonePalette, vec3(0.333))) * vec3(1.0, 0.985, 0.955) * 0.93, weatherZone * 0.45);
-                float slabTone = (slabHash - 0.5) * 0.080;
+                // Subtle, natural slab-to-slab stone variation + broad "pressure-washed vs. weathered" zones whose extent and strength follow the district:
+                // Ocean Drive / Star Island stay bright and well-kept, older neighbourhoods show wider duller zones (aerial-photo mottling, never dirt specks)
+                float weatherZone = smoothstep(0.64 - 0.14 * dwP, 0.84 - 0.12 * dwP, aNoise(p * 0.19 + 5.0)) * (0.20 + 0.80 * dwP);
+                stonePalette = mix(stonePalette, vec3(dot(stonePalette, vec3(0.333))) * vec3(1.0, 0.985, 0.955) * 0.93, weatherZone * 0.60);
+                float slabTone = (slabHash - 0.5) * (0.050 + 0.040 * dwP);
                 vec3 slabTint = stonePalette * (0.98 + slabTone + sunPatina);
                 float hasVein = step(0.86, slabHash);
                 float stoneVein = (1.0 - smoothstep(0.0, 0.020, abs(aNoise(p * 3.6 + slabHash * 11.3) - 0.5))) * hasVein * 0.048;
@@ -903,11 +929,12 @@ class RetroRenderer {
                                 // Seamless continuous Miami roof deck with natural sun-warmed paver/terracotta tone variation (zero dark soot blotches!)
                                 float subHash = aHash(floor(vWorldPos.xz * 2.0));
                                 float roofMacro = aNoise(vWorldPos.xz * 0.45 + 9.2) - 0.5;
-                                // Weathered, sun-aged roof coatings: broad low-contrast tone zones + faint one-directional rain-streak staining (aerial-photo look)
+                                // Weathered roof coatings follow the district: well-kept resort roofs stay clean, older neighbourhoods show broader tone zones + faint rain streaks
+                                float dwR = districtWear(vWorldPos.xz);
                                 float roofAge = aNoise(vWorldPos.xz * 0.14 + 27.0) - 0.5;
                                 float roofStreak = aNoise(vec2(vWorldPos.x * 3.2, vWorldPos.z * 0.22) + 61.0) - 0.5;
-                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.042 * (subHash - 0.5) + 0.075 * roofMacro + 0.10 * roofAge + 0.055 * roofStreak);
-                                cleanRoof = mix(cleanRoof, vec3(dot(cleanRoof, vec3(0.333))), 0.10 + 0.10 * smoothstep(0.0, 0.25, roofAge));
+                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.042 * (subHash - 0.5) + (0.04 + 0.05 * dwR) * roofMacro + (0.04 + 0.11 * dwR) * roofAge + (0.015 + 0.065 * dwR) * roofStreak);
+                                cleanRoof = mix(cleanRoof, vec3(dot(cleanRoof, vec3(0.333))), (0.04 + 0.10 * dwR) + (0.04 + 0.10 * dwR) * smoothstep(0.0, 0.25, roofAge));
                                 float paverJoint = smoothstep(0.015, 0.042, subD);
                                 float paverBevel = smoothstep(0.042, 0.075, subD) - smoothstep(0.075, 0.110, subD);
                                 float grainSum = 0.0;
