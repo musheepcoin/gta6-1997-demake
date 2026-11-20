@@ -311,18 +311,13 @@ class RetroRenderer {
                 float waterAlpha = mix(0.84, 0.66, shallowFactor * 0.70);
                 return vec4(rgb, waterAlpha);
             }
-            // Filmic ACES-inspired highlight shoulder roll-off (prevents blinding white clipping while boosting midtone punch)
-            vec3 filmicToneMap(vec3 x) {
-                vec3 a = max(vec3(0.0), x);
-                return clamp((a * (2.51 * a + 0.03)) / (a * (2.43 * a + 0.59) + 0.14), 0.0, 1.0);
-            }
-            // Same curb profile as the lane edge tiles (lid 1/74 texels 0..7): chiselled curb stone, deep 3D drop shadow, concrete gutter, yellow line
+            // Same curb profile as the lane edge tiles (lid 1/74 texels 0..7): curb stone, shade, gutter, yellow line
             vec3 junctionCurb(vec3 col, float d) {
                 float px = d * 64.0;
-                if (px < 2.2) return mix(vec3(0.88, 0.85, 0.79), vec3(0.70, 0.67, 0.62), px * 0.45);
-                if (px < 3.4) return vec3(0.32, 0.31, 0.29);
-                if (px < 4.5) return vec3(0.11, 0.13, 0.16);
-                if (px >= 5.0 && px < 7.2) return vec3(0.94, 0.76, 0.20);
+                if (px < 2.0) return mix(vec3(0.86, 0.83, 0.77), vec3(0.74, 0.71, 0.66), px * 0.5);
+                if (px < 3.0) return vec3(0.47, 0.45, 0.42);
+                if (px < 4.0) return vec3(0.16, 0.19, 0.21);
+                if (px >= 5.0 && px < 7.0) return vec3(0.92, 0.75, 0.22);
                 return col;
             }
             vec3 asphaltSurface(vec3 src, float darkFamily) {
@@ -333,7 +328,8 @@ class RetroRenderer {
                 // Lane paint / curb stones are much brighter than tar: crisp mask from the blurry 64px texel
                 float paint = smoothstep(0.40, 0.50, mx);
                 bool yellow = (src.r - src.b) > 0.16;
-                vec3 base = mix(vec3(0.205, 0.228, 0.252), vec3(0.155, 0.172, 0.202), darkFamily);
+                // Authentic Sun-Bleached Miami / Florida Limestone-Aggregate Coastal Asphalt
+                vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
 
                 if (uMobileFast > 0.5) {
                     float grainFast = aHash(floor(p * 32.0));
@@ -374,53 +370,32 @@ class RetroRenderer {
                     return outFast;
                 }
 
-                // Large faded patches, medium mottling, fine aggregate grain (all continuous across tiles)
+                // Large sun-baked patches, medium mottling, fine limestone aggregate grain (all continuous across tiles)
                 float big = aNoise(p * 0.45) * 0.6 + aNoise(p * 1.3 + 7.0) * 0.4;
                 float mid = aNoise(p * 4.0 + 13.0);
                 float grain = aHash(floor(p * 40.0));
                 float fine = aHash(floor(p * 96.0) + 19.0);
-                vec3 col = base * (0.86 + big * 0.20 + mid * 0.08);
-                col *= 0.93 + grain * 0.06 + fine * 0.09;
-                col += vec3(0.062, 0.065, 0.070) * step(0.980, fine);           // sparkling quartz aggregate stones
-                float tar = smoothstep(0.62, 0.78, aNoise(p * 0.7 + 31.0));
-                col *= 1.0 - tar * 0.16;                                         // dark resealed tar patches
-                float seam = 1.0 - smoothstep(0.0, 0.024, abs(aNoise(p * 1.1 + 57.0) - 0.5));
-                col *= 1.0 - seam * 0.18 * step(0.62, aNoise(p * 0.3 + 3.0));    // bitumen-filled expansion cracks
+                vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
+                col *= 0.94 + grain * 0.05 + fine * 0.08;
+                col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);           // light limestone aggregate stones
+                float tar = smoothstep(0.66, 0.80, aNoise(p * 0.7 + 31.0));
+                col *= 1.0 - tar * 0.13;                                         // dark resealed tar patches
+                float seam = 1.0 - smoothstep(0.0, 0.022, abs(aNoise(p * 1.1 + 57.0) - 0.5));
+                col *= 1.0 - seam * 0.12 * step(0.68, aNoise(p * 0.3 + 3.0));    // sparse thin repaired cracks
 
-                // Crisp, high-contrast thermoplastic road markings
-                vec3 paintCol = yellow ? vec3(0.96, 0.78, 0.18) : vec3(clamp(mx * 1.14, 0.0, 0.95));
-                if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.12, 0.0, 0.95) / max(mx, 0.01));
+                // Crisp, slightly worn thermoplastic lane paint keeping the original lane colours
+                vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.10, 0.0, 0.95));
+                if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.10, 0.0, 0.95) / max(mx, 0.01));
                 paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
 
-                // Dual polished specular tire-track ruts + darker center oil-drip crown along all traffic lanes
-                float laneRutX = exp(-pow((lp.x - 0.31) * 5.8, 2.0)) + exp(-pow((lp.x - 0.69) * 5.8, 2.0));
-                float laneRutY = exp(-pow((lp.y - 0.31) * 5.8, 2.0)) + exp(-pow((lp.y - 0.69) * 5.8, 2.0));
-                float oilCrownX = exp(-pow((lp.x - 0.50) * 7.5, 2.0));
-                float oilCrownY = exp(-pow((lp.y - 0.50) * 7.5, 2.0));
-                float rutMask = max(laneRutX, laneRutY);
-                float oilMask = max(oilCrownX, oilCrownY);
-                col *= 1.0 - oilMask * 0.075 * (0.55 + big * 0.45);
-                // Subtle PBR-style solar specular sheen on polished wheel tracks
-                col += vec3(0.022, 0.024, 0.028) * rutMask * (0.65 + fine * 0.55);
-
-                // Procedural Cast-Iron Municipal Manhole Covers (GTA 1 / GTA 2 / GTA 6 street detail)
-                float mhSeed = aHash(floor(p));
-                if (mhSeed > 0.83 && paint < 0.15) {
-                    vec2 mhCenter = vec2(0.50, 0.50);
-                    vec2 mhD = lp - mhCenter;
-                    float mhR = length(mhD);
-                    if (mhR < 0.095) {
-                        float rim = smoothstep(0.072, 0.088, mhR);
-                        float sunBevel = clamp((-mhD.x - mhD.y) * 14.0, -0.12, 0.14);
-                        float waffle = step(0.45, fract(lp.x * 48.0)) * step(0.45, fract(lp.y * 48.0));
-                        vec3 ironCol = vec3(0.24, 0.25, 0.27) * (0.82 + 0.22 * waffle) + sunBevel * rim;
-                        col = mix(ironCol, vec3(0.10, 0.11, 0.13), smoothstep(0.086, 0.095, mhR));
-                    }
-                }
+                // Subtle dual tire-rut wear along all traffic lanes
+                float laneRutX = exp(-pow((lp.x - 0.32) * 5.5, 2.0)) + exp(-pow((lp.x - 0.68) * 5.5, 2.0));
+                float laneRutY = exp(-pow((lp.y - 0.32) * 5.5, 2.0)) + exp(-pow((lp.y - 0.68) * 5.5, 2.0));
+                col *= 1.0 - max(laneRutX, laneRutY) * 0.038 * (0.65 + mid * 0.35);
 
                 // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (vAnim in 5.50 .. 9.375)
                 float cwPaint = 0.0;
-                vec3 cwCol = vec3(0.84, 0.85, 0.83);
+                vec3 cwCol = vec3(0.78, 0.79, 0.77);
                 if (vAnim > 5.45 && vAnim < 9.45) {
                     float idx = floor((vAnim - 5.5) * 8.0 + 0.5);
                     float curbMax = mod(floor(idx / 2.0), 2.0);
@@ -439,7 +414,7 @@ class RetroRenderer {
                     if (!yellow && across > acMin && across < acMax) {
                         float tireRut = exp(-pow((across - 0.31) * 6.2, 2.0)) + exp(-pow((across - 0.69) * 6.2, 2.0));
                         float chip = aNoise(p * 16.0 + 41.0) * 0.65 + fine * 0.35;
-                        float wearMask = clamp(1.0 - tireRut * (0.42 + (1.0 - chip) * 0.28), 0.32, 1.0);
+                        float wearMask = clamp(1.0 - tireRut * (0.42 + (1.0 - chip) * 0.28), 0.28, 1.0);
 
                         // 4 longitudinal FDOT Continental Crosswalk zebra bars per lane tile
                         float cwAlong = smoothstep(0.035, 0.050, along) * (1.0 - smoothstep(0.285, 0.300, along));
@@ -451,8 +426,8 @@ class RetroRenderer {
                         float stopAlong = smoothstep(0.375, 0.388, along) * (1.0 - smoothstep(0.428, 0.440, along));
                         float stopAcross = smoothstep(acMin + 0.02, acMin + 0.04, across) * (1.0 - smoothstep(acMax - 0.04, acMax - 0.02, across));
 
-                        cwPaint = max(cwAlong * cwBar * edgePad, stopAlong * stopAcross) * wearMask * (0.78 + chip * 0.16);
-                        cwCol = vec3(0.84, 0.85, 0.82) * (0.90 + aNoise(p * 10.0 + 23.0) * 0.12);
+                        cwPaint = max(cwAlong * cwBar * edgePad, stopAlong * stopAcross) * wearMask * (0.74 + chip * 0.14);
+                        cwCol = vec3(0.78, 0.79, 0.77) * (0.88 + aNoise(p * 10.0 + 23.0) * 0.14);
                     }
                 }
 
@@ -485,56 +460,45 @@ class RetroRenderer {
                 float r2 = cos(p.x * 14.37 - p.y * 8.19 + sin(p.x * 3.17) * 0.7);
                 float r3 = sin(p.x * 29.3 + p.y * 17.9);
                 float duneWave = r1 * 0.50 + r2 * 0.34 + r3 * 0.16;
-                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.068;
-                float microFoot = (aNoise(p * 11.5 + 29.0) - 0.5) * 0.055;
-                float shellSparkle = step(0.982, aHash(floor(p * 84.0) + 7.0)) * 0.085;
-                vec3 sandCrest = vec3(0.89, 0.77, 0.54);
-                vec3 sandTrough = vec3(0.71, 0.57, 0.37);
-                float duneMix = clamp(0.48 + duneWave * 0.32 + (macroDune - 0.5) * 0.26, 0.0, 1.0);
-                vec3 targetSand = mix(sandTrough, sandCrest, duneMix) + fineGrain + microFoot + vec3(shellSparkle, shellSparkle * 0.92, shellSparkle * 0.76);
-                return clamp(targetSand, 0.0, 0.94);
+                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.058;
+                float shellSparkle = step(0.984, aHash(floor(p * 84.0) + 7.0)) * 0.068;
+                vec3 sandCrest = vec3(0.93, 0.82, 0.60);
+                vec3 sandTrough = vec3(0.79, 0.65, 0.44);
+                float duneMix = clamp(0.48 + duneWave * 0.28 + (macroDune - 0.5) * 0.24, 0.0, 1.0);
+                vec3 targetSand = mix(sandTrough, sandCrest, duneMix) + fineGrain + vec3(shellSparkle, shellSparkle * 0.92, shellSparkle * 0.76);
+                return clamp(targetSand, 0.0, 0.95);
             }
             vec3 pavementSurface(vec3 src, vec2 p) {
                 if (uMobileFast > 0.5) return src;
-                // 100% Procedural High-Definition Miami Coral-Travertine & South Beach Terrazzo Sidewalk Flagstones
-                // (Eliminates the blurry 64x64 1997 tile cross from src while preserving warm coral vs cool limestone districts!)
-                float isCoralPave = clamp((src.r - src.b - 0.11) * 6.0, 0.0, 1.0);
+                // Authentic Real Miami Beach / Ocean Drive / Coral Gables Warm Sun-Bleached Coquina Cream & Pastel Coral-Sandstone Sidewalks!
+                // (Replaces the blurry 64x64 1997 cross without ANY dark grey prison grid or black mortar lines!)
+                float isCoralPave = clamp((src.r - src.b - 0.12) * 6.0, 0.0, 1.0);
                 vec3 stonePalette = mix(
-                    vec3(0.74, 0.71, 0.65), // Warm Miami architectural limestone / coquina sidewalk
-                    vec3(0.78, 0.65, 0.57), // South Beach coral-terrazzo promenade
+                    vec3(0.90, 0.85, 0.76), // Sun-bleached Miami Beach cream coquina limestone sidewalk
+                    vec3(0.92, 0.80, 0.72), // Ocean Drive / Española Way warm pastel coral-terrazzo promenade
                     isCoralPave
                 );
 
-                vec2 grid4 = p * 4.0;
-                vec2 cellId = floor(grid4);
-                vec2 sub = fract(grid4);
+                vec2 grid2 = p * 2.0;
+                vec2 cellId = floor(grid2);
+                vec2 sub = fract(grid2);
                 float slabHash = aHash(cellId);
-                float checker = mod(cellId.x + cellId.y, 2.0);
-                float fineGrain = (aHash(floor(p * 56.0)) - 0.5) * 0.044;
-                float medMottle = (aNoise(p * 3.8 + 19.0) - 0.5) * 0.052;
+                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.022;
+                float medMottle = (aNoise(p * 2.4 + 19.0) - 0.5) * 0.026;
 
-                // Subtle Art Deco terrazzo dual-tone ashlar alternation + occasional bronze/coral border accent
-                vec3 slabTint = stonePalette * (0.94 + (slabHash - 0.5) * 0.085 + (checker - 0.5) * 0.032);
-                if (isCoralPave > 0.35 && checker > 0.5) {
-                    slabTint = mix(slabTint, vec3(0.81, 0.74, 0.65), 0.35);
-                }
-
+                vec3 slabTint = stonePalette * (0.98 + (slabHash - 0.5) * 0.036);
                 float jointX = min(sub.x, 1.0 - sub.x);
                 float jointY = min(sub.y, 1.0 - sub.y);
                 float minJoint = min(jointX, jointY);
-                float groove = smoothstep(0.026, 0.078, minJoint);
+                float groove = smoothstep(0.012, 0.036, minJoint);
 
-                // Crisp 3D directional sunlit chamfer highlight (top/left) vs recessed shadow (bottom/right)
-                float bevelHi = (1.0 - smoothstep(0.04, 0.17, sub.x)) * 0.048 + (1.0 - smoothstep(0.04, 0.17, sub.y)) * 0.048;
-                float bevelLo = (1.0 - smoothstep(0.04, 0.17, 1.0 - sub.x)) * 0.045 + (1.0 - smoothstep(0.04, 0.17, 1.0 - sub.y)) * 0.045;
+                // Delicate sunlit coquina micro-chamfer & warm sandy-beige joint (never dark grey!)
+                float bevelHi = (1.0 - smoothstep(0.03, 0.12, sub.x)) * 0.015 + (1.0 - smoothstep(0.03, 0.12, sub.y)) * 0.015;
+                float bevelLo = (1.0 - smoothstep(0.03, 0.12, 1.0 - sub.x)) * 0.014 + (1.0 - smoothstep(0.03, 0.12, 1.0 - sub.y)) * 0.014;
 
-                // Outer block expansion seam (every 1.0 world tile) for architectural sidewalk scale
-                vec2 lp = fract(p);
-                float blockSeam = smoothstep(0.010, 0.026, min(min(lp.x, 1.0 - lp.x), min(lp.y, 1.0 - lp.y)));
-
-                vec3 baseCol = (slabTint + fineGrain + medMottle + bevelHi - bevelLo) * (0.88 + 0.12 * blockSeam);
-                vec3 mortarCol = stonePalette * vec3(0.48, 0.46, 0.44);
-                return clamp(mix(mortarCol, baseCol, 0.15 + 0.85 * groove), 0.0, 0.92);
+                vec3 baseCol = slabTint + fineGrain + medMottle + bevelHi - bevelLo;
+                vec3 mortarCol = stonePalette * vec3(0.89, 0.87, 0.85);
+                return clamp(mix(mortarCol, baseCol, groove), 0.0, 0.94);
             }
             float coastalSandDrift(vec2 p) {
                 float w = sin(p.y * 0.72 + 0.4) * 0.50 + cos(p.y * 1.65 - 0.9) * 0.32 + (aNoise(vec2(p.y * 2.3, 5.0)) - 0.5) * 0.36;
@@ -545,81 +509,81 @@ class RetroRenderer {
                 float m = max(a.x, a.y);
                 return (m > 0.0001) ? (m * pow(pow(a.x / m, p) + pow(a.y / m, p), 1.0 / p)) : 0.0;
             }
-            // 12 GTA 6 / Vice City Architectural Building Palettes (Pastel Art Deco, Mediterranean Terracotta, Modernist Condo, Curtain-Wall Glass)
-            // Roof palettes are calibrated to grounded 0.38..0.64 architectural reflectance so rooftops never clip to white and contrast against bright 3D parapets!
+            // 12 Authentic Miami Beach / Ocean Drive / Coral Gables / Brickell Architectural Building Palettes
+            // (Luminous South Beach Art Deco Pastels, Crisp White Resort Trim, Warm Spanish Terracotta & Sun-Bleached Coquina/Cool-Roof Terraces!)
             void getBuildingStyleColors(float styleId, out vec3 wallCol, out vec3 trimCol, out vec3 roofCol, out vec3 accentCol) {
                 if (styleId < 0.5) {
-                    // 0: Flamingo Rose Art Deco + Crisp White Trim + Warm Coral-Terracotta Roof + Electric Cyan Neon Accent
-                    wallCol   = vec3(0.92, 0.66, 0.74);
-                    trimCol   = vec3(0.96, 0.96, 0.98);
-                    roofCol   = vec3(0.62, 0.42, 0.35);
-                    accentCol = vec3(0.18, 0.86, 0.92);
+                    // 0: Flamingo Rose Art Deco + Crisp White Trim + Warm Coral-Terracotta Roof
+                    wallCol   = vec3(0.94, 0.73, 0.79);
+                    trimCol   = vec3(0.97, 0.97, 0.99);
+                    roofCol   = vec3(0.82, 0.58, 0.48);
+                    accentCol = vec3(0.42, 0.86, 0.88);
                 } else if (styleId < 1.5) {
-                    // 1: Seafoam Turquoise Art Deco + Crisp White Trim + Charcoal Bitumen Gravel Roof + Flamingo Neon Accent
-                    wallCol   = vec3(0.48, 0.82, 0.84);
-                    trimCol   = vec3(0.96, 0.97, 0.99);
-                    roofCol   = vec3(0.48, 0.52, 0.56);
-                    accentCol = vec3(0.96, 0.38, 0.64);
+                    // 1: Seafoam Turquoise Art Deco + Crisp White Trim + Sun-Bleached Ivory Cool-Roof
+                    wallCol   = vec3(0.56, 0.86, 0.86);
+                    trimCol   = vec3(0.97, 0.98, 0.99);
+                    roofCol   = vec3(0.83, 0.84, 0.82);
+                    accentCol = vec3(0.95, 0.72, 0.79);
                 } else if (styleId < 2.5) {
                     // 2: Sunlit Butter Yellow / Mediterranean Revival + Ivory Trim + Spanish Terracotta Clay Roof
-                    wallCol   = vec3(0.94, 0.84, 0.56);
-                    trimCol   = vec3(0.96, 0.94, 0.88);
-                    roofCol   = vec3(0.64, 0.36, 0.26);
-                    accentCol = vec3(0.86, 0.58, 0.22);
+                    wallCol   = vec3(0.96, 0.88, 0.64);
+                    trimCol   = vec3(0.97, 0.95, 0.89);
+                    roofCol   = vec3(0.76, 0.47, 0.35);
+                    accentCol = vec3(0.88, 0.64, 0.28);
                 } else if (styleId < 3.5) {
-                    // 3: Sky Periwinkle / Powder Blue Art Deco + White Mullions + Deep Slate Mechanical Roof
-                    wallCol   = vec3(0.62, 0.76, 0.92);
-                    trimCol   = vec3(0.96, 0.97, 0.99);
-                    roofCol   = vec3(0.44, 0.49, 0.56);
-                    accentCol = vec3(0.18, 0.54, 0.92);
+                    // 3: Sky Periwinkle / Powder Blue Art Deco + White Mullions + Azure Band + Warm Limestone Roof
+                    wallCol   = vec3(0.68, 0.80, 0.94);
+                    trimCol   = vec3(0.97, 0.98, 0.99);
+                    roofCol   = vec3(0.79, 0.81, 0.84);
+                    accentCol = vec3(0.24, 0.58, 0.90);
                 } else if (styleId < 4.5) {
-                    // 4: Crisp White Modernist Condo / Resort + Smoked Glass + Architectural Slate-Travertine Deck Roof
-                    wallCol   = vec3(0.90, 0.93, 0.96);
-                    trimCol   = vec3(0.98, 0.98, 1.00);
-                    roofCol   = vec3(0.54, 0.58, 0.63);
-                    accentCol = vec3(0.16, 0.76, 0.90);
+                    // 4: Crisp White South Beach Modernist Condo / Resort + Aqua Glass + Sun-Bleached Cream Cool-Roof
+                    wallCol   = vec3(0.94, 0.96, 0.98);
+                    trimCol   = vec3(0.98, 0.99, 1.00);
+                    roofCol   = vec3(0.86, 0.85, 0.81);
+                    accentCol = vec3(0.30, 0.74, 0.86);
                 } else if (styleId < 5.5) {
-                    // 5: Warm Coral-Peach Tropical Revival + Cream Trim + Weathered Sandstone Travertine Roof
-                    wallCol   = vec3(0.92, 0.70, 0.58);
-                    trimCol   = vec3(0.96, 0.93, 0.87);
-                    roofCol   = vec3(0.58, 0.50, 0.42);
-                    accentCol = vec3(0.78, 0.38, 0.28);
+                    // 5: Warm Coral-Peach Tropical Revival + Cream Trim + Sandstone Travertine Roof
+                    wallCol   = vec3(0.95, 0.76, 0.66);
+                    trimCol   = vec3(0.97, 0.94, 0.88);
+                    roofCol   = vec3(0.84, 0.74, 0.64);
+                    accentCol = vec3(0.78, 0.45, 0.35);
                 } else if (styleId < 6.5) {
-                    // 6: Tropical Mint / Key Lime Art Deco + Crisp White Trim + Warm Travertine Gravel Roof
-                    wallCol   = vec3(0.64, 0.87, 0.73);
-                    trimCol   = vec3(0.96, 0.97, 0.98);
-                    roofCol   = vec3(0.52, 0.55, 0.50);
-                    accentCol = vec3(0.16, 0.72, 0.54);
+                    // 6: Tropical Mint / Key Lime Art Deco + Crisp White Trim + Warm Travertine Roof
+                    wallCol   = vec3(0.71, 0.90, 0.78);
+                    trimCol   = vec3(0.97, 0.98, 0.99);
+                    roofCol   = vec3(0.83, 0.81, 0.75);
+                    accentCol = vec3(0.24, 0.70, 0.54);
                 } else if (styleId < 7.5) {
-                    // 7: Reflective Deep Teal-Sapphire Glass Curtain-Wall Office Tower + Dark Obsidian-Slate Roof
-                    wallCol   = vec3(0.16, 0.34, 0.46);
-                    trimCol   = vec3(0.62, 0.74, 0.80);
-                    roofCol   = vec3(0.34, 0.39, 0.45);
-                    accentCol = vec3(0.20, 0.68, 0.86);
+                    // 7: Brickell Reflective Aquamarine-Sapphire Glass Tower + Warm Architectural Limestone Roof
+                    wallCol   = vec3(0.22, 0.44, 0.56);
+                    trimCol   = vec3(0.72, 0.82, 0.88);
+                    roofCol   = vec3(0.68, 0.72, 0.75);
+                    accentCol = vec3(0.28, 0.68, 0.82);
                 } else if (styleId < 8.5) {
-                    // 8: Warm Ivory Coquina / Classical Limestone + Weathered Bronze-Travertine Roof
-                    wallCol   = vec3(0.88, 0.84, 0.75);
-                    trimCol   = vec3(0.96, 0.94, 0.89);
-                    roofCol   = vec3(0.55, 0.51, 0.45);
-                    accentCol = vec3(0.64, 0.54, 0.42);
+                    // 8: Warm Ivory Coquina / Classical Coral Gables Limestone + Travertine Roof
+                    wallCol   = vec3(0.92, 0.88, 0.80);
+                    trimCol   = vec3(0.97, 0.95, 0.90);
+                    roofCol   = vec3(0.81, 0.77, 0.69);
+                    accentCol = vec3(0.68, 0.60, 0.50);
                 } else if (styleId < 9.5) {
-                    // 9: Havana Terracotta / Red-Ochre Masonry + Cream Lintels + Spanish Clay Barrel Roof
-                    wallCol   = vec3(0.82, 0.50, 0.38);
-                    trimCol   = vec3(0.93, 0.89, 0.81);
-                    roofCol   = vec3(0.56, 0.34, 0.25);
-                    accentCol = vec3(0.76, 0.34, 0.24);
+                    // 9: Little Havana Terracotta / Coral Masonry + Cream Lintels + Spanish Clay Roof
+                    wallCol   = vec3(0.86, 0.57, 0.45);
+                    trimCol   = vec3(0.95, 0.90, 0.82);
+                    roofCol   = vec3(0.70, 0.44, 0.34);
+                    accentCol = vec3(0.76, 0.40, 0.30);
                 } else if (styleId < 10.5) {
-                    // 10: South Beach Lavender / Lilac Deco + Crisp White Trim + Warm Coral-Slate Roof
-                    wallCol   = vec3(0.80, 0.70, 0.90);
-                    trimCol   = vec3(0.96, 0.97, 0.99);
-                    roofCol   = vec3(0.52, 0.47, 0.54);
-                    accentCol = vec3(0.24, 0.86, 0.92);
+                    // 10: South Beach Lavender / Orchid Deco + Crisp White Trim + Warm Coral-Sand Roof
+                    wallCol   = vec3(0.84, 0.76, 0.92);
+                    trimCol   = vec3(0.97, 0.98, 0.99);
+                    roofCol   = vec3(0.82, 0.73, 0.66);
+                    accentCol = vec3(0.46, 0.84, 0.88);
                 } else {
-                    // 11: Sleek Silver-Precast Modernist High-Rise + Dark Industrial Precast Roof
-                    wallCol   = vec3(0.72, 0.76, 0.82);
-                    trimCol   = vec3(0.90, 0.93, 0.96);
-                    roofCol   = vec3(0.42, 0.46, 0.52);
-                    accentCol = vec3(0.24, 0.48, 0.68);
+                    // 11: Sleek Miami Coastal Modernist High-Rise + Warm Precast Travertine Roof
+                    wallCol   = vec3(0.80, 0.84, 0.88);
+                    trimCol   = vec3(0.93, 0.95, 0.97);
+                    roofCol   = vec3(0.74, 0.76, 0.79);
+                    accentCol = vec3(0.32, 0.54, 0.68);
                 }
             }
 
@@ -886,17 +850,18 @@ class RetroRenderer {
                             totalShade = clamp(bldShadow * 0.92 + bldAO * 0.32, 0.0, 1.0);
                         }
 
-                        vec3 sunlitTint = mix(vec3(1.12, 1.06, 0.94), vec3(1.04, 1.00, 0.94), sandMask);
-                        vec3 shadowTint = mix(vec3(0.40, 0.52, 0.78), vec3(0.62, 0.68, 0.82), sandMask);
+                        vec3 sunlitTint = mix(vec3(1.13, 1.07, 0.95), vec3(1.03, 1.00, 0.94), sandMask);
+                        vec3 shadowTint = mix(vec3(0.54, 0.65, 0.86), vec3(0.68, 0.72, 0.84), sandMask);
                         if (isRoad) {
-                            sunlitTint = vec3(1.10, 1.06, 0.98);
-                            shadowTint = vec3(0.45, 0.56, 0.80);
+                            sunlitTint = vec3(1.11, 1.07, 0.98);
+                            shadowTint = vec3(0.56, 0.66, 0.85);
                         }
-                        vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.28);
+                        vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.24);
                         float isElevatedRoof = step(2.85, vWorldPos.y);
                         if (isElevatedRoof > 0.5 && waterCoverage < 0.05) {
                             // Preserve turquoise rooftop swimming pools (lid 35), and style all building roofs
-                            // with deep 2.5D sunken roof decks, 3D parapet cast shadows, neon roof-edge tubes & architectural equipment!
+                            // as continuous, seamless Miami Beach Cool-Roof Cream, Warm Coral-Terracotta, or Coquina Travertine Terraces!
+                            // (Outer 3D building parapet walls are emitted strictly on true building edges by _emitParapetStripScalar — ZERO per-tile boxes!)
                             float isPoolRoof = step(0.18, c.b - c.r) * step(0.12, c.g - c.r);
                             if (isPoolRoof < 0.5) {
                                 float rStyle = floor(clamp(vAnim, 0.0, 0.45) * 40.0 + 0.5);
@@ -904,124 +869,27 @@ class RetroRenderer {
                                 getBuildingStyleColors(rStyle, bWallCol, bTrimCol, bRoofCol, bAccentCol);
 
                                 float tierSeed = fract(floor(vWorldPos.y + 0.1) * 0.37 + rStyle * 0.13);
-                                vec2 rf = fract(vWorldPos.xz);
                                 vec2 subRf = fract(vWorldPos.xz * 2.0);
-                                float edgeD = min(min(rf.x, 1.0 - rf.x), min(rf.y, 1.0 - rf.y));
                                 float subD  = min(min(subRf.x, 1.0 - subRf.x), min(subRf.y, 1.0 - subRf.y));
 
-                                // 100% Procedural Roof Deck Base (eliminates blurry 64px tile artifacts)
+                                // Seamless continuous Miami roof deck (no per-tile outer border or solar-panel grid spam!)
                                 float subHash = aHash(floor(vWorldPos.xz * 2.0));
-                                vec3 cleanRoof = bRoofCol * (0.94 + 0.10 * (tierSeed - 0.5) + 0.06 * (subHash - 0.5));
-                                float outerGutter = smoothstep(0.085, 0.125, edgeD);
-                                float paverJoint  = smoothstep(0.022, 0.058, subD);
-                                float paverBevel  = smoothstep(0.058, 0.095, subD) - smoothstep(0.095, 0.135, subD);
+                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.03 * (subHash - 0.5));
+                                float paverJoint = smoothstep(0.015, 0.042, subD);
+                                float paverBevel = smoothstep(0.042, 0.075, subD) - smoothstep(0.075, 0.110, subD);
                                 float grainSum = 0.0;
                                 float isClayRoof = step(abs(rStyle - 2.0), 0.4) + step(abs(rStyle - 9.0), 0.4) + step(abs(rStyle - 0.0), 0.4);
                                 if (uMobileFast < 0.5) {
-                                    float fineGrain = (aHash(floor(vWorldPos.xz * 64.0)) - 0.5) * 0.048;
-                                    float medGrain  = (aNoise(vWorldPos.xz * 6.5 + 11.0) - 0.5) * 0.042;
+                                    float fineGrain = (aHash(floor(vWorldPos.xz * 64.0)) - 0.5) * 0.028;
+                                    float medGrain  = (aNoise(vWorldPos.xz * 4.5 + 11.0) - 0.5) * 0.024;
                                     grainSum = fineGrain + medGrain;
-                                    // Mediterranean clay barrel-tile 3D ridges on terracotta/coral roof styles (0, 2, 9)
+                                    // Coral Gables / Little Havana Spanish terracotta barrel-tile waves on clay roof styles (0, 2, 9)
                                     if (isClayRoof > 0.5) {
-                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.048 + step(0.82, fract(vWorldPos.z * 4.0)) * (-0.055);
+                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.032 + step(0.84, fract(vWorldPos.z * 4.0)) * (-0.038);
                                         grainSum += clayRib;
                                     }
                                 }
-
-                                // 3D Inner Parapet Step Drop-Shadow cast by the North & West parapet walls onto the sunken roof deck
-                                float innerStepShad = (
-                                    smoothstep(0.080, 0.110, rf.y) * (1.0 - smoothstep(0.110, 0.255, rf.y)) * 0.92 +
-                                    smoothstep(0.080, 0.110, rf.x) * (1.0 - smoothstep(0.110, 0.235, rf.x)) * 0.82
-                                );
-
-                                // Procedural 2.5D Rooftop Architectural Details on every non-clay roof tile (Skylights, Twin HVAC Chiller Banks, Solar Arrays & Ducts)
-                                if (uMobileFast < 0.5 && isClayRoof < 0.5 && edgeD > 0.135) {
-                                    float tileSeed = aHash(floor(vWorldPos.xz));
-                                    if (tileSeed > 0.56) {
-                                        // Type A: 3D Recessed Architectural Glass Atrium Skylight with 3x3 Steel Mullions & Diagonal Miami Sky Reflection
-                                        vec2 skD = abs(rf - vec2(0.50, 0.50));
-                                        float skMax = max(skD.x, skD.y);
-                                        if (skMax < 0.27) {
-                                            if (skMax > 0.225) {
-                                                // Raised steel skylight curb frame with sunlit top/left bevel
-                                                float frameSun = (rf.x < 0.50 || rf.y < 0.50) ? 1.08 : 0.72;
-                                                cleanRoof = mix(bTrimCol * 0.85, vec3(0.28, 0.32, 0.38), step(0.25, skMax)) * frameSun;
-                                            } else {
-                                                float mullX = step(abs(fract((rf.x - 0.275) * 6.66) - 0.5), 0.06);
-                                                float mullY = step(abs(fract((rf.y - 0.275) * 6.66) - 0.5), 0.06);
-                                                float mull = max(mullX, mullY);
-                                                float innerRecess = (1.0 - smoothstep(0.275, 0.34, rf.x)) + (1.0 - smoothstep(0.275, 0.34, rf.y));
-                                                float diagGlint = smoothstep(0.08, 0.0, abs((rf.x - 0.5) + (rf.y - 0.5) - 0.05))
-                                                    + 0.45 * smoothstep(0.05, 0.0, abs((rf.x - 0.5) + (rf.y - 0.5) + 0.11));
-                                                vec3 skyGlass = mix(vec3(0.08, 0.22, 0.36), vec3(0.48, 0.84, 0.98), clamp(0.25 + 0.68 * diagGlint, 0.0, 1.0));
-                                                skyGlass *= (1.0 - clamp(innerRecess, 0.0, 1.0) * 0.38);
-                                                cleanRoof = mix(skyGlass, vec3(0.22, 0.26, 0.32), mull);
-                                            }
-                                        } else if (max(abs(rf.x - 0.54), abs(rf.y - 0.54)) < 0.27) {
-                                            innerStepShad = max(innerStepShad, 0.82);
-                                        }
-                                    } else if (tileSeed < 0.32) {
-                                        // Type B: Twin Galvanized Steel Rooftop HVAC Chiller Bank + Connecting Ductwork Pipes + 6-Blade Turbine Grilles
-                                        vec2 hvD = abs(rf - vec2(0.47, 0.48));
-                                        // Galvanized steel ductwork pipe running from chiller to North/East parapet
-                                        bool inDuct = (abs(rf.y - 0.48) < 0.038 && rf.x >= 0.65 && rf.x <= 0.86) || (abs(rf.x - 0.47) < 0.038 && rf.y >= 0.14 && rf.y <= 0.34);
-                                        if (hvD.x < 0.21 && hvD.y < 0.14) {
-                                            float hvEdge = max(hvD.x / 0.21, hvD.y / 0.14);
-                                            float fan1R = length(rf - vec2(0.37, 0.48));
-                                            float fan2R = length(rf - vec2(0.57, 0.48));
-                                            float fanR = min(fan1R, fan2R);
-                                            vec2 fanC = (fan1R < fan2R) ? vec2(0.37, 0.48) : vec2(0.57, 0.48);
-                                            vec3 hvacMetal = vec3(0.68, 0.72, 0.77) * (0.82 + 0.22 * step(hvEdge, 0.88));
-                                            if (fanR < 0.072) {
-                                                float blade = 0.5 + 0.5 * sin(atan(rf.y - fanC.y, rf.x - fanC.x) * 6.0);
-                                                hvacMetal = mix(vec3(0.09, 0.12, 0.16), vec3(0.38, 0.43, 0.50), blade * step(0.020, fanR));
-                                                if (fanR > 0.060) hvacMetal = vec3(0.22, 0.26, 0.32);
-                                            }
-                                            cleanRoof = hvacMetal;
-                                        } else if (inDuct) {
-                                            float ductCyl = 1.0 - min(abs(rf.y - 0.48), abs(rf.x - 0.47)) * 18.0;
-                                            cleanRoof = vec3(0.62, 0.66, 0.72) * (0.80 + 0.25 * clamp(ductCyl, 0.0, 1.0));
-                                        } else if (abs(rf.x - 0.515) < 0.21 && abs(rf.y - 0.525) < 0.14) {
-                                            innerStepShad = max(innerStepShad, 0.88);
-                                        }
-                                    } else {
-                                        // Type C: Angled Photovoltaic Rooftop Solar Panel Array & Cast-Iron Drainage Grate
-                                        vec2 spD = abs(rf - vec2(0.48, 0.48));
-                                        if (spD.x < 0.22 && spD.y < 0.16) {
-                                            float cellX = step(0.08, fract(rf.x * 16.0));
-                                            float cellY = step(0.12, fract(rf.y * 12.0));
-                                            float frame = step(0.20, spD.x) + step(0.14, spD.y);
-                                            float glint = smoothstep(0.18, 0.0, abs((rf.x - 0.48) + (rf.y - 0.48)));
-                                            vec3 pvCol = mix(vec3(0.09, 0.18, 0.32), vec3(0.22, 0.48, 0.72), glint) * (0.82 + 0.18 * cellX * cellY);
-                                            cleanRoof = mix(pvCol, vec3(0.76, 0.80, 0.85), clamp(frame, 0.0, 1.0));
-                                        } else if (abs(rf.x - 0.52) < 0.22 && abs(rf.y - 0.52) < 0.16) {
-                                            innerStepShad = max(innerStepShad, 0.78);
-                                        }
-                                    }
-                                }
-
-                                // Apply sunken roof deck shading before compositing the raised 3D perimeter parapet wall
-                                float sunEdgeRim = (1.0 - smoothstep(0.0, 0.16, rf.y)) * 0.055;
-                                vec3 deckRgb = (cleanRoof + grainSum + paverBevel * 0.032 + sunEdgeRim)
-                                    * mix(0.76, 1.0, outerGutter)
-                                    * mix(0.86, 1.0, paverJoint)
-                                    * (1.0 - clamp(innerStepShad, 0.0, 1.0) * 0.34);
-
-                                // Thick 3D Raised Parapet Wall around the perimeter (edgeD < 0.105) + Vice City Art Deco Neon Parapet Tube!
-                                float copingBand = 1.0 - smoothstep(0.075, 0.108, edgeD);
-                                float outerDrip  = 1.0 - smoothstep(0.014, 0.028, edgeD);
-                                float parSunBevel = (rf.x < 0.11 || rf.y < 0.11) ? 1.08 : 0.88;
-                                vec3 copingTint = mix(bWallCol, bTrimCol, 0.68) * parSunBevel;
-                                copingTint = mix(copingTint, copingTint * 0.58, outerDrip);
-
-                                // Signature Vice City Art Deco Neon Parapet Crown Tube along outer parapet rim on Deco/Condo buildings
-                                float hasNeonTrim = step(abs(rStyle - 0.0), 0.4) + step(abs(rStyle - 1.0), 0.4) + step(abs(rStyle - 3.0), 0.4)
-                                    + step(abs(rStyle - 4.0), 0.4) + step(abs(rStyle - 6.0), 0.4) + step(abs(rStyle - 7.0), 0.4) + step(abs(rStyle - 10.0), 0.4);
-                                if (hasNeonTrim > 0.5 && edgeD >= 0.022 && edgeD <= 0.048) {
-                                    vec3 neonCol = mix(bAccentCol, vec3(1.0, 0.95, 1.0), 0.35);
-                                    copingTint = mix(copingTint, neonCol * 1.15, 0.72);
-                                }
-                                c.rgb = mix(deckRgb, copingTint, copingBand * 0.92);
+                                c.rgb = (cleanRoof + grainSum + paverBevel * 0.018) * mix(0.94, 1.0, paverJoint);
                             } else {
                                 // Luxury Miami Art Deco Rooftop & Resort Swimming Pool (lid 35):
                                 // Travertine perimeter coping rim, cobalt ceramic waterline trim, mosaic tile floor & animated solar caustics!
@@ -1031,7 +899,7 @@ class RetroRenderer {
                                     // Chiselled warm ivory travertine pool coping stones
                                     float joint = smoothstep(0.012, 0.032, min(fract(pf.x * 4.0), fract(pf.y * 4.0)));
                                     float bevel = smoothstep(0.0, 0.022, edgeD) * (1.0 - 0.15 * smoothstep(0.048, 0.068, edgeD));
-                                    c.rgb = vec3(0.88, 0.84, 0.76) * (0.88 + 0.12 * joint) * bevel;
+                                    c.rgb = vec3(0.90, 0.87, 0.80) * (0.88 + 0.12 * joint) * bevel;
                                 } else if (edgeD < 0.086) {
                                     // Cobalt-blue glazed ceramic waterline tile trim
                                     c.rgb = vec3(0.08, 0.36, 0.68);
@@ -1050,11 +918,9 @@ class RetroRenderer {
                                 }
                             }
                         }
-                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.018, 0.0, 0.045) * (1.0 - sandMask * 0.85);
-                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.16 * (1.0 - totalShade) * (1.0 - sandMask * 0.55)) + 0.5, 0.0, 1.0);
-                        vec3 rawDayLit = sunlitRgb * dayGrading * (1.0 + roofSunBoost);
-                        // Smooth filmic highlight shoulder prevents any rooftop, sidewalk, or beach sand from clipping to flat white
-                        sunlitRgb = mix(min(vec3(1.0), rawDayLit), filmicToneMap(rawDayLit * 0.94), 0.42);
+                        float roofSunBoost = clamp((vWorldPos.y - 2.0) * 0.016, 0.0, 0.045) * (1.0 - sandMask * 0.85);
+                        vec3 sunlitRgb = clamp((c.rgb - 0.5) * (1.0 + 0.12 * (1.0 - totalShade) * (1.0 - sandMask * 0.65)) + 0.5, 0.0, 1.0);
+                        sunlitRgb = min(vec3(0.97), sunlitRgb * dayGrading * (1.0 + roofSunBoost));
                         c.rgb = mix(c.rgb, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
                     }
 
@@ -1209,22 +1075,21 @@ class RetroRenderer {
                     vec3 decoCol = mix(bAccentCol, bTrimCol, awningStripe * 0.65);
                     wallMasonry = mix(wallMasonry, decoCol, clamp(decoBand * (1.0 - isGlass), 0.0, 1.0));
 
-                    // Realistic Dark Architectural Tinted Glass with Diagonal Miami Sky & Cumulus Cloud Reflections
+                    // Luminous Miami Tropical Turquoise-Azure Sky Window Glass with Crisp White Casements
                     vec3 glassBase = (isCurtainWall > 0.5)
-                        ? vec3(0.08, 0.22, 0.34)
-                        : vec3(0.10, 0.17, 0.26);
+                        ? vec3(0.12, 0.30, 0.44)
+                        : vec3(0.16, 0.28, 0.40);
                     float diagSkyBand = smoothstep(0.24, 0.0, abs(fract(tileU * 2.0) + storeyY - 1.05)) * 0.55
                         + smoothstep(0.12, 0.0, abs(fract(tileU * 2.0) + storeyY - 0.78)) * 0.35;
-                    vec3 archGlass = (glassBase + vec3(0.14, 0.28, 0.42) * diagSkyBand) * (1.0 - winRecessShad);
+                    vec3 archGlass = (glassBase + vec3(0.18, 0.34, 0.48) * diagSkyBand) * (1.0 - winRecessShad * 0.65);
                     c.rgb = mix(wallMasonry, archGlass, isGlass);
 
-                    // Storey Cornice Ledge Highlight, Under-Eyebrow Shadow, Vertical Pilaster Fluting & 3D Urban Canyon Vertical AO Gradient
+                    // Storey Cornice Ledge Highlight, Under-Eyebrow Shadow, Vertical Pilaster Fluting & Sunny Miami Vertical Gradient
                     float wallHoriz = fract(vWorldPos.x + vWorldPos.z);
-                    float pilaster = mix(0.89, 1.04, smoothstep(0.04, 0.13, min(wallHoriz, 1.0 - wallHoriz)));
-                    float corniceLight = 1.0 + 0.12 * smoothstep(0.90, 0.96, storeyY) - 0.14 * (smoothstep(0.78, 0.85, storeyY) - smoothstep(0.85, 0.91, storeyY));
-                    // Strong 3D Vertical Urban Canyon Gradient: deep street-canyon AO at y=2.0 rising to sunlit penthouse crowns at y=5.5+
-                    float canyonVerticalGrad = mix(0.74, 1.12, clamp((vWorldPos.y - 2.0) / 3.2, 0.0, 1.0));
-                    float baseAO = mix(0.82, 1.0, smoothstep(0.0, 0.26, storeyY)) * canyonVerticalGrad;
+                    float pilaster = mix(0.92, 1.03, smoothstep(0.04, 0.13, min(wallHoriz, 1.0 - wallHoriz)));
+                    float corniceLight = 1.0 + 0.10 * smoothstep(0.90, 0.96, storeyY) - 0.10 * (smoothstep(0.78, 0.85, storeyY) - smoothstep(0.85, 0.91, storeyY));
+                    float canyonVerticalGrad = mix(0.88, 1.08, clamp((vWorldPos.y - 2.0) / 3.2, 0.0, 1.0));
+                    float baseAO = mix(0.86, 1.0, smoothstep(0.0, 0.26, storeyY)) * canyonVerticalGrad;
                     if (uMobileFast < 0.5) {
                         float stuccoGrain = (aHash(floor(vec2(wallAlong, vWorldPos.y) * 64.0)) - 0.5) * 0.036 * (1.0 - isGlass);
 
@@ -1374,14 +1239,14 @@ class RetroRenderer {
                 if (dayAmt > 0.01) {
                     vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                     float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
-                    float bldAO = lm.g * onGround * 0.28;
+                    float bldAO = lm.g * onGround * 0.24;
                     float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
                     float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround;
-                    float totalShade = clamp(bldShadow * 0.92 + bldAO * 0.32, 0.0, 1.0);
-                    vec3 sunlitTint = vec3(1.10, 1.06, 0.98);
-                    vec3 shadowTint = vec3(0.45, 0.56, 0.80);
-                    vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.26);
-                    vec3 sunlitRgb = clamp((col - 0.5) * (1.0 + 0.16 * (1.0 - totalShade)) + 0.5, 0.0, 1.0);
+                    float totalShade = clamp(bldShadow * 0.84 + bldAO * 0.26, 0.0, 1.0);
+                    vec3 sunlitTint = vec3(1.11, 1.07, 0.98);
+                    vec3 shadowTint = vec3(0.56, 0.66, 0.85);
+                    vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
+                    vec3 sunlitRgb = clamp((col - 0.5) * (1.0 + 0.14 * (1.0 - totalShade)) + 0.5, 0.0, 1.0);
                     sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading);
                     col = mix(col, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
                 }
@@ -1423,7 +1288,7 @@ class RetroRenderer {
 
                         vec2 p = vWorldPos.xz;
                         float darkFamily = step(1.25, modeFlag);
-                        vec3 base = mix(vec3(0.205, 0.228, 0.252), vec3(0.155, 0.172, 0.202), darkFamily);
+                        vec3 base = mix(vec3(0.255, 0.285, 0.310), vec3(0.200, 0.220, 0.255), darkFamily);
                         vec3 col;
                         if (uMobileFast > 0.5) {
                             float grainFast = sHash(floor(p * 32.0));
@@ -1433,29 +1298,29 @@ class RetroRenderer {
                             float mid   = sNoise(p * 4.0 + 13.0);
                             float grain = sHash(floor(p * 40.0));
                             float fine  = sHash(floor(p * 96.0) + 19.0);
-                            col = base * (0.86 + big * 0.20 + mid * 0.08);
-                            col *= 0.93 + grain * 0.06 + fine * 0.09;
-                            col += vec3(0.062, 0.065, 0.070) * step(0.980, fine);
-                            float tar = smoothstep(0.62, 0.78, sNoise(p * 0.7 + 31.0));
-                            col *= 1.0 - tar * 0.16;
-                            float seam = 1.0 - smoothstep(0.0, 0.024, abs(sNoise(p * 1.1 + 57.0) - 0.5));
-                            col *= 1.0 - seam * 0.18 * step(0.62, sNoise(p * 0.3 + 3.0));
+                            col = base * (0.88 + big * 0.18 + mid * 0.07);
+                            col *= 0.94 + grain * 0.05 + fine * 0.08;
+                            col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);
+                            float tar = smoothstep(0.66, 0.80, sNoise(p * 0.7 + 31.0));
+                            col *= 1.0 - tar * 0.13;
+                            float seam = 1.0 - smoothstep(0.0, 0.022, abs(sNoise(p * 1.1 + 57.0) - 0.5));
+                            col *= 1.0 - seam * 0.12 * step(0.68, sNoise(p * 0.3 + 3.0));
                         }
 
                         // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter + Continuous Worn Yellow Curb Line (matching cityFS)
-                        if (dCurbPx < 2.2) {
-                            col = mix(vec3(0.88, 0.85, 0.79), vec3(0.70, 0.67, 0.62), dCurbPx * 0.45);
-                        } else if (dCurbPx < 3.4) {
-                            col = vec3(0.32, 0.31, 0.29);
-                        } else if (dCurbPx < 4.5) {
-                            float gMix = (dCurbPx - 3.4) / 1.1;
-                            col = mix(vec3(0.11, 0.13, 0.16), col, gMix);
-                        } else if (modeFlag > 0.5 && dCurbPx >= 5.0 && dCurbPx < 7.2) {
+                        if (dCurbPx < 2.0) {
+                            col = mix(vec3(0.86, 0.83, 0.77), vec3(0.74, 0.71, 0.66), dCurbPx * 0.5);
+                        } else if (dCurbPx < 3.0) {
+                            col = vec3(0.47, 0.45, 0.42);
+                        } else if (dCurbPx < 4.2) {
+                            float gMix = (dCurbPx - 3.0) / 1.2;
+                            col = mix(vec3(0.16, 0.19, 0.21), col, gMix);
+                        } else if (modeFlag > 0.5 && dCurbPx >= 5.0 && dCurbPx < 7.0) {
                             if (uMobileFast > 0.5) {
-                                col = vec3(0.94, 0.76, 0.20);
+                                col = vec3(0.92, 0.75, 0.22);
                             } else {
-                                float yWear = clamp(0.68 + sNoise(p * 7.5 + 43.0) * 0.32 - step(0.72, sHash(floor(p * 36.0))) * 0.28, 0.25, 0.92);
-                                vec3 yPaint = vec3(0.96, 0.78, 0.18) * (0.90 + sNoise(p * 9.0 + 71.0) * 0.12);
+                                float yWear = clamp(0.68 + sNoise(p * 7.5 + 43.0) * 0.32 - step(0.72, sHash(floor(p * 36.0))) * 0.28, 0.22, 0.88);
+                                vec3 yPaint = vec3(0.95, 0.77, 0.20) * (0.90 + sNoise(p * 9.0 + 71.0) * 0.12);
                                 col = mix(col, yPaint, yWear);
                             }
                         }
@@ -12521,7 +12386,7 @@ class RetroRenderer {
         const sunX = W * (0.82 - dayProgress * 0.64);
         const maxDim = Math.hypot(W, H);
 
-        // Crisp Golden Florida Solar Corona, Corner Rim Glow & Subtle Cinematic 2.5D Screen-Edge Vignette
+        // Crisp Golden Florida Solar Corona & Corner Rim Glow (100% sunny tropical Miami atmosphere, zero dark grey screen vignette!)
         if (!this._sunCoronaStamp) {
             const sc = document.createElement("canvas");
             sc.width = 96;
@@ -12529,31 +12394,17 @@ class RetroRenderer {
             const sctx = sc.getContext("2d");
             const sg = sctx.createRadialGradient(48, 0, 2, 48, 0, 92);
             sg.addColorStop(0.0, "rgba(255, 246, 200, 1.0)");
-            sg.addColorStop(0.32, "rgba(255, 222, 142, 0.44)");
-            sg.addColorStop(0.68, "rgba(255, 198, 112, 0.14)");
+            sg.addColorStop(0.32, "rgba(255, 222, 142, 0.42)");
+            sg.addColorStop(0.68, "rgba(255, 198, 112, 0.12)");
             sg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
             sctx.fillStyle = sg;
             sctx.fillRect(0, 0, 96, 96);
             this._sunCoronaStamp = sc;
         }
-        if (!this._cinemaVignetteStamp) {
-            const vc = document.createElement("canvas");
-            vc.width = 128;
-            vc.height = 128;
-            const vctx = vc.getContext("2d");
-            const vg = vctx.createRadialGradient(64, 64, 34, 64, 64, 90);
-            vg.addColorStop(0.0, "rgba(0, 0, 0, 0)");
-            vg.addColorStop(0.65, "rgba(8, 14, 28, 0.05)");
-            vg.addColorStop(1.0, "rgba(6, 10, 22, 0.28)");
-            vctx.fillStyle = vg;
-            vctx.fillRect(0, 0, 128, 128);
-            this._cinemaVignetteStamp = vc;
-        }
-        const coronaR = maxDim * 0.50;
+        const coronaR = maxDim * 0.48;
         ctx.save();
-        ctx.drawImage(this._cinemaVignetteStamp, 0, 0, W, H);
         ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.16 * dayInt;
+        ctx.globalAlpha = 0.14 * dayInt;
         ctx.drawImage(this._sunCoronaStamp, sunX - coronaR * 0.5, 0, coronaR, coronaR * 0.65);
         ctx.globalAlpha = 1.0;
         ctx.restore();
