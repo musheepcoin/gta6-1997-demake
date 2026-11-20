@@ -375,7 +375,14 @@ class RetroRenderer {
                 float mid = aNoise(p * 4.0 + 13.0);
                 float grain = aHash(floor(p * 40.0));
                 float fine = aHash(floor(p * 96.0) + 19.0);
-                vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
+                vec3 col = base * (0.86 + big * 0.24 + mid * 0.07);
+                // Lived-in road state (feeling, not dirt): aerial-photo style resurfacing patches & utility cuts = straight-edged
+                // cells a few % darker (fresh seal) or lighter (sun-faded old surface). Very low contrast, large scale, zero speckle.
+                vec2 patchCell = floor(p * vec2(0.30, 0.21) + 3.0);
+                float patchH = aHash(patchCell);
+                float patchEdge = smoothstep(0.0, 0.06, min(min(fract(p.x * 0.30 + 3.0), 1.0 - fract(p.x * 0.30 + 3.0)), min(fract(p.y * 0.21 + 3.0), 1.0 - fract(p.y * 0.21 + 3.0))));
+                col *= 1.0 + patchEdge * (step(0.80, patchH) * -0.075 + step(0.62, patchH) * step(patchH, 0.80) * 0.05);
+                col = mix(col, vec3(dot(col, vec3(0.333))), 0.10);                // sun-bleached: slightly less colourful
                 col *= 0.94 + grain * 0.05 + fine * 0.08;
                 col += vec3(0.055, 0.058, 0.062) * step(0.980, fine);           // light limestone aggregate stones
                 float tar = smoothstep(0.64, 0.80, aNoise(p * 0.65 + 31.0));
@@ -392,8 +399,9 @@ class RetroRenderer {
                 float paintChip = aNoise(p * 10.0 + 71.0) * 0.65 + fine * 0.35;
                 vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.09, 0.0, 0.95));
                 if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.09, 0.0, 0.95) / max(mx, 0.01));
-                paintCol *= 0.88 + paintChip * 0.12;
-                paint *= clamp(0.88 + paintChip * 0.15 - max(laneRutX, laneRutY) * 0.08, 0.68, 1.0);
+                paintCol *= 0.84 + paintChip * 0.12;                                // chalky, sun-bleached thermoplastic (no longer showroom white)
+                paintCol = mix(paintCol, vec3(dot(paintCol, vec3(0.333))) * vec3(1.02, 1.0, 0.95), 0.18);
+                paint *= clamp(0.80 + paintChip * 0.17 - max(laneRutX, laneRutY) * 0.14, 0.50, 0.97);
 
                 // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (vAnim in 5.50 .. 9.375)
                 float cwPaint = 0.0;
@@ -496,10 +504,13 @@ class RetroRenderer {
                 float slabHash = aHash(cellId);
                 float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.022;
                 float medMottle = (aNoise(p * 2.2 + 19.0) - 0.5) * 0.025;
-                float sunPatina = (aNoise(p * 0.36 + 7.3) - 0.5) * 0.032;
+                float sunPatina = (aNoise(p * 0.36 + 7.3) - 0.5) * 0.032 + (aNoise(p * 0.13 + 41.0) - 0.5) * 0.07;
 
-                // Subtle, natural slab-to-slab stone variation (±2.8%) + delicate hairline mineral vein on ~14% of slabs
-                float slabTone = (slabHash - 0.5) * 0.056;
+                // Subtle, natural slab-to-slab stone variation (±4%) + delicate hairline mineral vein on ~14% of slabs
+                // + broad "pressure-washed vs. weathered" zones: a few % duller/greyer over several tiles (aerial-photo mottling, never dirt specks)
+                float weatherZone = smoothstep(0.52, 0.78, aNoise(p * 0.19 + 5.0));
+                stonePalette = mix(stonePalette, vec3(dot(stonePalette, vec3(0.333))) * vec3(1.0, 0.985, 0.955) * 0.93, weatherZone * 0.45);
+                float slabTone = (slabHash - 0.5) * 0.080;
                 vec3 slabTint = stonePalette * (0.98 + slabTone + sunPatina);
                 float hasVein = step(0.86, slabHash);
                 float stoneVein = (1.0 - smoothstep(0.0, 0.020, abs(aNoise(p * 3.6 + slabHash * 11.3) - 0.5))) * hasVein * 0.048;
@@ -892,7 +903,11 @@ class RetroRenderer {
                                 // Seamless continuous Miami roof deck with natural sun-warmed paver/terracotta tone variation (zero dark soot blotches!)
                                 float subHash = aHash(floor(vWorldPos.xz * 2.0));
                                 float roofMacro = aNoise(vWorldPos.xz * 0.45 + 9.2) - 0.5;
-                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.042 * (subHash - 0.5) + 0.040 * roofMacro);
+                                // Weathered, sun-aged roof coatings: broad low-contrast tone zones + faint one-directional rain-streak staining (aerial-photo look)
+                                float roofAge = aNoise(vWorldPos.xz * 0.14 + 27.0) - 0.5;
+                                float roofStreak = aNoise(vec2(vWorldPos.x * 3.2, vWorldPos.z * 0.22) + 61.0) - 0.5;
+                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.042 * (subHash - 0.5) + 0.075 * roofMacro + 0.10 * roofAge + 0.055 * roofStreak);
+                                cleanRoof = mix(cleanRoof, vec3(dot(cleanRoof, vec3(0.333))), 0.10 + 0.10 * smoothstep(0.0, 0.25, roofAge));
                                 float paverJoint = smoothstep(0.015, 0.042, subD);
                                 float paverBevel = smoothstep(0.042, 0.075, subD) - smoothstep(0.075, 0.110, subD);
                                 float grainSum = 0.0;
