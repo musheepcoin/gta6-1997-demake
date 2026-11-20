@@ -464,16 +464,45 @@ function isDynamicVehicleId(vid) {
     return (
         vid.startsWith("trf_") ||
         vid.startsWith("traf_") ||
+        vid.startsWith("srv_trf_") ||
+        vid.startsWith("v_init_") ||
         vid.startsWith("cop_") ||
         vid.startsWith("rb_") ||
         vid.startsWith("amb_") ||
         vid.startsWith("medic_") ||
         vid.startsWith("vcfd_") ||
+        vid.startsWith("fire_") ||
         vid.startsWith("tow_") ||
+        vid.startsWith("nemesis_") ||
+        vid.startsWith("crim_") ||
         vid.startsWith("fixer_") ||
         vid.startsWith("mission_") ||
         vid.startsWith("mcheetah_") ||
         vid.startsWith("mbrinks_")
+    );
+}
+
+function isTransientResponderRow(vid, row) {
+    if (typeof vid === "string" && (
+        vid.startsWith("cop_") ||
+        vid.startsWith("rb_") ||
+        vid.startsWith("amb_") ||
+        vid.startsWith("medic_") ||
+        vid.startsWith("vcfd_") ||
+        vid.startsWith("fire_") ||
+        vid.startsWith("tow_") ||
+        vid.startsWith("nemesis_") ||
+        vid.startsWith("crim_")
+    )) {
+        return true;
+    }
+    const specKey = Array.isArray(row) ? row[1] : "";
+    return (
+        specKey === "VCPD_CRUISER" ||
+        specKey === "SWAT_ENFORCER" ||
+        specKey === "TOW_TRUCK" ||
+        specKey === "FIRE_TRUCK" ||
+        specKey === "MEDIC_AMBULANCE"
     );
 }
 
@@ -588,7 +617,7 @@ function loadPersistentState() {
                                 if (!Array.isArray(vrow) || vrow.length < 11) continue;
                                 if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
                                 // Strip destroyed wrecks and transient traffic/cop/mission cars from modifiedVehs on server startup
-                                if ((vrow[10] & 1) || isDynamicVehicleId(vid)) {
+                                if ((vrow[10] & 1) || isDynamicVehicleId(vid) || isTransientResponderRow(vid, vrow)) {
                                     migratedAny = true;
                                     continue;
                                 }
@@ -1238,9 +1267,15 @@ function handleClientPacket(socket, pkt) {
             }
             const isMod = Boolean(row[13]) || Boolean(row[10] & 1); // mod === 1 or destroyed
             if (!isMod) continue;
-            if (row[8] !== 0 && row[8] !== 4 && !(row[10] & 1)) {
+            if (
+                (row[8] !== 0 && row[8] !== 4 && !(row[10] & 1)) ||
+                (isTransientResponderRow(vid, row) && row[8] !== 4 && !(row[10] & 1))
+            ) {
                 delete room.modifiedVehs[vid];
                 delete room.modifiedVehTs[vid];
+                if (isTransientResponderRow(vid, row) && row[8] === 0 && !(row[10] & 1)) {
+                    delete room.vehs[vid];
+                }
                 continue;
             }
             row[13] = 1;
@@ -2703,14 +2738,15 @@ setInterval(() => {
             }
         }
 
-        // Expire burned wrecks (> 90s) and abandoned dynamic traffic/mission vehicles (> 180s) from modifiedVehs
+        // Expire burned wrecks (> 60s), unoccupied transient/dynamic vehicles (> 45s), and other unoccupied modified cars (> 180s) from modifiedVehs
         if (rv.modifiedVehs && rv.modifiedVehTs) {
             for (const [vid, vrow] of Object.entries(rv.modifiedVehs)) {
                 if (!Array.isArray(vrow)) continue;
                 const vts = rv.modifiedVehTs[vid] || nowMs;
                 const isDestroyed = Boolean(vrow[10] & 1);
-                const isUnoccupiedDynamic = (vrow[8] === 0) && isDynamicVehicleId(vid);
-                const maxVehAge = isDestroyed ? 90000 : (isUnoccupiedDynamic ? 180000 : 0);
+                const isUnoccupiedResponderOrDynamic = (vrow[8] === 0) && (isDynamicVehicleId(vid) || isTransientResponderRow(vid, vrow));
+                const isUnoccupiedOther = (vrow[8] === 0);
+                const maxVehAge = isDestroyed ? 60000 : (isUnoccupiedResponderOrDynamic ? 45000 : (isUnoccupiedOther ? 180000 : 0));
                 if (maxVehAge > 0 && (nowMs - vts) > maxVehAge) {
                     delete rv.modifiedVehs[vid];
                     delete rv.modifiedVehTs[vid];

@@ -3057,28 +3057,46 @@ class Vehicle {
         const blockedByWallNear = (!wantedTarget.inVehicle || Math.abs(wantedTarget.speed || 0) < 85) && distToPlayer < blockedMaxDist && noProgress > 1.35;
 
         if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
-            const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 64, wantedTarget);
-            if (!spacingOk && this.aiBailTimer < 0.65) {
-                this.aiBailTimer += dt * 0.4;
-                const offRoadHere = map && map.isRoadAtPixel ? !map.isRoadAtPixel(this.x, this.y) : false;
-                return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.42, false, offRoadHere);
+            // Coherent Scene Cap: if 2 or more stopped/unoccupied police or emergency units are already parked within 220px of this spot,
+            // do NOT bail out and abandon a 3rd/4th/5th empty VCPD cruiser in the street — stay mobile in vehicle pursuit/flanking!
+            let nearbyStoppedCops = 0;
+            if (game && Array.isArray(game.vehicles)) {
+                for (let vi = 0; vi < game.vehicles.length; vi++) {
+                    const ov = game.vehicles[vi];
+                    if (!ov || ov === this || ov.destroyed || !ov.isPolice) continue;
+                    if ((ov.driver === null || Math.abs(ov.speed || 0) < 22) && Math.hypot(ov.x - this.x, ov.y - this.y) < 220) {
+                        nearbyStoppedCops++;
+                    }
+                }
             }
-            this.aiBailTimer += dt;
-            const brakeMult = Math.pow(0.001, dt);
-            this.vx *= brakeMult;
-            this.vy *= brakeMult;
-            this.speed *= brakeMult;
-            const bailDelay = playerBoxedNear ? 0.35 : 0.18;
-            if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
+            if (nearbyStoppedCops >= 2) {
+                this.noDeployCooldown = 2.5;
                 this.aiBailTimer = 0;
                 this.approachNoProgress = 0;
-                this.vx = 0;
-                this.vy = 0;
-                this.speed = 0;
-                game.ejectVehicleDriver(this, "COP_DEPLOY");
+            } else {
+                const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 64, wantedTarget);
+                if (!spacingOk && this.aiBailTimer < 0.65) {
+                    this.aiBailTimer += dt * 0.4;
+                    const offRoadHere = map && map.isRoadAtPixel ? !map.isRoadAtPixel(this.x, this.y) : false;
+                    return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.42, false, offRoadHere);
+                }
+                this.aiBailTimer += dt;
+                const brakeMult = Math.pow(0.001, dt);
+                this.vx *= brakeMult;
+                this.vy *= brakeMult;
+                this.speed *= brakeMult;
+                const bailDelay = playerBoxedNear ? 0.35 : 0.18;
+                if (this.aiBailTimer > bailDelay && typeof game.ejectVehicleDriver === "function") {
+                    this.aiBailTimer = 0;
+                    this.approachNoProgress = 0;
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.speed = 0;
+                    game.ejectVehicleDriver(this, "COP_DEPLOY");
+                    return { throttle: 0, steer: 0, handbrake: true };
+                }
                 return { throttle: 0, steer: 0, handbrake: true };
             }
-            return { throttle: 0, steer: 0, handbrake: true };
         }
         this.aiBailTimer = Math.max(0, this.aiBailTimer - dt * 1.5);
 
@@ -3721,6 +3739,16 @@ class Vehicle {
         if (this.towingVehicle) {
             const tv = this.towingVehicle;
             this.towingTimer = (this.towingTimer || 0) + dt;
+            if (Math.abs(this.speed || 0) < 12) {
+                this.towingStuckTimer = (this.towingStuckTimer || 0) + dt;
+                if (this.towingStuckTimer > 2.2 && !(this.gridlockEscapeTimer > 0)) {
+                    this.gridlockEscapeTimer = 2.8;
+                    this.aiPullOverOffset = ((parseInt(String(this.id).replace(/\D/g, ""), 10) || 0) % 2 === 0 ? 1 : -1) * 22;
+                    this.aiPullOverTimer = 2.8;
+                }
+            } else {
+                this.towingStuckTimer = Math.max(0, (this.towingStuckTimer || 0) - dt * 1.5);
+            }
             const tvBurning = (!tv.destroyed && ((tv.burnTimer || 0) > 0 || tv.hp <= 50)) ||
                 (tv.destroyed && !tv.fireExtinguished && tv.specKey !== "BMX_BIKE" && tv.specKey !== "E_SCOOTER");
             if (!this.impoundDepot && game && typeof game.getNearestEmergencyStation === "function") {
@@ -3730,11 +3758,12 @@ class Vehicle {
             const isOffscreen = game && typeof game.isPointInAnyPlayerCameraView === "function"
                 ? !game.isPointInAnyPlayerCameraView(this.x, this.y, 80)
                 : ((game && game.player) ? Math.hypot(tv.x - game.player.x, tv.y - game.player.y) > 720 : true);
-            // Deliver towed vehicle once it reaches the Vice Customs / Impound Yard (< 190px) or is hauled off-screen toward the depot!
+            // Deliver towed vehicle once it reaches the Vice Customs / Impound Yard (< 190px), is hauled off-screen toward the depot, or if boxed in for > 6.5s after 18s of hauling!
             if (
                 distToDepot < 190 ||
-                (this.towingTimer > 12.0 && isOffscreen && distToDepot < 680) ||
-                (this.towingTimer > 28.0 && isOffscreen)
+                (this.towingTimer > 10.0 && isOffscreen && distToDepot < 760) ||
+                (this.towingTimer > 22.0 && isOffscreen) ||
+                (this.towingTimer > 16.0 && (this.towingStuckTimer || 0) > 6.0)
             ) {
                 if (this.impoundDepot && game && typeof game.addFloatingText === "function" && !isOffscreen) {
                     game.addFloatingText(tv.x, tv.y - 24, `🛻 IMPOUNDED AT ${this.impoundDepot.shortName || "VICE CUSTOMS"}!`, "#ffd13b");
@@ -3742,6 +3771,7 @@ class Vehicle {
                 tv.towedByTruck = null;
                 this.towingVehicle = null;
                 this.towingTimer = 0;
+                this.towingStuckTimer = 0;
                 const tvIdx = game.vehicles.indexOf(tv);
                 if (tvIdx !== -1 && tv !== (game.player && game.player.inVehicle)) {
                     game.vehicles.splice(tvIdx, 1);
@@ -3756,6 +3786,7 @@ class Vehicle {
                 tv.towedByTruck = null;
                 this.towingVehicle = null;
                 this.towingTimer = 0;
+                this.towingStuckTimer = 0;
             } else {
                 const tCtrl = this.impoundDepot
                     ? this.computeTargetRoadOrFeelerControls(dt, map, game, this.impoundDepot.x, this.impoundDepot.y, 0, 0, 0.35, false, false)
@@ -3771,17 +3802,34 @@ class Vehicle {
 
         // Validate or acquire target abandoned / wrecked vehicle on road
         // (Tow Truck prioritizes cooled wrecks first so it can peel a multi-car pileup while the Fire Truck extinguishes burning ones!)
+        // Intact VCPD police cruisers and emergency units are recovered by relief officers / crews — civilian Tow Trucks only tow wrecks or abandoned civilian cars!
         const isVehBurning = (v) =>
             (!v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50)) ||
             (v.destroyed && !v.fireExtinguished && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER");
 
         const isValidTowCandidate = (v) => {
             if (!v || v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) return false;
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 12.0;
+            if (!v.destroyed && (v.isPolice || v.isEmergency)) return false;
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 10.0;
             const isAbandoned = !v.destroyed &&
                 v.driver === null &&
                 (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : 35.0);
-            return isWreck || isAbandoned;
+            if (!isWreck && !isAbandoned) return false;
+            if (game && Array.isArray(game.vehicles)) {
+                for (let ti = 0; ti < game.vehicles.length; ti++) {
+                    const ot = game.vehicles[ti];
+                    if (!ot || ot === this || ot.destroyed || ot.driver !== "AI_TOW") continue;
+                    if (
+                        ot.towTarget === v ||
+                        ot.towingVehicle === v ||
+                        Math.hypot(ot.x - v.x, ot.y - v.y) < 680 ||
+                        (ot.towTarget && Math.hypot(ot.towTarget.x - v.x, ot.towTarget.y - v.y) < 580)
+                    ) {
+                        return false;
+                    }
+                }
+            }
+            return true;
         };
 
         let target = this.towTarget;
@@ -3789,6 +3837,7 @@ class Vehicle {
             !target ||
             !game.vehicles.includes(target) ||
             (target.driver !== null && !target.destroyed) ||
+            (!target.destroyed && (target.isPolice || target.isEmergency)) ||
             (target.towedByTruck && target.towedByTruck !== this) ||
             target.isStaticParked ||
             target.missionTag
@@ -3901,6 +3950,7 @@ class Vehicle {
             this.towHookTimer = 0;
             this.approachBestDist = undefined;
             this.approachNoProgress = 0;
+            this.towingStuckTimer = 0;
             this.towingVehicle = target;
             this.towTarget = null;
             target.towedByTruck = this;
@@ -3909,6 +3959,34 @@ class Vehicle {
             target.vx = 0;
             target.vy = 0;
             target.speed = 0;
+            // Orient the Tow Truck so the hooked vehicle sits cleanly behind the rear winch boom
+            // (and if the lane ahead of the Tow Truck is blocked by another pileup vehicle, turn outbound to pull the wreck out cleanly!)
+            const hCos = Math.cos(this.angle);
+            const hSin = Math.sin(this.angle);
+            const targetInFront = ((target.x - this.x) * hCos + (target.y - this.y) * hSin) > 0;
+            let frontLaneBlocked = false;
+            if (game && Array.isArray(game.vehicles)) {
+                const probeX = this.x + hCos * 72;
+                const probeY = this.y + hSin * 72;
+                for (let vi = 0; vi < game.vehicles.length; vi++) {
+                    const ov = game.vehicles[vi];
+                    if (!ov || ov === this || ov === target) continue;
+                    if (Math.hypot(ov.x - probeX, ov.y - probeY) < 52) {
+                        frontLaneBlocked = true;
+                        break;
+                    }
+                }
+            }
+            if (frontLaneBlocked && targetInFront) {
+                this.angle = this.normalizeAngle(this.angle + Math.PI);
+                this.aiBlockX = -1;
+                this.aiBlockY = -1;
+                this.aiChosenDir = null;
+            }
+            const hitchDist = ((this.w || 56) + (target.w || 46)) * 0.52 + 8;
+            target.x = this.x - Math.cos(this.angle) * hitchDist;
+            target.y = this.y - Math.sin(this.angle) * hitchDist;
+            target.angle = this.angle;
             if (game.audio && typeof game.audio.playBeep === "function") {
                 game.audio.playBeep(580, 0.08, "square", 0.06);
             }
@@ -4077,9 +4155,9 @@ class Vehicle {
             this.driver === "AI_EMERGENCY" ||
             this.driver === "AI_COP" ||
             this.driver === "AI_CRIMINAL";
-        if (isAiDriven && !this.towingVehicle && this.aiState !== "STOPPED_LIGHT" && this.aiState !== "CURB_PARKED" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0) && !(this.gridlockEscapeTimer > 0)) {
+        if (isAiDriven && this.aiState !== "STOPPED_LIGHT" && this.aiState !== "CURB_PARKED" && Math.abs(this.speed || 0) < 6 && !(this.gridlockReverseTimer > 0) && !(this.gridlockEscapeTimer > 0)) {
             let counts = true;
-            if (this.driver === "AI_TOW") counts = (this.approachNoProgress || 0) > 3.0 && !this.towHookTimer;
+            if (this.driver === "AI_TOW") counts = (Boolean(this.towingVehicle) && (this.towingStuckTimer || 0) > 2.5) || ((this.approachNoProgress || 0) > 3.0 && !this.towHookTimer);
             else if (this.driver === "AI_EMERGENCY") counts = !this.deployedFireman && !this.deployedMedic && (this.approachNoProgress || 0) > 3.0;
             if (counts) {
                 this.gridlockTimer = (this.gridlockTimer || 0) + dt;

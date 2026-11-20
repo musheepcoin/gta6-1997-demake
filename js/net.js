@@ -2410,7 +2410,14 @@ class ViceNetworkManager {
         vehs.length = 0;
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
+            const isTransientUnoccupiedResponder = Boolean(
+                !v.destroyed &&
+                !v.driver &&
+                !v.lastPlayerDriven &&
+                (v.isPolice || v.isEmergency || v.specKey === "TOW_TRUCK" || /^(cop_|rb_|amb_|medic_|vcfd_|fire_|tow_|nemesis_|crim_)/.test(String(v.id || "")))
+            );
             const isMod = Boolean(
+                !isTransientUnoccupiedResponder &&
                 (v._worldModified ||
                 v.lastPlayerDriven ||
                 v.destroyed ||
@@ -2663,12 +2670,30 @@ class ViceNetworkManager {
                 if (!isMod && typeof id === "string" && (id.startsWith("curb_park_") || id.startsWith("estate_") || id.startsWith("boat_") || id.startsWith("vport_") || id.startsWith("armored_") || id.startsWith("parked_") || missionTag === "LANDMARK") && drvCode === 0 && !(flags & 1)) {
                     continue;
                 }
-                // On initial server bootstrap (or autonomous server tick), skip stale transient emergency/pursuit/event vehicles
+                // On initial server bootstrap (or autonomous server tick), skip stale transient emergency/pursuit/tow/traffic vehicles unless actively driven by a remote human player
                 if (
                     (isInitialServerBootstrap || isAutonomousServerTick) &&
-                    !isMod &&
+                    drvCode !== 4 &&
                     typeof id === "string" &&
-                    (id.startsWith("cop_") || id.startsWith("medic_") || id.startsWith("amb_") || id.startsWith("vcfd_") || id.startsWith("fire_") || id.startsWith("tow_") || id.startsWith("rb_") || id.startsWith("nemesis_") || id.startsWith("crim_"))
+                    (
+                        id.startsWith("cop_") ||
+                        id.startsWith("medic_") ||
+                        id.startsWith("amb_") ||
+                        id.startsWith("vcfd_") ||
+                        id.startsWith("fire_") ||
+                        id.startsWith("tow_") ||
+                        id.startsWith("rb_") ||
+                        id.startsWith("nemesis_") ||
+                        id.startsWith("crim_") ||
+                        id.startsWith("trf_") ||
+                        id.startsWith("traf_") ||
+                        id.startsWith("srv_trf_") ||
+                        specKey === "VCPD_CRUISER" ||
+                        specKey === "SWAT_ENFORCER" ||
+                        specKey === "TOW_TRUCK" ||
+                        specKey === "FIRE_TRUCK" ||
+                        specKey === "MEDIC_AMBULANCE"
+                    )
                 ) {
                     continue;
                 }

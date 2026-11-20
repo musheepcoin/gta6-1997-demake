@@ -2438,6 +2438,29 @@ function runSimulations() {
 
         g.player.inVehicle = null;
         g.setWantedLevel(0);
+
+        // Verify Coherent VCPD Cruiser Recovery & Anti-Pileup Tow Truck Policy on Ocean Drive (even when player is standing nearby at ~120px!)
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        g.player.dead = false;
+        g.respawnTimer = 0;
+        g.player.x = 443.2 * 64;
+        g.player.y = 260.0 * 64;
+        const emptyCop1 = sandbox.makeVeh("cop_pile_1", "VCPD_CRUISER", 444.5 * 64, 260.0 * 64, Math.PI * 0.5);
+        emptyCop1.driver = null;
+        emptyCop1.abandonedTimer = 22.0;
+        emptyCop1._worldModified = true;
+        const emptyCop2 = sandbox.makeVeh("cop_pile_2", "VCPD_CRUISER", 445.5 * 64, 260.0 * 64, -Math.PI * 0.5);
+        emptyCop2.driver = null;
+        emptyCop2.abandonedTimer = 22.0;
+        emptyCop2._worldModified = true;
+        g.vehicles.push(emptyCop1, emptyCop2);
+        stepSec(2.0);
+        const towForIntactCop = g.vehicles.some((v) => v.driver === "AI_TOW" && (v.towTarget === emptyCop1 || v.towTarget === emptyCop2 || v.towingVehicle === emptyCop1 || v.towingVehicle === emptyCop2));
+        assert(
+            emptyCop1.driver === "AI_TRAFFIC" && emptyCop2.driver === "AI_TRAFFIC" && !towForIntactCop,
+            `Unoccupied VCPD Cruisers on Ocean Drive are recovered back onto patrol even while player is nearby (~85px) and never targeted by civilian Tow Trucks (cop1=${emptyCop1.driver}, cop2=${emptyCop2.driver}, towForIntactCop=${towForIntactCop})`
+        );
         console.log("");
     }
 

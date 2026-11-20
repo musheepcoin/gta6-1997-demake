@@ -11319,7 +11319,7 @@ class LeonidaGame {
 
         const p = this.player;
 
-        if (!p || p.dead || this.activeInterior) return;
+        if (!p) return;
 
         // Throttle the full-city towing scan to 2 Hz (every 0.5s) instead of scanning 636 vehicles every frame
         this._towScanAccum = (this._towScanAccum || 0) + dt;
@@ -11362,19 +11362,43 @@ class LeonidaGame {
             if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
 
             // Coherent VCPD Cruiser & Crime-Scene Getaway Car Recovery: if an intact police cruiser or bandit car is left driverless on the street after a chase,
-            // a relief officer only spawns off-screen (never materializing in front of the player's eyes) and walks to recover the vehicle!
-            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > 12.0 && this.getDistanceToNearestHumanPlayer(v.x, v.y) > 760) {
-                const hasReturningCop = this.peds.some(
-                    (pd) => pd && !pd.dead && pd.kind === "COP" && (pd._boardingVeh === v || (!pd.inCombat && Math.hypot(pd.x - v.x, pd.y - v.y) < 420))
-                );
-                if (!hasReturningCop && this.peds.length < 145) {
+            // nearby non-combat officers re-board it or a relief officer spawns down the street (outside the player's core view) to drive it back on patrol!
+            const reliefThreshold = (this.wantedLevel || 0) > 0 ? 15.0 : 8.5;
+            const autoResumeThreshold = (this.wantedLevel || 0) > 0 ? 28.0 : 18.0;
+            if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > reliefThreshold) {
+                let assignedCop = null;
+                for (let pi = 0; pi < this.peds.length; pi++) {
+                    const pd = this.peds[pi];
+                    if (!pd || pd.dead || pd.kind !== "COP") continue;
+                    if (pd._boardingVeh === v) {
+                        assignedCop = pd;
+                        break;
+                    }
+                    if (!pd.inCombat && !pd._boardingVeh && Math.hypot(pd.x - v.x, pd.y - v.y) < 420) {
+                        pd._boardingVeh = v;
+                        pd.homeCruiser = v;
+                        assignedCop = pd;
+                        break;
+                    }
+                }
+                if ((v.abandonedTimer || 0) > autoResumeThreshold && (!assignedCop || Math.hypot(assignedCop.x - v.x, assignedCop.y - v.y) > 95)) {
+                    v.driver = (this.wantedLevel || 0) > 0 && v.isPolice ? "AI_COP" : "AI_TRAFFIC";
+                    v.noDeployCooldown = 5.5;
+                    v.sirenActive = Boolean((this.wantedLevel || 0) > 0 && v.isPolice);
+                    v.wasCriminalCar = false;
+                    v.lastPlayerDriven = false;
+                    v._worldModified = false;
+                    v.abandonedTimer = 0;
+                    continue;
+                }
+                if (!assignedCop && this.peds.length < 165) {
                     const cz = v.z || 2.0;
                     for (let ca = 0; ca < 12; ca++) {
                         const ang = (ca / 12) * Math.PI * 2;
-                        const sDist = 260 + (ca % 3) * 55;
+                        const sDist = 280 + (ca % 3) * 60;
                         const sx = v.x + Math.cos(ang) * sDist;
                         const sy = v.y + Math.sin(ang) * sDist;
-                        if (this.isPointInAnyPlayerCameraView(sx, sy, 200)) continue;
+                        if (ca < 10 && this.isPointInAnyPlayerCameraView(sx, sy, 40)) continue;
                         const sbx = Math.floor(sx / TILE_SIZE);
                         const sby = Math.floor(sy / TILE_SIZE);
                         const nav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, cz) : null;
@@ -11394,10 +11418,11 @@ class LeonidaGame {
                                 g24Type: "police",
                                 copWeapon: "PISTOL",
                                 hp: 105,
-                                speed: 84
+                                speed: 88
                             });
                             reliefCop.isReliefDriver = true;
                             reliefCop._boardingVeh = v;
+                            reliefCop.homeCruiser = v;
                             this.peds.push(reliefCop);
                             break;
                         }
@@ -11407,7 +11432,10 @@ class LeonidaGame {
 
             const isWreck = v.destroyed && (v.abandonedTimer || 0) > 8.0;
 
+            // Intact VCPD police cruisers and emergency units are recovered by relief officers / crews — civilian Tow Trucks only tow wrecks or abandoned civilian cars!
             const isAbandoned = !v.destroyed &&
+                !v.isPolice &&
+                !v.isEmergency &&
                 v.driver === null &&
                 (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 38.0 : 18.0);
 
@@ -11453,9 +11481,15 @@ class LeonidaGame {
 
 
 
-            // Check if a tow truck is already assigned or close to this vehicle (within 1800px)
+            // Strict 1-Tow-Truck-Per-Scene Rule: never dispatch a 2nd Tow Truck to the same intersection/pileup (< 820px)!
             const alreadyTargeted = this.vehicles.some(
-                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (tv.towTarget === v || (!tv.towingVehicle && Math.hypot(tv.x - v.x, tv.y - v.y) < 620))
+                (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (
+                    tv.towTarget === v ||
+                    tv.towingVehicle === v ||
+                    Math.hypot(tv.x - v.x, tv.y - v.y) < 820 ||
+                    (tv.towTarget && Math.hypot(tv.towTarget.x - v.x, tv.towTarget.y - v.y) < 680) ||
+                    (tv.towingVehicle && Math.hypot(tv.towingVehicle.x - v.x, tv.towingVehicle.y - v.y) < 680)
+                )
             );
             if (alreadyTargeted) continue;
 
@@ -13426,6 +13460,7 @@ class LeonidaGame {
                 if (a.z !== undefined && b.z !== undefined && Math.abs(a.z - b.z) > 0.24) continue;
 
                 if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
+                if ((a.towedByTruck || b.towedByTruck) && a.driver !== "PLAYER" && b.driver !== "PLAYER") continue;
 
                 const bRad = Math.max(10, Math.min(16, (b.h || 28) * 0.45));
 
@@ -13580,20 +13615,20 @@ class LeonidaGame {
                             }
 
                             // Emergency Corridor Assist: if one vehicle has its siren active (Police, Ambulance, Fire, Tow)
-                            // and touches a civilian traffic vehicle, smoothly shift the civilian vehicle toward its right curb
-                            // so the emergency responder passes through without ever getting stuck or spinning the civilian car!
+                            // and touches a civilian traffic vehicle or an unoccupied non-static car blocking the lane, smoothly shift
+                            // the blocking car toward the right curb so the emergency responder / hauling tow truck passes through cleanly!
                             const aPriority = Boolean(a.sirenActive || a.driver === "AI_COP" || a.driver === "AI_EMERGENCY" || a.driver === "AI_TOW");
                             const bPriority = Boolean(b.sirenActive || b.driver === "AI_COP" || b.driver === "AI_EMERGENCY" || b.driver === "AI_TOW");
                             if (aPriority !== bPriority) {
                                 const civ = aPriority ? b : a;
                                 const emg = aPriority ? a : b;
-                                if (civ.driver === "AI_TRAFFIC") {
+                                if (civ.driver === "AI_TRAFFIC" || (civ.driver === null && !civ.isStaticParked && !civ.isEstateCar && !civ.missionTag)) {
                                     const cRx = -Math.sin(civ.angle || 0);
                                     const cRy = Math.cos(civ.angle || 0);
                                     civ.aiPullOverOffset = 20;
                                     civ.aiPullOverTimer = 2.0;
-                                    civ.x += cRx * (bestOverlap * 0.65 + 1.5);
-                                    civ.y += cRy * (bestOverlap * 0.65 + 1.5);
+                                    civ.x += cRx * (bestOverlap * 0.72 + 1.8);
+                                    civ.y += cRy * (bestOverlap * 0.72 + 1.8);
                                     emg.angularVelocity = 0;
                                     civ.angularVelocity = 0;
                                     continue;
@@ -17238,6 +17273,7 @@ class LeonidaGame {
         let nearestCopDist = 9999;
 
         let activeCopCars = 0;
+        let emptyCopCarsNearScene = 0;
 
         let activeSwatCars = 0;
 
@@ -17252,24 +17288,28 @@ class LeonidaGame {
         const copVehList = this._copVehicles || this.vehicles;
         for (let vi = 0; vi < copVehList.length; vi++) {
             const v = copVehList[vi];
-            if (v && v.isPolice && !v.destroyed && v.driver === "AI_COP") {
+            if (v && v.isPolice && !v.destroyed) {
+                if (v.driver === "AI_COP") {
 
-                activeCopCars++;
+                    activeCopCars++;
 
-                if (v.specKey === "SWAT_ENFORCER") activeSwatCars++;
+                    if (v.specKey === "SWAT_ENFORCER") activeSwatCars++;
 
-                const d = Math.hypot(v.x - pEnt.x, v.y - pEnt.y);
+                    const d = Math.hypot(v.x - pEnt.x, v.y - pEnt.y);
 
-                if (d < nearestCopDist) nearestCopDist = d;
+                    if (d < nearestCopDist) nearestCopDist = d;
 
-                if (!copsAtCrimeScene && Math.hypot(v.x - scenePos.x, v.y - scenePos.y) < 280) {
-                    copsAtCrimeScene = true;
+                    if (!copsAtCrimeScene && Math.hypot(v.x - scenePos.x, v.y - scenePos.y) < 280) {
+                        copsAtCrimeScene = true;
+                    }
+
+                    if (!anyCopHasVisual && this.canCopIdentifyPlayer(v.x, v.y, v.angle, 480)) {
+                        anyCopHasVisual = true;
+                    }
+
+                } else if (v.driver === null && (Math.hypot(v.x - pEnt.x, v.y - pEnt.y) < 420 || Math.hypot(v.x - scenePos.x, v.y - scenePos.y) < 420)) {
+                    emptyCopCarsNearScene++;
                 }
-
-                if (!anyCopHasVisual && this.canCopIdentifyPlayer(v.x, v.y, v.angle, 480)) {
-                    anyCopHasVisual = true;
-                }
-
             }
 
         }
@@ -17317,14 +17357,14 @@ class LeonidaGame {
             // Each Cruiser parks cleanly on the nearest road (e.g. Ocean Drive) and deploys 2 VCPD officers on foot!
             const maxCops = Math.min(4, tWanted);
 
-            const totalActiveUnits = activeCopCars + Math.floor(activeFootCopsNear * 0.5);
+            const totalActiveUnits = activeCopCars + Math.floor(activeFootCopsNear * 0.5) + (emptyCopCarsNearScene >= 2 ? 1 : 0);
 
             const isEvadingNow = this.wantedLevel > 0 && !anyCopHasVisual && (this.wantedDecayTimer || 0) > 1.5 && totalActiveUnits >= maxCops;
             this.copSpawnTimer += dt * (isEvadingNow ? 0.32 : 1.0);
 
             const spawnInterval = tWanted <= 1 ? 9.5 : (tWanted === 2 ? 8.0 : (tWanted === 3 ? 6.5 : 5.2));
 
-            if (totalActiveUnits < maxCops && activeCopCars < maxCops && this.copSpawnTimer > spawnInterval) {
+            if (totalActiveUnits < maxCops && activeCopCars < maxCops && emptyCopCarsNearScene < 3 && this.copSpawnTimer > spawnInterval) {
 
                 this.copSpawnTimer = 0;
 
