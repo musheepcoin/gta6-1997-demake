@@ -2432,7 +2432,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 }
             } else {
                 const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
-                if (!hasTowUnit && activeTowCount < 2) {
+                const wreckAgeMs = nowMs - ((room.modifiedVehTs && room.modifiedVehTs[vid]) || nowMs);
+                if (!hasTowUnit && activeTowCount < 2 && wreckAgeMs > 120000) {
                     const st = getStationCoords("TOW");
                     const sp = snapStationToNearestRoad(st.x, st.y);
                     const tid = `tow_srv_${nowMs.toString(36)}`;
@@ -2827,7 +2828,7 @@ setInterval(() => {
                 const isDestroyed = Boolean(vrow[10] & 1);
                 const isUnoccupiedResponderOrDynamic = (vrow[8] === 0) && (isDynamicVehicleId(vid) || isTransientResponderRow(vid, vrow));
                 const isUnoccupiedOther = (vrow[8] === 0);
-                const maxVehAge = isDestroyed ? 60000 : (isUnoccupiedResponderOrDynamic ? 45000 : (isUnoccupiedOther ? 180000 : 0));
+                const maxVehAge = isDestroyed ? 300000 : (isUnoccupiedResponderOrDynamic ? 45000 : (isUnoccupiedOther ? 180000 : 0));
                 if (maxVehAge > 0 && (nowMs - vts) > maxVehAge) {
                     delete rv.modifiedVehs[vid];
                     delete rv.modifiedVehTs[vid];
