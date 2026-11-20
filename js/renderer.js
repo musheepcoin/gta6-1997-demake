@@ -370,28 +370,35 @@ class RetroRenderer {
                     return outFast;
                 }
 
-                // Large sun-baked patches, medium mottling, fine limestone aggregate grain (all continuous across tiles)
+                // Lived-in Miami urban asphalt: sun-baked patches, dark bitumen road repairs, branching tar-sealed cracks, tire ruts & center-lane oil drip strip
                 float big = aNoise(p * 0.45) * 0.6 + aNoise(p * 1.3 + 7.0) * 0.4;
                 float mid = aNoise(p * 4.0 + 13.0);
                 float grain = aHash(floor(p * 40.0));
                 float fine = aHash(floor(p * 96.0) + 19.0);
-                vec3 col = base * (0.88 + big * 0.18 + mid * 0.07);
-                col *= 0.94 + grain * 0.05 + fine * 0.08;
-                col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);           // light limestone aggregate stones
-                float tar = smoothstep(0.66, 0.80, aNoise(p * 0.7 + 31.0));
-                col *= 1.0 - tar * 0.13;                                         // dark resealed tar patches
-                float seam = 1.0 - smoothstep(0.0, 0.022, abs(aNoise(p * 1.1 + 57.0) - 0.5));
-                col *= 1.0 - seam * 0.12 * step(0.68, aNoise(p * 0.3 + 3.0));    // sparse thin repaired cracks
+                vec3 col = base * (0.83 + big * 0.24 + mid * 0.09);
+                col *= 0.92 + grain * 0.06 + fine * 0.09;
+                col += vec3(0.055, 0.058, 0.062) * step(0.978, fine);           // sun-bleached limestone aggregate stones
+                float tar = smoothstep(0.56, 0.72, aNoise(p * 0.55 + 31.0));
+                float patchBlock = smoothstep(0.66, 0.72, aNoise(floor(p * 1.25) * 0.73 + 17.0));
+                col *= 1.0 - max(tar * 0.19, patchBlock * 0.14);                 // dark bitumen utility & pothole patches
+                float seam1 = 1.0 - smoothstep(0.0, 0.024, abs(aNoise(p * 1.15 + 57.0) - 0.5));
+                float seam2 = 1.0 - smoothstep(0.0, 0.020, abs(aNoise(p * 2.10 + 83.0) - 0.5));
+                float crackZone = step(0.54, aNoise(p * 0.34 + 3.0));
+                col *= 1.0 - max(seam1, seam2 * 0.85) * 0.22 * crackZone;        // branching tar-sealed asphalt cracks
 
-                // Crisp, slightly worn thermoplastic lane paint keeping the original lane colours
-                vec3 paintCol = yellow ? vec3(0.95, 0.77, 0.20) : vec3(clamp(mx * 1.10, 0.0, 0.95));
-                if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.10, 0.0, 0.95) / max(mx, 0.01));
-                paintCol *= 0.90 + aNoise(p * 9.0 + 71.0) * 0.12;
+                // Dual tire-rut wear & darker center-lane engine oil / rubber stain strip
+                float laneRutX = exp(-pow((lp.x - 0.30) * 5.2, 2.0)) + exp(-pow((lp.x - 0.70) * 5.2, 2.0));
+                float laneRutY = exp(-pow((lp.y - 0.30) * 5.2, 2.0)) + exp(-pow((lp.y - 0.70) * 5.2, 2.0));
+                float oilCenter = exp(-pow((lp.x - 0.50) * 9.5, 2.0)) + exp(-pow((lp.y - 0.50) * 9.5, 2.0));
+                float oilStain = smoothstep(0.45, 0.78, aNoise(p * 1.6 + 29.0));
+                col *= 1.0 - max(laneRutX, laneRutY) * 0.075 * (0.55 + mid * 0.45) - oilCenter * oilStain * 0.085;
 
-                // Subtle dual tire-rut wear along all traffic lanes
-                float laneRutX = exp(-pow((lp.x - 0.32) * 5.5, 2.0)) + exp(-pow((lp.x - 0.68) * 5.5, 2.0));
-                float laneRutY = exp(-pow((lp.y - 0.32) * 5.5, 2.0)) + exp(-pow((lp.y - 0.68) * 5.5, 2.0));
-                col *= 1.0 - max(laneRutX, laneRutY) * 0.038 * (0.65 + mid * 0.35);
+                // Tire-scuffed, weathered thermoplastic lane paint with asphalt grain bleeding through
+                float paintChip = aNoise(p * 11.0 + 71.0) * 0.65 + fine * 0.35;
+                vec3 paintCol = yellow ? vec3(0.93, 0.75, 0.20) : vec3(clamp(mx * 1.08, 0.0, 0.93));
+                if (!yellow && (mx - mn) > 0.06) paintCol = src * (clamp(mx * 1.08, 0.0, 0.93) / max(mx, 0.01));
+                paintCol *= 0.82 + paintChip * 0.18;
+                paint *= clamp(0.76 + paintChip * 0.28 - max(laneRutX, laneRutY) * 0.18, 0.42, 1.0);
 
                 // FDOT Continental Crosswalk & Stop Bar on intersection approach tiles (vAnim in 5.50 .. 9.375)
                 float cwPaint = 0.0;
@@ -454,29 +461,37 @@ class RetroRenderer {
             }
             vec3 styleBeachSand(vec3 baseSand) {
                 vec2 p = vWorldPos.xz;
-                // Authentic Real Miami Beach / South Beach White-Coral & Quartz Sand:
-                // Bright, silky, sun-bleached pale ivory-cream (#f7ebd2 .. #ecdec0) with delicate powdery wind ripples (zero dark brown mud stripes!)
-                float macroDune = aNoise(p * 0.45) * 0.65 + aNoise(p * 1.25 + 11.3) * 0.35;
-                float warp = sin(p.y * 1.65 + p.x * 0.82) * 0.75 + (macroDune - 0.5) * 1.1;
+                // Authentic Real Miami Beach / South Beach White-Coral & Quartz Sand with natural zone-to-zone variations:
+                // Shifts organically across the beach between powdery sun-bleached ivory crests, creamy coral sand,
+                // and slightly warmer packed champagne-shell pockets & wind-blown drift hollows!
+                float zoneMacro = aNoise(p * 0.16 + 3.7) * 0.60 + aNoise(p * 0.42 + 19.1) * 0.40;
+                float pocketNoise = aNoise(p * 0.95 + 41.3);
+                float trampledPocket = smoothstep(0.56, 0.78, pocketNoise);
+                float warp = sin(p.y * 1.65 + p.x * 0.82) * 0.75 + (zoneMacro - 0.5) * 1.35;
                 float r1 = sin(p.x * 5.20 + p.y * 2.65 + warp);
                 float r2 = cos(p.x * 13.10 - p.y * 7.40 + sin(p.x * 2.90) * 0.6);
                 float duneWave = r1 * 0.62 + r2 * 0.38;
-                float fineGrain = (aHash(floor(p * 56.0)) - 0.5) * 0.018;
-                float shellSparkle = step(0.985, aHash(floor(p * 84.0) + 7.0)) * 0.035;
-                vec3 sandCrest = vec3(0.97, 0.92, 0.82);
-                vec3 sandTrough = vec3(0.92, 0.86, 0.74);
-                float duneMix = clamp(0.55 + duneWave * 0.13 + (macroDune - 0.5) * 0.10, 0.0, 1.0);
-                vec3 targetSand = mix(sandTrough, sandCrest, duneMix) + fineGrain + vec3(shellSparkle, shellSparkle * 0.96, shellSparkle * 0.88);
-                return clamp(targetSand, 0.0, 0.98);
+                float fineGrain = (aHash(floor(p * 56.0)) - 0.5) * 0.026;
+                float shellSparkle = step(0.976, aHash(floor(p * 84.0) + 7.0)) * 0.038;
+                float coquinaSpeck = step(0.974, aHash(floor(p * 48.0) + 23.0)) * 0.042;
+                vec3 sandCrest  = vec3(0.985, 0.942, 0.852); // Sun-bleached powdery white-ivory coral crest
+                vec3 sandMid    = vec3(0.952, 0.896, 0.786); // Classic Miami Beach creamy sand
+                vec3 sandHollow = vec3(0.878, 0.806, 0.676); // Warm packed champagne-shell hollow / drift pocket
+                float duneMix = clamp(0.50 + duneWave * 0.19 + (zoneMacro - 0.5) * 0.36, 0.0, 1.0);
+                vec3 targetSand = mix(sandHollow, sandCrest, duneMix);
+                targetSand = mix(targetSand, sandMid, 0.25);
+                targetSand = mix(targetSand, sandHollow * 0.97, trampledPocket * 0.42);
+                targetSand += fineGrain + vec3(shellSparkle, shellSparkle * 0.96, shellSparkle * 0.88) - vec3(coquinaSpeck * 0.75, coquinaSpeck * 0.88, coquinaSpeck * 1.05);
+                return clamp(targetSand, 0.0, 0.985);
             }
             vec3 pavementSurface(vec3 src, vec2 p) {
                 if (uMobileFast > 0.5) return src;
-                // Authentic Real Miami Beach / Ocean Drive / Coral Gables Warm Sun-Bleached Coquina Cream & Pastel Coral-Sandstone Sidewalks!
-                // (Replaces the blurry 64x64 1997 cross without ANY dark grey prison grid or black mortar lines!)
+                // Authentic Lived-In Miami Beach / Ocean Drive / Coral Gables Coquina Cream & Pastel Coral-Sandstone Sidewalks:
+                // Warm coastal palette + realistic urban foot-traffic patina, slab-to-slab aging, hairline cracks, gum/oil specks & gutter dust!
                 float isCoralPave = clamp((src.r - src.b - 0.12) * 6.0, 0.0, 1.0);
                 vec3 stonePalette = mix(
-                    vec3(0.90, 0.85, 0.76), // Sun-bleached Miami Beach cream coquina limestone sidewalk
-                    vec3(0.92, 0.80, 0.72), // Ocean Drive / Española Way warm pastel coral-terrazzo promenade
+                    vec3(0.89, 0.84, 0.75), // Sun-bleached Miami Beach cream coquina limestone sidewalk
+                    vec3(0.91, 0.79, 0.71), // Ocean Drive / Espanola Way warm pastel coral-terrazzo promenade
                     isCoralPave
                 );
 
@@ -484,21 +499,42 @@ class RetroRenderer {
                 vec2 cellId = floor(grid2);
                 vec2 sub = fract(grid2);
                 float slabHash = aHash(cellId);
-                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.022;
-                float medMottle = (aNoise(p * 2.4 + 19.0) - 0.5) * 0.026;
+                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.028;
+                float medMottle = (aNoise(p * 2.4 + 19.0) - 0.5) * 0.036;
 
-                vec3 slabTint = stonePalette * (0.98 + (slabHash - 0.5) * 0.036);
+                // Stronger slab-to-slab weathering & occasional darker replaced concrete slab
+                float slabAge = (slabHash - 0.5) * 0.095 - step(0.88, slabHash) * 0.055;
+                vec3 slabTint = stonePalette * (0.97 + slabAge);
+
+                // Continuous multi-tile pedestrian foot-traffic wear path & urban grime patina
+                float grimeMacro = aNoise(p * 0.38 + 5.3) * 0.62 + aNoise(p * 1.45 + 19.7) * 0.38;
+                float dirtMask = smoothstep(0.44, 0.78, grimeMacro);
+                vec3 dirtCol = slabTint * vec3(0.83, 0.81, 0.78);
+                slabTint = mix(slabTint, dirtCol, dirtMask * 0.68);
+
+                // Scattered dark chewed-gum spots, coffee/oil drops & moisture blotches
+                float gumSpot = step(0.985, aHash(floor(p * 24.0) + 13.0)) * 0.18;
+                float stainBlotch = smoothstep(0.71, 0.85, aNoise(p * 3.2 + 43.0)) * 0.095;
+                // Hairline diagonal crack on ~25% of aged flagstones
+                float hasCrack = step(0.75, slabHash);
+                float crackLine = (1.0 - smoothstep(0.0, 0.024, abs(aNoise(p * 3.8 + slabHash * 11.3) - 0.5))) * hasCrack * 0.14;
+
+                // Subtle rain-runoff & street dust accumulation near tile edges (curb / building base)
+                vec2 tileLP = fract(p);
+                float tileEdgeD = min(min(tileLP.x, 1.0 - tileLP.x), min(tileLP.y, 1.0 - tileLP.y));
+                float edgeDust = (1.0 - smoothstep(0.0, 0.14, tileEdgeD)) * (0.045 + 0.045 * grimeMacro);
+
                 float jointX = min(sub.x, 1.0 - sub.x);
                 float jointY = min(sub.y, 1.0 - sub.y);
                 float minJoint = min(jointX, jointY);
-                float groove = smoothstep(0.012, 0.036, minJoint);
+                float groove = smoothstep(0.014, 0.042, minJoint);
 
-                // Delicate sunlit coquina micro-chamfer & warm sandy-beige joint (never dark grey!)
-                float bevelHi = (1.0 - smoothstep(0.03, 0.12, sub.x)) * 0.015 + (1.0 - smoothstep(0.03, 0.12, sub.y)) * 0.015;
-                float bevelLo = (1.0 - smoothstep(0.03, 0.12, 1.0 - sub.x)) * 0.014 + (1.0 - smoothstep(0.03, 0.12, 1.0 - sub.y)) * 0.014;
+                // Sunlit coquina micro-chamfer & dusty sandy-earth joint
+                float bevelHi = (1.0 - smoothstep(0.03, 0.12, sub.x)) * 0.018 + (1.0 - smoothstep(0.03, 0.12, sub.y)) * 0.018;
+                float bevelLo = (1.0 - smoothstep(0.03, 0.12, 1.0 - sub.x)) * 0.017 + (1.0 - smoothstep(0.03, 0.12, 1.0 - sub.y)) * 0.017;
 
-                vec3 baseCol = slabTint + fineGrain + medMottle + bevelHi - bevelLo;
-                vec3 mortarCol = stonePalette * vec3(0.89, 0.87, 0.85);
+                vec3 baseCol = (slabTint + fineGrain + medMottle + bevelHi - bevelLo) * (1.0 - gumSpot - stainBlotch - crackLine - edgeDust);
+                vec3 mortarCol = stonePalette * vec3(0.80, 0.77, 0.73) * (1.0 - dirtMask * 0.12);
                 return clamp(mix(mortarCol, baseCol, groove), 0.0, 0.94);
             }
             float coastalSandDrift(vec2 p) {
@@ -873,24 +909,27 @@ class RetroRenderer {
                                 vec2 subRf = fract(vWorldPos.xz * 2.0);
                                 float subD  = min(min(subRf.x, 1.0 - subRf.x), min(subRf.y, 1.0 - subRf.y));
 
-                                // Seamless continuous Miami roof deck (no per-tile outer border or solar-panel grid spam!)
+                                // Seamless continuous Miami roof deck with tropical rainwater pooling patina, aged paver slabs & bitumen patches
                                 float subHash = aHash(floor(vWorldPos.xz * 2.0));
-                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.03 * (subHash - 0.5));
-                                float paverJoint = smoothstep(0.015, 0.042, subD);
-                                float paverBevel = smoothstep(0.042, 0.075, subD) - smoothstep(0.075, 0.110, subD);
+                                float roofMacro = aNoise(vWorldPos.xz * 0.48 + 9.2) * 0.62 + aNoise(vWorldPos.xz * 1.65 + 27.4) * 0.38;
+                                float rainStain = smoothstep(0.45, 0.78, roofMacro) * 0.14;
+                                float tarPatch  = smoothstep(0.69, 0.81, aNoise(vWorldPos.xz * 0.85 + 53.0)) * 0.13;
+                                vec3 cleanRoof = bRoofCol * (0.97 + 0.06 * (tierSeed - 0.5) + 0.075 * (subHash - 0.5)) * (1.0 - rainStain - tarPatch);
+                                float paverJoint = smoothstep(0.015, 0.044, subD);
+                                float paverBevel = smoothstep(0.044, 0.075, subD) - smoothstep(0.075, 0.110, subD);
                                 float grainSum = 0.0;
                                 float isClayRoof = step(abs(rStyle - 2.0), 0.4) + step(abs(rStyle - 9.0), 0.4) + step(abs(rStyle - 0.0), 0.4);
                                 if (uMobileFast < 0.5) {
-                                    float fineGrain = (aHash(floor(vWorldPos.xz * 64.0)) - 0.5) * 0.028;
-                                    float medGrain  = (aNoise(vWorldPos.xz * 4.5 + 11.0) - 0.5) * 0.024;
+                                    float fineGrain = (aHash(floor(vWorldPos.xz * 64.0)) - 0.5) * 0.034;
+                                    float medGrain  = (aNoise(vWorldPos.xz * 4.5 + 11.0) - 0.5) * 0.032;
                                     grainSum = fineGrain + medGrain;
-                                    // Coral Gables / Little Havana Spanish terracotta barrel-tile waves on clay roof styles (0, 2, 9)
+                                    // Coral Gables / Little Havana Spanish terracotta barrel-tile waves & weathered tile moss/soot patina on clay roof styles (0, 2, 9)
                                     if (isClayRoof > 0.5) {
-                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.032 + step(0.84, fract(vWorldPos.z * 4.0)) * (-0.038);
+                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.038 + step(0.84, fract(vWorldPos.z * 4.0)) * (-0.046);
                                         grainSum += clayRib;
                                     }
                                 }
-                                c.rgb = (cleanRoof + grainSum + paverBevel * 0.018) * mix(0.94, 1.0, paverJoint);
+                                c.rgb = (cleanRoof + grainSum + paverBevel * 0.018) * mix(0.87, 1.0, paverJoint);
                             } else {
                                 // Luxury Miami Art Deco Rooftop & Resort Swimming Pool (lid 35):
                                 // Travertine perimeter coping rim, cobalt ceramic waterline trim, mosaic tile floor & animated solar caustics!
@@ -1066,10 +1105,13 @@ class RetroRenderer {
                     float isGlass = procGlass;
                     winGlassMask = isGlass;
 
-                    // Procedural Ashlar Stone Courses, Under-Sill Drip Shadows & Stucco Relief (100% sharp at any zoom!)
-                    float courseSeam = 1.0 - 0.065 * (1.0 - smoothstep(0.0, 0.08, abs(fract(storeyY * 6.0) - 0.5)));
-                    float underSillShad = 1.0 - 0.14 * step(0.13, storeyY) * step(storeyY, 0.19) * (1.0 - winFrame);
-                    vec3 wallMasonry = bWallCol * courseSeam * underSillShad;
+                    // Procedural Ashlar Stone Courses, Under-Sill Rain-Streak Drips, Street-Level Splash Grime & Stucco Relief (100% sharp at any zoom!)
+                    float courseSeam = 1.0 - 0.075 * (1.0 - smoothstep(0.0, 0.08, abs(fract(storeyY * 6.0) - 0.5)));
+                    float underSillShad = 1.0 - 0.16 * step(0.11, storeyY) * step(storeyY, 0.19) * (1.0 - winFrame);
+                    float dripNoise = aNoise(vec2(wallAlong * 9.5, vWorldPos.y * 1.8) + 17.0);
+                    float sillDrip = (1.0 - storeyY) * smoothstep(0.48, 0.82, dripNoise) * 0.11 * (1.0 - winFrame);
+                    float groundSplash = isGroundStorey * (1.0 - smoothstep(0.0, 0.42, storeyY)) * (0.08 + 0.08 * dripNoise);
+                    vec3 wallMasonry = bWallCol * courseSeam * underSillShad * (1.0 - sillDrip - groundSplash);
                     wallMasonry = mix(wallMasonry, bTrimCol * (0.96 + 0.14 * winSillLight), clamp(winFrame + winSillLight * 0.5, 0.0, 1.0));
                     // Ground-floor Art Deco striped awning / frieze accent
                     float awningStripe = isGroundStorey * step(0.74, storeyY) * step(storeyY, 0.83) * step(0.5, fract(tileU * 8.0));
@@ -1299,13 +1341,16 @@ class RetroRenderer {
                             float mid   = sNoise(p * 4.0 + 13.0);
                             float grain = sHash(floor(p * 40.0));
                             float fine  = sHash(floor(p * 96.0) + 19.0);
-                            col = base * (0.88 + big * 0.18 + mid * 0.07);
-                            col *= 0.94 + grain * 0.05 + fine * 0.08;
-                            col += vec3(0.055, 0.058, 0.062) * step(0.982, fine);
-                            float tar = smoothstep(0.66, 0.80, sNoise(p * 0.7 + 31.0));
-                            col *= 1.0 - tar * 0.13;
-                            float seam = 1.0 - smoothstep(0.0, 0.022, abs(sNoise(p * 1.1 + 57.0) - 0.5));
-                            col *= 1.0 - seam * 0.12 * step(0.68, sNoise(p * 0.3 + 3.0));
+                            col = base * (0.83 + big * 0.24 + mid * 0.09);
+                            col *= 0.92 + grain * 0.06 + fine * 0.09;
+                            col += vec3(0.055, 0.058, 0.062) * step(0.978, fine);
+                            float tar = smoothstep(0.56, 0.72, sNoise(p * 0.55 + 31.0));
+                            float patchBlock = smoothstep(0.66, 0.72, sNoise(floor(p * 1.25) * 0.73 + 17.0));
+                            col *= 1.0 - max(tar * 0.19, patchBlock * 0.14);
+                            float seam1 = 1.0 - smoothstep(0.0, 0.024, abs(sNoise(p * 1.15 + 57.0) - 0.5));
+                            float seam2 = 1.0 - smoothstep(0.0, 0.020, abs(sNoise(p * 2.10 + 83.0) - 0.5));
+                            float crackZone = step(0.54, sNoise(p * 0.34 + 3.0));
+                            col *= 1.0 - max(seam1, seam2 * 0.85) * 0.22 * crackZone;
                         }
 
                         // 3D Stone Curb + Curb Drop Shadow + Concrete Gutter + Continuous Worn Yellow Curb Line (matching cityFS)
