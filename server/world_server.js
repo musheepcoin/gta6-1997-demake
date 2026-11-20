@@ -695,6 +695,8 @@ function loadPersistentState() {
                                 ver: Math.max(Number(existing.ver) || 0, Number(rv.ver) || 0),
                                 worldMinutes: Number(rv.worldMinutes) || existing.worldMinutes || 720,
                                 trafficLightTimer: Number(rv.trafficLightTimer) || existing.trafficLightTimer || 0,
+                                fleetHome: (rv.fleetHome && typeof rv.fleetHome === "object") ? rv.fleetHome : {},
+                                fleetHomeVer: Number(rv.fleetHomeVer) || 0,
                                 updatedAt: Math.max(Number(existing.updatedAt) || 0, Number(rv.updatedAt) || 0)
                             };
                         }
@@ -2234,9 +2236,132 @@ function snapStationToNearestRoad(wx, wy) {
     return { x: wx, y: wy, z: 2.0, angle: 0 };
 }
 
+/* ============================================================================
+   PERMANENT MUNICIPAL FLEET (EMS / VCFD / TOW)
+   Units are seeded ONCE, parked at their depot, persist across restarts, drive out on
+   a call and drive back to park again. They are never created or deleted per mission.
+   ============================================================================ */
+const FLEET_DEFS = {
+    EMS:  { spec: "MEDIC_AMBULANCE", station: "MEDIC", count: 8, hp: 160, drv: 3 },
+    FIRE: { spec: "FIRE_TRUCK",      station: "FIRE",  count: 5, hp: 220, drv: 3 },
+    TOW:  { spec: "TOW_TRUCK",       station: "TOW",   count: 6, hp: 180, drv: 6 }
+};
+
+function fleetUnitId(role, k) {
+    return `fleet_${role.toLowerCase()}_${k}`;
+}
+
+function findFleetParkingSpot(stationType, used) {
+    const TS = global.TILE_SIZE || 64;
+    const st = getStationCoords(stationType);
+    const baseBx = Math.floor(st.x / TS);
+    const baseBy = Math.floor(st.y / TS);
+    let best = null;
+    for (let r = 0; r <= 14 && !best; r++) {
+        for (let dy = -r; dy <= r && !best; dy++) {
+            for (let dx = -r; dx <= r && !best; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                const bx = baseBx + dx;
+                const by = baseBy + dy;
+                if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
+                const nav = serverMap.getNavigationBlock(bx, by, 2.0);
+                if (!nav || nav.groundType !== global.GROUND_TYPE.ROAD || !nav.isParkingBay) continue;
+                const px = (bx + 0.5) * TS;
+                const py = (by + 0.5) * TS;
+                if (used.some((u) => Math.hypot(u.x - px, u.y - py) < 40)) continue;
+                best = { x: px, y: py, z: serverMap.getHeightAtPixel(px, py, 2.0), angle: Math.PI * 0.5 };
+            }
+        }
+    }
+    if (best) return best;
+    // Fallback: spread units along the nearest road tiles around the depot
+    for (let k = 0; k < 60; k++) {
+        const sp = snapStationToNearestRoad(st.x + (k % 10) * TS * 1.0, st.y + Math.floor(k / 10) * TS * 1.0);
+        if (!used.some((u) => Math.hypot(u.x - sp.x, u.y - sp.y) < 40)) return sp;
+    }
+    return snapStationToNearestRoad(st.x, st.y);
+}
+
+function ensureFleetParked(room) {
+    if (!room.fleetHome || room.fleetHomeVer !== 2) {
+        // v2: every unit of every depot gets its own unique bay (no overlaps between EMS / VCFD / TOW)
+        room.fleetHome = {};
+        room.fleetHomeVer = 2;
+        for (const id of Object.keys(room.vehs)) {
+            if (id.startsWith("fleet_")) {
+                const row = room.vehs[id];
+                if (Array.isArray(row) && row[8] === 0) delete room.vehs[id]; // idle units are re-created at their new bay
+            }
+        }
+        isDirty = true;
+    }
+    const used = [];
+    for (const h of Object.values(room.fleetHome)) used.push(h);
+    for (const [role, def] of Object.entries(FLEET_DEFS)) {
+        for (let k = 0; k < def.count; k++) {
+            const id = fleetUnitId(role, k);
+            if (!room.fleetHome[id]) {
+                const sp = findFleetParkingSpot(def.station, used);
+                room.fleetHome[id] = { x: Math.round(sp.x), y: Math.round(sp.y), z: Math.round((sp.z || 2.0) * 100) / 100, angle: Math.round((sp.angle || 0) * 1000) / 1000 };
+                used.push(room.fleetHome[id]);
+                isDirty = true;
+            }
+            if (!room.vehs[id]) {
+                const h = room.fleetHome[id];
+                room.vehs[id] = [id, def.spec, h.x, h.y, h.z, h.angle, 0, 0, 0, def.hp, 0, k % 4, 0, 0];
+                isDirty = true;
+            }
+        }
+    }
+}
+
+function parkFleetUnit(room, id) {
+    const row = room.vehs[id];
+    const h = room.fleetHome && room.fleetHome[id];
+    if (!Array.isArray(row) || !h) return;
+    row[2] = h.x; row[3] = h.y; row[4] = h.z; row[5] = h.angle;
+    row[6] = 0; row[7] = 0; row[8] = 0;
+    row[10] = (row[10] || 0) & ~2;
+    if (room.vehNav) delete room.vehNav[id];
+    isDirty = true;
+}
+
+function launchFleetUnit(room, role, targetId, goalX, goalY) {
+    const def = FLEET_DEFS[role];
+    if (!def || !room.fleetHome) return false;
+    for (let k = 0; k < def.count; k++) {
+        const id = fleetUnitId(role, k);
+        const row = room.vehs[id];
+        const nav = room.vehNav[id];
+        if (!Array.isArray(row) || row[8] !== 0 || (nav && nav.role) || (row[10] & 1)) continue;
+        const h = room.fleetHome[id];
+        row[8] = def.drv;
+        row[10] = (row[10] || 0) | 2;
+        row[6] = 0; row[7] = 0;
+        room.vehNav[id] = {
+            role,
+            phase: "TO_SCENE",
+            targetId,
+            targetBx: null,
+            targetBy: null,
+            turnedInIntersection: false,
+            entryAngle: row[5],
+            goalX: goalX,
+            goalY: goalY,
+            homeX: h.x,
+            homeY: h.y,
+            workTimer: 0,
+            turnSeed: 0.37 + k * 0.07
+        };
+        return true;
+    }
+    return false;
+}
+
 function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     if (!serverMap || !serverMap.cmpLoaded) return;
     ensureRoomAutonomousPopulation(roomCode, room);
+    ensureFleetParked(room);
 
     const nowMs = Date.now();
     const TS = global.TILE_SIZE || 64;
@@ -2375,6 +2500,9 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 }
                 isDirty = true;
             }
+            if (String(vid).startsWith("fleet_") && vrow[8] !== 0 && (!room.vehNav[vid] || !room.vehNav[vid].role)) {
+                parkFleetUnit(room, vid);
+            }
             if (
                 (String(vid).startsWith("amb_srv_") || String(vid).startsWith("vcfd_srv_") || String(vid).startsWith("tow_srv_")) &&
                 (!room.vehNav[vid] || !room.vehNav[vid].role)
@@ -2388,43 +2516,19 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
         const corpseEntries = Object.entries(room.corpses || {});
         if (corpseEntries.length > 0) {
-            const activeAmbs = Object.entries(room.vehs).filter(([, r]) => Array.isArray(r) && r[1] === "MEDIC_AMBULANCE" && !(r[10] & 1));
-            if (activeAmbs.length < Math.min(2, corpseEntries.length)) {
-                const [targetCid, targetCrow] = corpseEntries[0];
-                if (Array.isArray(targetCrow) && Number.isFinite(targetCrow[3]) && Number.isFinite(targetCrow[4])) {
-                    const st = getStationCoords("MEDIC");
-                    const sp = snapStationToNearestRoad(st.x, st.y);
-                    const aid = `amb_srv_${nowMs.toString(36)}`;
-                    const spd = 106;
-                    room.vehs[aid] = [
-                        aid, "MEDIC_AMBULANCE",
-                        Math.round(sp.x), Math.round(sp.y), Math.round(sp.z * 100) / 100,
-                        Math.round(sp.angle * 1000) / 1000,
-                        Math.round(Math.cos(sp.angle) * spd), Math.round(Math.sin(sp.angle) * spd),
-                        3, 160, 2, 0, 0, 0
-                    ];
-                    room.vehNav[aid] = {
-                        role: "EMS",
-                        phase: "TO_SCENE",
-                        targetId: targetCid,
-                        targetBx: null,
-                        targetBy: null,
-                        turnedInIntersection: false,
-                        entryAngle: sp.angle,
-                        goalX: targetCrow[3],
-                        goalY: targetCrow[4],
-                        homeX: sp.x,
-                        homeY: sp.y,
-                        workTimer: 0,
-                        turnSeed: 0.37
-                    };
-                }
+            const activeAmbs = Object.entries(room.vehNav).filter(([, nv]) => nv && nv.role === "EMS");
+            const claimedCorpses = new Set(activeAmbs.map(([, nv]) => nv.targetId));
+            let launchedEms = 0;
+            for (const [targetCid, targetCrow] of corpseEntries) {
+                if (claimedCorpses.has(targetCid)) continue;
+                if (!Array.isArray(targetCrow) || !Number.isFinite(targetCrow[3]) || !Number.isFinite(targetCrow[4])) continue;
+                if (!launchFleetUnit(room, "EMS", targetCid, targetCrow[3], targetCrow[4])) break; // whole fleet busy
+                if (++launchedEms >= 3) break; // stagger departures
             }
         }
 
         // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
-        const activeFireCount = Object.values(room.vehs).filter((r) => Array.isArray(r) && r[1] === "FIRE_TRUCK" && !(r[10] & 1)).length;
-        const activeTowCount = Object.values(room.vehs).filter((r) => Array.isArray(r) && r[1] === "TOW_TRUCK" && !(r[10] & 1)).length;
+        // (permanent fleet: units are parked at their depot, drive out on a call, and drive back to park again - never created/deleted)
         for (const [vid, vrow] of Object.entries(room.modifiedVehs || {})) {
             if (!Array.isArray(vrow) || !(vrow[10] & 1)) continue;
             const wx = vrow[2];
@@ -2432,65 +2536,11 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             if (!Number.isFinite(wx) || !Number.isFinite(wy) || wx < 128 || wy < 128) continue;
             if (!(vrow[10] & 128)) {
                 const hasFireUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "FIRE" && nv.targetId === vid);
-                if (!hasFireUnit && activeFireCount < 2) {
-                    const st = getStationCoords("FIRE");
-                    const sp = snapStationToNearestRoad(st.x, st.y);
-                    const fid = `vcfd_srv_${nowMs.toString(36)}`;
-                    const spd = 104;
-                    room.vehs[fid] = [
-                        fid, "FIRE_TRUCK",
-                        Math.round(sp.x), Math.round(sp.y), Math.round(sp.z * 100) / 100,
-                        Math.round(sp.angle * 1000) / 1000,
-                        Math.round(Math.cos(sp.angle) * spd), Math.round(Math.sin(sp.angle) * spd),
-                        3, 220, 2, 0, 0, 0
-                    ];
-                    room.vehNav[fid] = {
-                        role: "FIRE",
-                        phase: "TO_SCENE",
-                        targetId: vid,
-                        targetBx: null,
-                        targetBy: null,
-                        turnedInIntersection: false,
-                        entryAngle: sp.angle,
-                        goalX: wx,
-                        goalY: wy,
-                        homeX: sp.x,
-                        homeY: sp.y,
-                        workTimer: 0,
-                        turnSeed: 0.41
-                    };
-                }
+                if (!hasFireUnit) launchFleetUnit(room, "FIRE", vid, wx, wy);
             } else {
                 const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
                 const wreckAgeMs = nowMs - ((room.modifiedVehTs && room.modifiedVehTs[vid]) || nowMs);
-                if (!hasTowUnit && activeTowCount < 2 && wreckAgeMs > 120000) {
-                    const st = getStationCoords("TOW");
-                    const sp = snapStationToNearestRoad(st.x, st.y);
-                    const tid = `tow_srv_${nowMs.toString(36)}`;
-                    const spd = 92;
-                    room.vehs[tid] = [
-                        tid, "TOW_TRUCK",
-                        Math.round(sp.x), Math.round(sp.y), Math.round(sp.z * 100) / 100,
-                        Math.round(sp.angle * 1000) / 1000,
-                        Math.round(Math.cos(sp.angle) * spd), Math.round(Math.sin(sp.angle) * spd),
-                        6, 180, 2, 0, 0, 0
-                    ];
-                    room.vehNav[tid] = {
-                        role: "TOW",
-                        phase: "TO_SCENE",
-                        targetId: vid,
-                        targetBx: null,
-                        targetBy: null,
-                        turnedInIntersection: false,
-                        entryAngle: sp.angle,
-                        goalX: wx,
-                        goalY: wy,
-                        homeX: sp.x,
-                        homeY: sp.y,
-                        workTimer: 0,
-                        turnSeed: 0.53
-                    };
-                }
+                if (!hasTowUnit && wreckAgeMs > 120000) launchFleetUnit(room, "TOW", vid, wx, wy);
             }
         }
     }
@@ -2583,6 +2633,21 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 }
                 continue;
             } else if (nav.phase === "RETURNING" && distGoal < 110) {
+                if (String(vid).startsWith("fleet_")) {
+                    // Roll the last metres into the parking bay, then park for good (siren off, ready for the next call)
+                    if (distGoal < 6) {
+                        parkFleetUnit(room, vid);
+                        continue;
+                    }
+                    const homeAng = Math.atan2(nav.goalY - y, nav.goalX - x);
+                    row[2] = Math.round((x + Math.cos(homeAng) * 46 * dt) * 10) / 10;
+                    row[3] = Math.round((y + Math.sin(homeAng) * 46 * dt) * 10) / 10;
+                    row[5] = Math.round(homeAng * 1000) / 1000;
+                    row[6] = Math.round(Math.cos(homeAng) * 46);
+                    row[7] = Math.round(Math.sin(homeAng) * 46);
+                    row[10] = (row[10] || 0) & ~2;
+                    continue;
+                }
                 delete room.vehs[vid];
                 delete room.vehNav[vid];
                 continue;
