@@ -9291,6 +9291,67 @@ class RetroRenderer {
                         this.batchPedSprite3D("vc_hawaiian_red", 98, ev.x - 2, ev.y - 16, bz + 0.038, Math.PI * 0.5 + buskSway, 1.26, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                         this.batchPedSprite3D("bikini_cyan", 98, ev.x + 12, ev.y + 10, bz + 0.038, -Math.PI * 0.65 - buskSway * 0.4, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
                     }
+                } else if (ev.kind === "BEACH_YOGA_CLASS") {
+                    // Outdoor Miami Beach Yoga & Pilates Class: 4 pastel fitness mats + instructor & 3 synchronized stretching participants
+                    const yogaMats = [
+                        { dx: 0, dy: -16, col: [0.96, 0.36, 0.74], ped: "bikini_white", ang: Math.PI * 0.5 },
+                        { dx: -13, dy: 4, col: [0.18, 0.88, 0.96], ped: "bikini_pink", ang: -Math.PI * 0.5 },
+                        { dx: 0, dy: 8, col: [0.98, 0.82, 0.22], ped: "vc_jogger", ang: -Math.PI * 0.5 },
+                        { dx: 13, dy: 4, col: [0.68, 0.42, 0.96], ped: "bikini_cyan", ang: -Math.PI * 0.5 }
+                    ];
+                    const stretchSway = Math.sin(this.time * 1.85 + ei) * 0.22;
+                    for (let ym = 0; ym < yogaMats.length; ym++) {
+                        const m = yogaMats[ym];
+                        const mx = ev.x + m.dx;
+                        const my = ev.y + m.dy;
+                        this.pushSolidQuad3D(mx, my, bz + 0.015, 7.5, 16.5, 0, m.col[0], m.col[1], m.col[2], 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        if (!evWiped) {
+                            const poseFr = (Math.sin(this.time * 1.85 + ei) > 0.35) ? 42 : 98;
+                            this.batchPedSprite3D(m.ped, poseFr, mx, my, bz + 0.038, m.ang + (ym === 0 ? -stretchSway : stretchSway), 1.22, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        }
+                    }
+                } else if (ev.kind === "FASHION_PHOTO_SHOOT") {
+                    // Miami Fashion & Influencer Photo Shoot: 3D studio strobe tripod umbrella + photographer + posing fashion model
+                    const triX = ev.x - 10;
+                    const triY = ev.y - 12;
+                    this.pushSolidQuad3D(triX, triY, bz + 0.020, 7.0, 7.0, 0.4, 0.22, 0.26, 0.32, 0.95, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(triX, triY, bz + 0.095, 8.5, 8.5, 0.78, 0.92, 0.95, 0.99, 0.98, SPRITE_DRAW_ORDER.TREES);
+                    if (!evWiped) {
+                        const poseSway = Math.sin(this.time * 2.4 + ei) * 0.32;
+                        // Photographer with camera aiming South at model
+                        this.batchPedSprite3D("vc_crockett", 98, ev.x + 2, ev.y - 14, bz + 0.038, Math.PI * 0.5, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.pushSolidQuad3D(ev.x + 2, ev.y - 8, bz + 0.052, 3.6, 3.0, Math.PI * 0.5, 0.14, 0.16, 0.20, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        // Fashion model striking poses
+                        this.batchPedSprite3D((ei % 2 === 0) ? "bikini_pink" : "bikini_white", 98, ev.x + 1, ev.y + 12, bz + 0.038, -Math.PI * 0.5 + poseSway, 1.26, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        // Periodic studio strobe flash burst!
+                        if (Math.sin(this.time * 3.4 + ei * 2.1) > 0.92) {
+                            this.pushSolidQuad3D(triX, triY + 4, bz + 0.11, 18.0, 18.0, this.time * 5.0, 1.0, 0.98, 0.90, 0.85, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        }
+                    }
+                } else if (ev.kind === "STREET_FOOD_VENDOR_SCENE") {
+                    // Miami Sidewalk Street-Food / Cafe Cubano Cart + Vendor + Customers in Queue
+                    const isPinkC = (ei % 2 === 0);
+                    this.pushSolidQuad3D(ev.x, ev.y, bz + 0.030, 11.5, 18.5, 0, 0.88, 0.91, 0.96, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(ev.x, ev.y, bz + 0.042, 10.5, 17.5, 0, isPinkC ? 0.96 : 0.18, isPinkC ? 0.32 : 0.86, isPinkC ? 0.72 : 0.96, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.batchObjectSprite3D(isPinkC ? "umbrella_pink" : "umbrella_cyan", ev.x, ev.y, bz + 0.085, 0.2, 0.82, SPRITE_DRAW_ORDER.TREES);
+                    if (!evWiped) {
+                        const vSway = Math.sin(this.time * 2.0 + ei) * 0.12;
+                        this.batchPedSprite3D("vc_cuban", 98, ev.x - 11, ev.y, bz + 0.038, vSway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_tourist", 98, ev.x + 12, ev.y - 5, bz + 0.038, Math.PI - vSway, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_yellow", 98, ev.x + 14, ev.y + 9, bz + 0.038, Math.PI + 0.2, 1.22, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
+                } else if (ev.kind === "CONGA_SALSA_CIRCLE") {
+                    // Latin Conga Percussion & Salsa Sidewalk Dance Circle
+                    this.batchObjectSprite3D("beach_boombox", ev.x - 11, ev.y - 10, bz + 0.026, 0.25, 0.94, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(ev.x - 8, ev.y + 2, bz + 0.032, 6.2, 6.2, 0, 0.76, 0.42, 0.18, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    this.pushSolidQuad3D(ev.x - 8, ev.y + 2, bz + 0.036, 4.6, 4.6, 0, 0.96, 0.92, 0.82, 0.98, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                    if (!evWiped) {
+                        const salsaT = this.time * 4.2 + ei;
+                        const dStep = Math.sin(salsaT) * 2.4;
+                        this.batchPedSprite3D("vc_cuban", 98, ev.x - 15, ev.y + 2, bz + 0.038, 0, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("vc_hawaiian_red", Math.floor(this.time * 5.5 + ei) % 8, ev.x + 6 + dStep, ev.y - 5, bz + 0.038, Math.PI * 0.5 + Math.sin(salsaT) * 0.25, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.batchPedSprite3D("bikini_red", Math.floor(this.time * 5.5 + ei + 3) % 8, ev.x + 6 - dStep, ev.y + 8, bz + 0.038, -Math.PI * 0.5 - Math.sin(salsaT) * 0.25, 1.24, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    }
                 } else {
                     // Lummus Park & Oceanfront Boardwalk 1:1 Scale 3D Wooden-Slat Promenade Bench (permanent map furniture — never disappears!)
                     const benchPairs = [
@@ -10668,10 +10729,11 @@ class RetroRenderer {
                 frameIdx = this.getPedFrameIndex("FIST", true, true, walkPhase);
             } else {
                 const isRunning = (ped.panicTimer || 0) > 0 || (ped.burnTimer || 0) > 0 || (ped.dodgeTimer || 0) > 0;
-                const isJoggerOrSkate = ped.isRollerblader || pedType === "vc_jogger";
-                const stepMult = isChildPed ? 1.22 : (isJoggerOrSkate ? 1.38 : 1.0);
-                const walkPhase = this.time * (isRunning ? 2.1 : 1.12) * stepMult + ped.animSeed;
-                frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0.5, isRunning, walkPhase);
+                const isJoggerPed = Boolean(ped.isJogger || pedType === "vc_jogger");
+                const isJoggerOrSkate = ped.isRollerblader || ped.isSkateboarder || isJoggerPed;
+                const stepMult = isChildPed ? 1.22 : (isJoggerOrSkate ? 1.42 : 1.0);
+                const walkPhase = this.time * ((isRunning || isJoggerPed) ? 1.95 : 1.12) * stepMult + ped.animSeed;
+                frameIdx = this.getPedFrameIndex("FIST", ped.speed > 0.5, isRunning || isJoggerPed, walkPhase);
             }
 
             let pr = 1.0, pg = 1.0, pb = 1.0;
@@ -10724,8 +10786,9 @@ class RetroRenderer {
                 pb *= k * 0.82;
             }
 
-            const skateSwayX = ped.isRollerblader ? Math.cos(ped.angle + Math.PI * 0.5) * Math.sin(this.time * 5.2 + (ped.animSeed || 0) * 10) * 3.2 : 0;
-            const skateSwayY = ped.isRollerblader ? Math.sin(ped.angle + Math.PI * 0.5) * Math.sin(this.time * 5.2 + (ped.animSeed || 0) * 10) * 3.2 : 0;
+            const isCarvingSkater = Boolean(ped.isRollerblader || ped.isSkateboarder);
+            const skateSwayX = isCarvingSkater ? Math.cos(ped.angle + Math.PI * 0.5) * Math.sin(this.time * 5.2 + (ped.animSeed || 0) * 10) * (ped.isSkateboarder ? 2.2 : 3.2) : 0;
+            const skateSwayY = isCarvingSkater ? Math.sin(ped.angle + Math.PI * 0.5) * Math.sin(this.time * 5.2 + (ped.animSeed || 0) * 10) * (ped.isSkateboarder ? 2.2 : 3.2) : 0;
             if (ped.isRollerblader && !ped.dead) {
                 const skCos = Math.cos(ped.angle);
                 const skSin = Math.sin(ped.angle);
@@ -10735,6 +10798,16 @@ class RetroRenderer {
                 const sb = isPinkSkate ? 0.78 : 0.98;
                 this.pushSolidQuad3D(ped.x + skateSwayX - skSin * 3.2, ped.y + skateSwayY + skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
                 this.pushSolidQuad3D(ped.x + skateSwayX + skSin * 3.2, ped.y + skateSwayY - skCos * 3.2, pz - 0.012, 5.2, 2.2, ped.angle, sr, sg, sb, 0.92, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            } else if (ped.isSkateboarder && !ped.dead) {
+                // 3D Miami Skateboard Deck (maple deck + neon grip graphic + 4 urethane wheels) under feet!
+                const skX = ped.x + skateSwayX;
+                const skY = ped.y + skateSwayY;
+                const skCos = Math.cos(ped.angle);
+                const skSin = Math.sin(ped.angle);
+                this.pushSolidQuad3D(skX + skCos * 3.6, skY + skSin * 3.6, pz - 0.014, 2.2, 5.4, ped.angle, 0.96, 0.34, 0.74, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(skX - skCos * 3.6, skY - skSin * 3.6, pz - 0.014, 2.2, 5.4, ped.angle, 0.18, 0.92, 0.98, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(skX, skY, pz - 0.012, 13.5, 4.4, ped.angle, 0.18, 0.20, 0.24, 0.98, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(skX, skY, pz - 0.010, 11.2, 2.2, ped.angle, 0.56, 0.96, 0.18, 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
             if (ped.kind === "MEDIC" && (ped.isKneelingMedic || (ped.healTimer || 0) > 0)) {
@@ -10761,24 +10834,105 @@ class RetroRenderer {
 
                 this.batchPedSprite3D(pedType, frameIdx, ped.x + mCos * cprLunge, ped.y + mSin * cprLunge, kneelZ, ped.angle, thisPedScale, false, pedDrawOrder, pr, pg, pb);
             } else {
-                this.batchPedSprite3D(pedType, frameIdx, ped.x + skateSwayX, ped.y + skateSwayY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
+                const drawPedX = ped.x + skateSwayX;
+                const drawPedY = ped.y + skateSwayY;
+                this.batchPedSprite3D(pedType, frameIdx, drawPedX, drawPedY, pz, ped.angle, thisPedScale, (ped.muzzleTimer || 0) > 0, pedDrawOrder, pr, pg, pb);
                 if (!ped.dead && (ped.calling911Timer || 0) > 0) {
                     const phCos = Math.cos(ped.angle);
                     const phSin = Math.sin(ped.angle);
-                    const phX = ped.x + phCos * 5.2 - phSin * 3.8;
-                    const phY = ped.y + phSin * 5.2 + phCos * 3.8;
+                    const phX = drawPedX + phCos * 5.2 - phSin * 3.8;
+                    const phY = drawPedY + phSin * 5.2 + phCos * 3.8;
                     const sigPulse = ((this.time * 3.8) % 1.0 + 1.0) % 1.0;
                     const sigRad = 4.0 + sigPulse * 11.0;
                     this.pushSolidQuad3D(phX, phY, pz + 0.014, 3.0, 1.8, ped.angle, 0.22, 0.78, 0.98, 0.96, pedDrawOrder);
-                    this.pushSolidQuad3D(ped.x, ped.y, pz + 0.018, sigRad, sigRad, this.time * 2.4, 0.98, 0.82, 0.12, (1.0 - sigPulse) * 0.45, pedDrawOrder);
+                    this.pushSolidQuad3D(drawPedX, drawPedY, pz + 0.018, sigRad, sigRad, this.time * 2.4, 0.98, 0.82, 0.12, (1.0 - sigPulse) * 0.45, pedDrawOrder);
+                } else if (!ped.dead && (ped.panicTimer || 0) <= 0 && (ped.carryProp || ped.isJogger || pedType === "vc_jogger")) {
+                    // Render 3D Carried Pedestrian Items & Athletic Jogger Gear in hands/shoulders!
+                    const cProp = ped.carryProp || ((ped.isJogger || pedType === "vc_jogger") ? "JOGGER_GEAR" : null);
+                    const pCos = Math.cos(ped.angle);
+                    const pSin = Math.sin(ped.angle);
+                    const armSwing = (ped.speed > 0.5) ? Math.sin(this.time * ((ped.isJogger || pedType === "vc_jogger") ? 9.5 : 5.4) + (ped.animSeed || 0) * 11.0) * 1.6 : 0;
+                    if (cProp === "JOGGER_GEAR") {
+                        // White wireless headphones / neon sweatband on head + cyan hydro-flask water bottle in hand
+                        const earLX = drawPedX - pSin * 3.3;
+                        const earLY = drawPedY + pCos * 3.3;
+                        const earRX = drawPedX + pSin * 3.3;
+                        const earRY = drawPedY - pCos * 3.3;
+                        this.pushSolidQuad3D(earLX, earLY, pz + 0.016, 2.2, 2.2, ped.angle, 0.96, 0.98, 1.0, 0.96, pedDrawOrder);
+                        this.pushSolidQuad3D(earRX, earRY, pz + 0.016, 2.2, 2.2, ped.angle, 0.96, 0.98, 1.0, 0.96, pedDrawOrder);
+                        const botX = drawPedX + pCos * (2.5 + armSwing) - pSin * 5.2;
+                        const botY = drawPedY + pSin * (2.5 + armSwing) + pCos * 5.2;
+                        this.pushSolidQuad3D(botX, botY, pz + 0.012, 3.6, 2.0, ped.angle, 0.14, 0.88, 0.98, 0.96, pedDrawOrder);
+                    } else if (cProp === "SURFBOARD") {
+                        // Colorful 3D fiberglass surfboard with center racing stripe tucked under arm
+                        const sbX = drawPedX - pSin * 6.4;
+                        const sbY = drawPedY + pCos * 6.4;
+                        const isPinkBrd = (Math.abs(Math.floor((ped.animSeed || 0) * 100)) % 2) === 0;
+                        this.pushSolidQuad3D(sbX, sbY, pz + 0.012, 19.5, 4.6, ped.angle + 0.06, isPinkBrd ? 0.98 : 0.18, isPinkBrd ? 0.34 : 0.90, isPinkBrd ? 0.74 : 0.98, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(sbX, sbY, pz + 0.014, 17.5, 1.4, ped.angle + 0.06, 0.98, 0.98, 1.0, 0.98, pedDrawOrder);
+                    } else if (cProp === "BOOMBOX") {
+                        // Retro-modern silver & neon shoulder boombox + pulsing music wave ring
+                        const bbX = drawPedX - pSin * 5.2 + pCos * 1.0;
+                        const bbY = drawPedY + pCos * 5.2 + pSin * 1.0;
+                        this.pushSolidQuad3D(bbX, bbY, pz + 0.018, 7.6, 4.2, ped.angle, 0.78, 0.82, 0.88, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(bbX, bbY, pz + 0.020, 6.2, 1.8, ped.angle, 0.96, 0.28, 0.74, 0.98, pedDrawOrder);
+                        const beatP = ((this.time * 2.6 + (ped.animSeed || 0) * 5.0) % 1.0);
+                        const beatR = 5.0 + beatP * 12.0;
+                        this.pushSolidQuad3D(bbX, bbY, pz + 0.022, beatR, beatR, this.time * 2.0, 0.18, 0.92, 0.98, (1.0 - beatP) * 0.38, pedDrawOrder);
+                    } else if (cProp === "SHOPPING_BAG") {
+                        // Luxury pastel boutique shopping bags swinging at left & right sides
+                        const b1X = drawPedX + pCos * (1.2 + armSwing * 0.5) - pSin * 5.6;
+                        const b1Y = drawPedY + pSin * (1.2 + armSwing * 0.5) + pCos * 5.6;
+                        const b2X = drawPedX + pCos * (1.2 - armSwing * 0.5) + pSin * 5.6;
+                        const b2Y = drawPedY + pSin * (1.2 - armSwing * 0.5) - pCos * 5.6;
+                        this.pushSolidQuad3D(b1X, b1Y, pz + 0.008, 4.4, 3.0, ped.angle, 0.98, 0.36, 0.74, 0.96, pedDrawOrder);
+                        this.pushSolidQuad3D(b2X, b2Y, pz + 0.008, 4.2, 2.8, ped.angle, 0.22, 0.90, 0.96, 0.96, pedDrawOrder);
+                    } else if (cProp === "BRIEFCASE") {
+                        const bcX = drawPedX + pCos * (1.4 + armSwing * 0.4) - pSin * 5.5;
+                        const bcY = drawPedY + pSin * (1.4 + armSwing * 0.4) + pCos * 5.5;
+                        this.pushSolidQuad3D(bcX, bcY, pz + 0.008, 5.4, 2.4, ped.angle, 0.28, 0.18, 0.12, 0.98, pedDrawOrder);
+                    } else if (cProp === "CLIPBOARD") {
+                        const cbX = drawPedX + pCos * 5.0 - pSin * 3.2;
+                        const cbY = drawPedY + pSin * 5.0 + pCos * 3.2;
+                        this.pushSolidQuad3D(cbX, cbY, pz + 0.012, 4.4, 3.4, ped.angle + 0.2, 0.88, 0.68, 0.24, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(cbX, cbY, pz + 0.014, 3.6, 2.8, ped.angle + 0.2, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+                    } else if (cProp === "CAMERA") {
+                        // Tourist camera / selfie smartphone held out in front with periodic camera flash!
+                        const cmX = drawPedX + pCos * 6.4 - pSin * 1.8;
+                        const cmY = drawPedY + pSin * 6.4 + pCos * 1.8;
+                        this.pushSolidQuad3D(cmX, cmY, pz + 0.015, 2.8, 3.6, ped.angle, 0.16, 0.18, 0.22, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(cmX, cmY, pz + 0.016, 2.0, 2.8, ped.angle, 0.24, 0.88, 0.98, 0.98, pedDrawOrder);
+                        const flashWave = Math.sin(this.time * 2.2 + (ped.animSeed || 0) * 19.0);
+                        if (flashWave > 0.96) {
+                            this.pushSolidQuad3D(cmX + pCos * 2.5, cmY + pSin * 2.5, pz + 0.022, 9.5, 9.5, this.time * 4.0, 1.0, 0.98, 0.88, 0.88, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        }
+                    } else if (cProp === "PIZZA_STACK") {
+                        // Warm square pizza delivery boxes held in front
+                        const pzX = drawPedX + pCos * 5.8;
+                        const pzY = drawPedY + pSin * 5.8;
+                        this.pushSolidQuad3D(pzX, pzY, pz + 0.014, 5.8, 5.8, ped.angle, 0.96, 0.94, 0.88, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(pzX, pzY, pz + 0.016, 3.4, 3.4, ped.angle, 0.90, 0.22, 0.18, 0.98, pedDrawOrder);
+                    } else if (cProp === "COFFEE_CUP") {
+                        // Cuban cafecito / iced coffee cup held in right hand
+                        const cfX = drawPedX + pCos * 4.8 - pSin * 3.8;
+                        const cfY = drawPedY + pSin * 4.8 + pCos * 3.8;
+                        this.pushSolidQuad3D(cfX, cfY, pz + 0.014, 2.6, 2.6, ped.angle, 0.96, 0.95, 0.92, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(cfX, cfY, pz + 0.016, 1.6, 1.6, ped.angle, 0.72, 0.42, 0.20, 0.98, pedDrawOrder);
+                    } else if (cProp === "BEACH_COOLER") {
+                        // Red & white Igloo beach cooler carried at the side
+                        const clX = drawPedX - pSin * 5.8;
+                        const clY = drawPedY + pCos * 5.8;
+                        this.pushSolidQuad3D(clX, clY, pz + 0.010, 6.8, 4.4, ped.angle, 0.92, 0.22, 0.20, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(clX, clY, pz + 0.012, 6.4, 3.8, ped.angle, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+                    }
                 }
             }
 
-            // Rare Sidewalk Dog Walkers (~4% of calm adult civilians): animated top-down companion dog on a leash!
+            // Sidewalk Dog Walkers (~9% of calm adult civilians): animated top-down companion dog on a leash!
             if (ped.hasDog === undefined) {
-                if (ped.kind === "CIVILIAN" && !ped.isRollerblader && !isChildPed && !isPrisonZone && ped.missionTag !== "BEACH") {
+                if (ped.kind === "CIVILIAN" && !ped.isRollerblader && !ped.isSkateboarder && !isChildPed && !isPrisonZone && ped.missionTag !== "BEACH") {
                     const dogHash = Math.abs(Math.floor((ped.turnSeed || 1) * 41 + (ped.animSeed || 0) * 997));
-                    ped.hasDog = (dogHash % 24) === 7;
+                    ped.hasDog = (dogHash % 11) === 3;
                     if (ped.hasDog && !ped.dogBreed) {
                         const dogBreeds = ["GOLDEN", "FRENCHIE", "DALMATIAN", "DOBERMAN"];
                         ped.dogBreed = dogBreeds[(dogHash >>> 4) % dogBreeds.length];

@@ -2254,7 +2254,41 @@ class LeonidaMap {
             { c: 448.45, r: 236.5, kind: "BOARDWALK_ROLLERBLADERS", exactPos: true },
             { c: 448.35, r: 268.5, kind: "BOARDWALK_BUSKER", exactPos: true },
             { c: 448.45, r: 300.5, kind: "BOARDWALK_ROLLERBLADERS", exactPos: true },
-            { c: 448.35, r: 332.5, kind: "BOARDWALK_BUSKER", exactPos: true }
+            { c: 448.35, r: 332.5, kind: "BOARDWALK_BUSKER", exactPos: true },
+            // Outdoor Miami Beach Yoga & Pilates Classes on Sand & Lummus Park Promenade
+            { c: 448.5,  r: 182.5, kind: "BEACH_YOGA_CLASS" },
+            { c: 448.5,  r: 254.5, kind: "BEACH_YOGA_CLASS" },
+            { c: 448.5,  r: 322.5, kind: "BEACH_YOGA_CLASS" },
+            { c: 356.5,  r: 168.5, kind: "BEACH_YOGA_CLASS" },
+            { c: 467.5,  r: 128.5, kind: "BEACH_YOGA_CLASS", onSand: true },
+            { c: 470.5,  r: 162.5, kind: "BEACH_YOGA_CLASS", onSand: true },
+            { c: 473.5,  r: 196.5, kind: "BEACH_YOGA_CLASS", onSand: true },
+            { c: 471.5,  r: 238.5, kind: "BEACH_YOGA_CLASS", onSand: true },
+            { c: 473.5,  r: 284.5, kind: "BEACH_YOGA_CLASS", onSand: true },
+            { c: 470.5,  r: 316.5, kind: "BEACH_YOGA_CLASS", onSand: true },
+            // Miami Fashion & Influencer Photo Shoots (Photographer + Strobe Reflector + Posing Model)
+            { c: 448.38, r: 176.5, kind: "FASHION_PHOTO_SHOOT", exactPos: true },
+            { c: 448.38, r: 214.5, kind: "FASHION_PHOTO_SHOOT", exactPos: true },
+            { c: 448.38, r: 246.5, kind: "FASHION_PHOTO_SHOOT", exactPos: true },
+            { c: 448.38, r: 278.5, kind: "FASHION_PHOTO_SHOOT", exactPos: true },
+            { c: 448.38, r: 310.5, kind: "FASHION_PHOTO_SHOOT", exactPos: true },
+            { c: 225.5,  r: 142.5, kind: "FASHION_PHOTO_SHOOT" },
+            { c: 245.5,  r: 156.5, kind: "FASHION_PHOTO_SHOOT" },
+            // Street-Food Taco / Hot-Dog / Cafe Cubano Vendor Scenes (Cart + Vendor + Waiting Customers)
+            { c: 448.5,  r: 210.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 448.5,  r: 244.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 448.5,  r: 292.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 443.5,  r: 194.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 443.5,  r: 234.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 218.5,  r: 128.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 290.5,  r: 185.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            { c: 306.5,  r: 173.5, kind: "STREET_FOOD_VENDOR_SCENE" },
+            // Latin Conga & Salsa Sidewalk Dance Circles (Espanola Way, Ocean Drive & Calle Ocho)
+            { c: 448.38, r: 198.5, kind: "CONGA_SALSA_CIRCLE", exactPos: true },
+            { c: 448.38, r: 262.5, kind: "CONGA_SALSA_CIRCLE", exactPos: true },
+            { c: 448.38, r: 296.5, kind: "CONGA_SALSA_CIRCLE", exactPos: true },
+            { c: 288.5,  r: 250.5, kind: "CONGA_SALSA_CIRCLE" },
+            { c: 308.5,  r: 266.5, kind: "CONGA_SALSA_CIRCLE" }
         ];
         for (let ei = 0; ei < rawStreetEvents.length; ei++) {
             const ev = rawStreetEvents[ei];

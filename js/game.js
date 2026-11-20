@@ -1031,9 +1031,11 @@ class LeonidaGame {
         ];
 
         starterPeds.forEach((sp, idx) => {
+            const isJoggerInit = Boolean(sp.isJogger || sp.type === "vc_jogger");
+            const isSkateInit = Boolean(sp.isSkateboarder || (!isJoggerInit && !sp.isRollerblader && sp.type === "beach_guy_yellow" && (idx % 3) === 0));
             const initWalkSpd = sp.dead
                 ? 0
-                : (sp.isRollerblader ? (45 + (idx % 5)) : (sp.isChild ? (21 + (idx % 3)) : (22 + (idx % 5))));
+                : (sp.isRollerblader ? (45 + (idx % 5)) : (isSkateInit ? (42 + (idx % 5)) : (isJoggerInit ? (39 + (idx % 5)) : (sp.isChild ? (21 + (idx % 3)) : (22 + (idx % 5))))));
 
             const pedObj = new Pedestrian({
 
@@ -1074,6 +1076,21 @@ class LeonidaGame {
             });
             pedObj.baseWalkSpeed = initWalkSpd || 24;
             if (sp.isRollerblader) pedObj.isRollerblader = true;
+            if (isSkateInit) pedObj.isSkateboarder = true;
+            if (isJoggerInit) {
+                pedObj.isJogger = true;
+                pedObj.carryProp = sp.carryProp || "JOGGER_GEAR";
+            } else if (sp.carryProp) {
+                pedObj.carryProp = sp.carryProp;
+            } else if (sp.type === "surfer_guy" && (idx % 2) === 0) {
+                pedObj.carryProp = "SURFBOARD";
+            } else if (sp.type === "beach_guy_red" && (idx % 3) === 0) {
+                pedObj.carryProp = "BOOMBOX";
+            }
+            if (sp.hasDog) {
+                pedObj.hasDog = true;
+                pedObj.dogBreed = sp.dogBreed || "GOLDEN";
+            }
             if (sp.isChild || (sp.type && sp.type.startsWith("kid_"))) pedObj.isChild = true;
             this.peds.push(pedObj);
 
@@ -19292,6 +19309,30 @@ class LeonidaGame {
                             { ped: "vc_hawaiian_red", x: ev.x - 2, y: ev.y - 16 },
                             { ped: "bikini_cyan", x: ev.x + 12, y: ev.y + 10 }
                         ], null);
+                    } else if (ev.kind === "BEACH_YOGA_CLASS") {
+                        spawnScenePeds(ev, [
+                            { ped: "bikini_white", x: ev.x, y: ev.y - 16 },
+                            { ped: "bikini_pink", x: ev.x - 13, y: ev.y + 4 },
+                            { ped: "vc_jogger", x: ev.x, y: ev.y + 8 },
+                            { ped: "bikini_cyan", x: ev.x + 13, y: ev.y + 4 }
+                        ], "🧘 YOGA CLASS SCATTERED!", true);
+                    } else if (ev.kind === "FASHION_PHOTO_SHOOT") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_crockett", x: ev.x + 2, y: ev.y - 14 },
+                            { ped: "bikini_pink", x: ev.x + 1, y: ev.y + 12 }
+                        ], "📸 PHOTO SHOOT CRASHED!");
+                    } else if (ev.kind === "STREET_FOOD_VENDOR_SCENE") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_cuban", x: ev.x - 11, y: ev.y },
+                            { ped: "vc_tourist", x: ev.x + 12, y: ev.y - 5 },
+                            { ped: "bikini_yellow", x: ev.x + 14, y: ev.y + 9 }
+                        ], "🌭 STREET VENDOR CART CRASHED!");
+                    } else if (ev.kind === "CONGA_SALSA_CIRCLE") {
+                        spawnScenePeds(ev, [
+                            { ped: "vc_cuban", x: ev.x - 15, y: ev.y + 2 },
+                            { ped: "vc_hawaiian_red", x: ev.x + 6, y: ev.y - 5 },
+                            { ped: "bikini_red", x: ev.x + 6, y: ev.y + 8 }
+                        ], "🥁 SALSA CIRCLE SCATTERED!");
                     } else {
                         // PROMENADE_BENCH: spawn only the exact 1 or 2 seated NPCs falling forward in front of the bench!
                         const pair = benchPairs[i % benchPairs.length];

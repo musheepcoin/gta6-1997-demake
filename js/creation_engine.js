@@ -1,5 +1,5 @@
 /* ============================================================================
-   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_235)
+   VICE CITY 26 — UNIFIED 3D WORLD, ASSET & MISSION CREATION ENGINE (v101_236)
    ----------------------------------------------------------------------------
    Provides both:
    1. A Declarative Programmatic Creation API (`game.creationEngine.*`) with
@@ -23,7 +23,7 @@
     class ViceCreationEngine {
         constructor(game) {
             this.game = game;
-            this.version = "101_235";
+            this.version = "101_236";
             this.studioActive = false;
             this.freeCamActive = true;
             this.gridSnap = false;

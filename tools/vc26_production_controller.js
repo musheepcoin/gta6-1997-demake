@@ -1490,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_235"), "ViceCreationEngine (v101_235) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_236"), "ViceCreationEngine (v101_236) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2386,6 +2386,54 @@ function runSimulations() {
         assert(
             g.getTimePhaseInfo().phase === "NIGHT" && g.renderer.nightFactor > 0.9,
             `Manual [N] phase toggle to NEON NIGHT persists across incoming server_sim WORLD_SYNC ticks (phase=${g.getTimePhaseInfo().phase}, nightFactor=${g.renderer.nightFactor.toFixed(2)})`
+        );
+
+        // Verify 1,000+ Destructible 3D Miami Street Props (Trash Cans, Recycle Bins, Parking Meters, Mailboxes, E-Scooter Racks, Bus Stops, Food Carts, Menu Boards, Velvet Ropes) & Joggers/Carried Props
+        const oe = g.map && g.map.objectEngine;
+        const sProps = (oe && Array.isArray(oe.streetProps)) ? oe.streetProps : [];
+        const trashCansSouthBeach = sProps.filter((sp) => sp.kind === "TRASH_CAN" && sp.homeY >= 140 * 64 && sp.homeY <= 360 * 64);
+        const parkingMeters = sProps.filter((sp) => sp.kind === "PARKING_METER");
+        const escooterRacks = sProps.filter((sp) => sp.kind === "ESCOOTER_RACK");
+        const foodCarts = sProps.filter((sp) => sp.kind === "FOOD_CART");
+        assert(
+            sProps.length >= 600 && trashCansSouthBeach.length >= 30 && parkingMeters.length >= 25 && escooterRacks.length >= 15 && foodCarts.length >= 15,
+            `1,000+ Destructible 3D Miami Street Props distributed across Ocean Drive & all districts (total=${sProps.length}, southBeachTrashCans=${trashCansSouthBeach.length}, parkingMeters=${parkingMeters.length}, escooterRacks=${escooterRacks.length}, foodCarts=${foodCarts.length})`
+        );
+
+        // Drive pickup truck into a South Beach 3D Trash Can and verify physics knock-over & garbage scatter
+        const targetCan = trashCansSouthBeach[0];
+        pickup.x = targetCan.x - 10;
+        pickup.y = targetCan.y;
+        pickup.vx = 95;
+        pickup.vy = 0;
+        pickup.speed = 95;
+        pickup.angle = 0;
+        g.player.inVehicle = pickup;
+        oe.updateAndCollideProps(g, 0.05);
+        assert(
+            targetCan.broken === true && Math.hypot(targetCan.vx, targetCan.vy) > 50,
+            `Driving a car into a 3D Street Trash Can knocks it flying across the street and scatters garbage debris (broken=${targetCan.broken}, launchSpd=${Math.round(Math.hypot(targetCan.vx, targetCan.vy))})`
+        );
+
+        // Verify Joggers, Skateboarders, Carried 3D Items & New Miami Street Scenes (Beach Yoga, Fashion Photo Shoot, Street Food Vendor, Conga Salsa Circle)
+        let sampledJogger = g.peds.some((p) => p && p.isJogger && p.speed >= 38 && p.carryProp === "JOGGER_GEAR");
+        let sampledSkater = g.peds.some((p) => p && p.isSkateboarder && p.speed >= 40);
+        const sampledProps = new Set();
+        for (let s = 0; s < 120; s++) {
+            const spSpec = g.trafficManager.chooseDistrictPedSpec(443 + (s % 6), 200 + s, false, g.map, s * 13 + 7);
+            if (spSpec.isJogger && spSpec.speed >= 38 && spSpec.carryProp === "JOGGER_GEAR") sampledJogger = true;
+            if (spSpec.isSkateboarder && spSpec.speed >= 40) sampledSkater = true;
+            if (spSpec.carryProp) sampledProps.add(spSpec.carryProp);
+        }
+        const stEvents = (g.map && Array.isArray(g.map.streetEvents)) ? g.map.streetEvents : [];
+        const hasYoga = stEvents.some((e) => e.kind === "BEACH_YOGA_CLASS");
+        const hasPhoto = stEvents.some((e) => e.kind === "FASHION_PHOTO_SHOOT");
+        const hasVendor = stEvents.some((e) => e.kind === "STREET_FOOD_VENDOR_SCENE");
+        const hasSalsa = stEvents.some((e) => e.kind === "CONGA_SALSA_CIRCLE");
+        const hasNewScenes = hasYoga && hasPhoto && hasVendor && hasSalsa;
+        assert(
+            sampledJogger && sampledSkater && sampledProps.size >= 4 && hasNewScenes,
+            `Miami Joggers (jog=${sampledJogger}), Skateboarders (skate=${sampledSkater}), Carried 3D Items (${Array.from(sampledProps).join(",")}) & new street micro-life scenes (yoga=${hasYoga}, photo=${hasPhoto}, vendor=${hasVendor}, salsa=${hasSalsa}) active`
         );
 
         g.player.inVehicle = null;

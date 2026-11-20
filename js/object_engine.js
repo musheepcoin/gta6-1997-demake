@@ -6047,103 +6047,137 @@ class WorldObjectEngine {
 
         const M = MAP_COLS;
         const g = map.surfaceGround;
-        const kinds = ["HYDRANT", "NEWS_STAND", "PAYPHONE_BOOTH", "HYDRANT"];
+        const oceanDriveKinds = [
+            "TRASH_CAN", "PARKING_METER", "MENU_BOARD", "ESCOOTER_RACK",
+            "TRASH_CAN", "VELVET_ROPE", "NEWS_STAND", "HYDRANT",
+            "RECYCLE_BIN", "FOOD_CART", "MAILBOX", "BUS_STOP_SHELTER",
+            "TRASH_CAN", "PARKING_METER", "STREET_BENCH"
+        ];
+        const urbanMiamiKinds = [
+            "TRASH_CAN", "PARKING_METER", "HYDRANT", "MAILBOX",
+            "RECYCLE_BIN", "NEWS_STAND", "BUS_STOP_SHELTER", "ESCOOTER_RACK",
+            "TRASH_CAN", "PAYPHONE_BOOTH", "FOOD_CART", "TRAFFIC_CONE_SET",
+            "MENU_BOARD", "STREET_BENCH", "TRASH_CAN"
+        ];
         let kIdx = 0;
 
-        // Scan sidewalk curb tiles (PAWEMENT adjacent to ROAD) with deterministic spacing
-        for (let r = 24; r < MAP_ROWS - 24; r += 7) {
-            for (let c = 24; c < M - 24; c += 7) {
-                if (this.streetProps.length >= 210) break;
-                const idx = r * M + c;
-                if (g[idx] !== GROUND_TYPE.PAWEMENT) continue;
-                // Never place sidewalk booths or street furniture on lid 69 tree planter tiles
-                const blk1 = map.getBlockInfo ? map.getBlockInfo(c, r, 1) : null;
-                if (blk1 && blk1.lid === 69) continue;
-
-                // Check which neighbor is an active ROAD tile (ignoring off-street parking lots) so we place the prop near the curb facing the street
-                const isActiveStreet = (tc, tr) => {
-                    if (g[tr * M + tc] !== GROUND_TYPE.ROAD) return false;
-                    if (map.voxelGrid && map.roadParkingNavIdx !== undefined && map.voxelGrid[(2 * MAP_ROWS + tr) * M + tc] === map.roadParkingNavIdx) {
-                        const b1 = map.getBlockInfo ? map.getBlockInfo(tc, tr, 1) : null;
-                        if (!b1 || (b1.lid !== 1 && b1.lid !== 2 && b1.lid !== 24 && b1.lid !== 25 && b1.lid !== 74 && b1.lid !== 75 && b1.lid !== 80 && b1.lid !== 81 && b1.lid !== 82)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                };
-                let curbDx = 0, curbDy = 0, armAng = 0, hasRoad = false;
-                if (isActiveStreet(c + 1, r)) {
-                    curbDx = 18; curbDy = 0; armAng = 0; hasRoad = true;
-                } else if (isActiveStreet(c - 1, r)) {
-                    curbDx = -18; curbDy = 0; armAng = Math.PI; hasRoad = true;
-                } else if (isActiveStreet(c, r + 1)) {
-                    curbDx = 0; curbDy = 18; armAng = Math.PI * 0.5; hasRoad = true;
-                } else if (isActiveStreet(c, r - 1)) {
-                    curbDx = 0; curbDy = -18; armAng = -Math.PI * 0.5; hasRoad = true;
+        // Check which neighbor is an active ROAD tile (ignoring off-street parking lots) so we place the prop near the curb facing the street
+        const isActiveStreet = (tc, tr) => {
+            if (tc < 0 || tc >= M || tr < 0 || tr >= MAP_ROWS) return false;
+            if (g[tr * M + tc] !== GROUND_TYPE.ROAD) return false;
+            if (map.voxelGrid && map.roadParkingNavIdx !== undefined && map.voxelGrid[(2 * MAP_ROWS + tr) * M + tc] === map.roadParkingNavIdx) {
+                const b1 = map.getBlockInfo ? map.getBlockInfo(tc, tr, 1) : null;
+                if (!b1 || (b1.lid !== 1 && b1.lid !== 2 && b1.lid !== 24 && b1.lid !== 25 && b1.lid !== 74 && b1.lid !== 75 && b1.lid !== 80 && b1.lid !== 81 && b1.lid !== 82)) {
+                    return false;
                 }
-                if (!hasRoad) continue;
-
-                const px = (c + 0.5) * TILE_SIZE + curbDx;
-                const py = (r + 0.5) * TILE_SIZE + curbDy;
-
-                // Ensure not blocking any parking bay, surface parking lot, interior door, tree/palm canopy, café parasol, soda machine, streetlamp, or mission payphone
-                if (Array.isArray(map.curbParkingStrips) && map.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 - 1 && r <= st.r1 + 1) || (py >= st.yMin - 24 && py <= st.yMax + 24)))) {
-                    continue;
-                }
-                if (Array.isArray(map.surfaceParkingLots) && map.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) {
-                    continue;
-                }
-                if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - px, it.doorY - py) < 52)) {
-                    continue;
-                }
-                if (Array.isArray(map.streetlights) && map.streetlights.some(sl => Math.hypot(sl.baseX - px, sl.baseY - py) < 46)) {
-                    continue;
-                }
-                if (Array.isArray(map.trafficSignals) && map.trafficSignals.some(ts => Math.hypot(ts.baseX - px, ts.baseY - py) < 46)) {
-                    continue;
-                }
-                if (Array.isArray(map.vicePalms) && map.vicePalms.some(pm => Math.hypot(pm.x - px, pm.y - py) < 56)) {
-                    continue;
-                }
-                if (Array.isArray(map.trees) && map.trees.some(tr => Math.hypot(tr.x - px, tr.y - py) < 56)) {
-                    continue;
-                }
-                if (Array.isArray(map.viceStreetDetails) && map.viceStreetDetails.some(vd => Math.hypot(vd.x - px, vd.y - py) < 44)) {
-                    continue;
-                }
-                if (Array.isArray(this.sodaMachines) && this.sodaMachines.some(sm => Math.hypot(sm.x - px, sm.y - py) < 56)) {
-                    continue;
-                }
-                if (
-                    Math.hypot(443.5 * TILE_SIZE - px, 285.5 * TILE_SIZE - py) < 56 ||
-                    Math.hypot(448.5 * TILE_SIZE - px, 293.5 * TILE_SIZE - py) < 56 ||
-                    Math.hypot(344.5 * TILE_SIZE - px, 171.5 * TILE_SIZE - py) < 56 ||
-                    Math.hypot(68.5 * TILE_SIZE - px, 187.5 * TILE_SIZE - py) < 56
-                ) {
-                    continue;
-                }
-
-                const kind = kinds[kIdx % kinds.length];
-                kIdx++;
-                this.streetProps.push({
-                    id: `stprop_${kIdx}`,
-                    kind,
-                    homeX: px,
-                    homeY: py,
-                    x: px,
-                    y: py,
-                    z: 2.0,
-                    vx: 0,
-                    vy: 0,
-                    vz: 0,
-                    ang: armAng,
-                    vang: 0,
-                    broken: false,
-                    timer: 0,
-                    geyserTimer: 0,
-                    neonPink: (kIdx % 2 === 0)
-                });
             }
+            return true;
+        };
+
+        const tryPlaceStreetPropAt = (c, r) => {
+            const idx = r * M + c;
+            if (g[idx] !== GROUND_TYPE.PAWEMENT) return false;
+            const blk1 = map.getBlockInfo ? map.getBlockInfo(c, r, 1) : null;
+            if (blk1 && blk1.lid === 69) return false;
+
+            let curbDx = 0, curbDy = 0, armAng = 0, hasRoad = false;
+            if (isActiveStreet(c + 1, r)) {
+                curbDx = 18; curbDy = 0; armAng = 0; hasRoad = true;
+            } else if (isActiveStreet(c - 1, r)) {
+                curbDx = -18; curbDy = 0; armAng = Math.PI; hasRoad = true;
+            } else if (isActiveStreet(c, r + 1)) {
+                curbDx = 0; curbDy = 18; armAng = Math.PI * 0.5; hasRoad = true;
+            } else if (isActiveStreet(c, r - 1)) {
+                curbDx = 0; curbDy = -18; armAng = -Math.PI * 0.5; hasRoad = true;
+            }
+            if (!hasRoad) return false;
+
+            const px = (c + 0.5) * TILE_SIZE + curbDx;
+            const py = (r + 0.5) * TILE_SIZE + curbDy;
+
+            // Ensure not blocking any parking bay, surface parking lot, interior door, tree/palm canopy, cafe parasol, soda machine, streetlamp, or mission payphone
+            if (Array.isArray(map.curbParkingStrips) && map.curbParkingStrips.some(st => st.c === c && ((r >= st.r0 - 1 && r <= st.r1 + 1) || (py >= st.yMin - 24 && py <= st.yMax + 24)))) {
+                return false;
+            }
+            if (Array.isArray(map.surfaceParkingLots) && map.surfaceParkingLots.some(lot => c >= lot.asphaltMinX && c <= lot.asphaltMaxX && r >= lot.asphaltMinY && r <= lot.asphaltMaxY)) {
+                return false;
+            }
+            if (Array.isArray(map.interiors) && map.interiors.some(it => Math.hypot(it.doorX - px, it.doorY - py) < 52)) {
+                return false;
+            }
+            if (Array.isArray(map.streetlights) && map.streetlights.some(sl => Math.hypot(sl.baseX - px, sl.baseY - py) < 34)) {
+                return false;
+            }
+            if (Array.isArray(map.trafficSignals) && map.trafficSignals.some(ts => Math.hypot(ts.baseX - px, ts.baseY - py) < 38)) {
+                return false;
+            }
+            if (Array.isArray(map.vicePalms) && map.vicePalms.some(pm => Math.hypot(pm.x - px, pm.y - py) < 38)) {
+                return false;
+            }
+            if (Array.isArray(map.trees) && map.trees.some(tr => Math.hypot(tr.x - px, tr.y - py) < 42)) {
+                return false;
+            }
+            if (Array.isArray(map.viceStreetDetails) && map.viceStreetDetails.some(vd => Math.hypot(vd.x - px, vd.y - py) < 36)) {
+                return false;
+            }
+            if (Array.isArray(this.sodaMachines) && this.sodaMachines.some(sm => Math.hypot(sm.x - px, sm.y - py) < 46)) {
+                return false;
+            }
+            if (this.streetProps.some(sp => Math.hypot(sp.homeX - px, sp.homeY - py) < 42)) {
+                return false;
+            }
+            if (
+                Math.hypot(443.5 * TILE_SIZE - px, 285.5 * TILE_SIZE - py) < 56 ||
+                Math.hypot(448.5 * TILE_SIZE - px, 293.5 * TILE_SIZE - py) < 56 ||
+                Math.hypot(344.5 * TILE_SIZE - px, 171.5 * TILE_SIZE - py) < 56 ||
+                Math.hypot(68.5 * TILE_SIZE - px, 187.5 * TILE_SIZE - py) < 56
+            ) {
+                return false;
+            }
+
+            const isOceanDriveOrBeach = (c >= 406 && c <= 462 && r >= 44 && r <= 372);
+            const roster = isOceanDriveOrBeach ? oceanDriveKinds : urbanMiamiKinds;
+            const detHash = ((c * 73856093) ^ (r * 19349663) ^ (kIdx * 83492791)) >>> 0;
+            const kind = roster[detHash % roster.length];
+            kIdx++;
+            this.streetProps.push({
+                id: `stprop_${kIdx}`,
+                kind,
+                homeX: px,
+                homeY: py,
+                x: px,
+                y: py,
+                z: 2.0,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                ang: armAng,
+                vang: 0,
+                broken: false,
+                timer: 0,
+                geyserTimer: 0,
+                neonPink: (kIdx % 2 === 0),
+                variant: detHash % 4
+            });
+            return true;
+        };
+
+        // Pass 1: Heart of Miami (Ocean Drive, Lummus Park, South Beach, Mid-Beach, Espanola Way, Downtown, Little Cuba, Wynwood, Star Island)
+        for (let r = 46; r <= 376; r += 3) {
+            for (let c = 164; c <= 460; c += 3) {
+                if (this.streetProps.length >= 1020) break;
+                tryPlaceStreetPropAt(c, r);
+            }
+            if (this.streetProps.length >= 1020) break;
+        }
+
+        // Pass 2: Outer Leonida Districts (Port Gellhorn, North Beach, SERA Approach, Keys)
+        for (let r = 24; r < MAP_ROWS - 24; r += 6) {
+            for (let c = 24; c < M - 24; c += 6) {
+                if (this.streetProps.length >= 1380) break;
+                tryPlaceStreetPropAt(c, r);
+            }
+            if (this.streetProps.length >= 1380) break;
         }
 
         // Rebuild map.floraGrid after all WorldObjectEngine flora & booth clearance passes (solid-trunk trees only; ferns/bushes allow 100% pass-through!)
@@ -6774,7 +6808,7 @@ class WorldObjectEngine {
         // Fast early-out when player is on foot or stationary in vehicle: zero 5,500-prop scans!
         if (!pCar) return;
         const carSpd = Math.hypot(pCar.vx || 0, pCar.vy || 0) || Math.abs(pCar.speed || 0);
-        if (carSpd <= 30) return;
+        if (carSpd <= 15) return;
 
         const grid = this._ensurePropCollisionGrid();
         if (!grid) return;
@@ -6828,19 +6862,31 @@ class WorldObjectEngine {
                     }
                 }
 
-                // 2. 3D Sidewalk Street Furniture
-                if (carSpd > 34) {
+                // 2. 3D Sidewalk Street Furniture (Trash Cans, Recycle Bins, Parking Meters, Mailboxes, E-Scooter Racks, Bus Stops, Menu Boards, Velvet Ropes, Food Carts, Cones, Hydrants)
+                if (carSpd > 15) {
                     const sProps = cell.sProps;
-                    const bOff = (pCar.w || 48) * 0.32;
+                    const bOff = (pCar.w || 48) * 0.34;
                     const noseX = pCar.x + Math.cos(pCar.angle || 0) * bOff;
                     const noseY = pCar.y + Math.sin(pCar.angle || 0) * bOff;
                     for (let i = 0; i < sProps.length; i++) {
                         const sp = sProps[i];
                         if (sp.broken || (sp.hitCooldown || 0) > 0) continue;
-                        const blockedByTwoWheeler = (sp.kind === "PAYPHONE_BOOTH") ? isTwoWheeler : isMicroVeh;
-                        if (!blockedByTwoWheeler && Math.abs(pCar.x - sp.x) < 42 && Math.abs(pCar.y - sp.y) < 42) {
+                        const isLightProp = (
+                            sp.kind === "TRASH_CAN" ||
+                            sp.kind === "RECYCLE_BIN" ||
+                            sp.kind === "MENU_BOARD" ||
+                            sp.kind === "VELVET_ROPE" ||
+                            sp.kind === "TRAFFIC_CONE_SET" ||
+                            sp.kind === "PARKING_METER" ||
+                            sp.kind === "ESCOOTER_RACK" ||
+                            sp.kind === "NEWS_STAND"
+                        );
+                        if (!isLightProp && carSpd <= 30) continue;
+                        const blockedByTwoWheeler = (sp.kind === "PAYPHONE_BOOTH" || sp.kind === "BUS_STOP_SHELTER") ? isTwoWheeler : (isLightProp ? false : isMicroVeh);
+                        if (!blockedByTwoWheeler && Math.abs(pCar.x - sp.x) < 44 && Math.abs(pCar.y - sp.y) < 44) {
                             const dist = Math.min(Math.hypot(pCar.x - sp.x, pCar.y - sp.y), Math.hypot(noseX - sp.x, noseY - sp.y));
-                            if (dist < 25) {
+                            const hitRad = (sp.kind === "BUS_STOP_SHELTER" || sp.kind === "FOOD_CART" || sp.kind === "ESCOOTER_RACK") ? 30 : 26;
+                            if (dist < hitRad) {
                                 const dx = sp.x - pCar.x;
                                 const dy = sp.y - pCar.y;
                                 const d = Math.hypot(dx, dy) || 1.0;
@@ -6881,6 +6927,7 @@ class WorldObjectEngine {
                                 sp.broken = true;
                                 sp._persistedSmash = true;
                                 sp.timer = 0;
+                                sp.impactAng = Math.atan2(dy, dx);
                                 actSProps.add(sp);
                                 if (game.net && typeof game.net.broadcastWorldEvent === "function") {
                                     game.net.broadcastWorldEvent({
@@ -6888,23 +6935,92 @@ class WorldObjectEngine {
                                         pType: "SPROP",
                                         x: Math.round(sp.homeX ?? sp.x),
                                         y: Math.round(sp.homeY ?? sp.y),
-                                        a: Math.round(Math.atan2(dy, dx) * 100) / 100
+                                        a: Math.round(sp.impactAng * 100) / 100
                                     });
                                 }
-                                const launchSpd = Math.min(310, Math.max(110, carSpd * 1.25));
+                                const launchSpd = Math.min(320, Math.max(115, carSpd * (isLightProp ? 1.38 : 1.22)));
                                 sp.vx = (dx / d) * launchSpd;
                                 sp.vy = (dy / d) * launchSpd;
-                                sp.vz = 0.55;
-                                sp.vang = (Math.random() - 0.5) * 16.0;
-                                pCar.crashCooldown = 0.45;
+                                sp.vz = isLightProp ? 0.68 : 0.55;
+                                sp.vang = (Math.random() - 0.5) * 18.0;
+                                pCar.crashCooldown = 0.35;
                                 if (game.audio && typeof game.audio.playCarCrash === "function") {
-                                    game.audio.playCarCrash(1.05);
+                                    game.audio.playCarCrash(isLightProp ? 0.72 : 1.05);
                                 }
 
                                 if (sp.kind === "HYDRANT") {
                                     sp.geyserTimer = 14.0;
                                     if (Array.isArray(game.floatingTexts)) {
                                         game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.35, text: "💦 HYDRANT BURST!", color: "#38bdf8", life: 1.3 });
+                                    }
+                                } else if (sp.kind === "TRASH_CAN" || sp.kind === "RECYCLE_BIN") {
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 8; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "DEBRIS");
+                                        }
+                                    }
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({
+                                            x: sp.x,
+                                            y: sp.y,
+                                            z: 2.32,
+                                            text: sp.kind === "RECYCLE_BIN" ? "♻️ RECYCLE BIN SMASHED!" : "🗑️ TRASH CAN SMASHED!",
+                                            color: sp.kind === "RECYCLE_BIN" ? "#38bdf8" : "#4ade80",
+                                            life: 1.2
+                                        });
+                                    }
+                                } else if (sp.kind === "PARKING_METER") {
+                                    if (typeof game.addScore === "function") {
+                                        game.addScore(25);
+                                    }
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 6; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 10, sp.y + (Math.random() - 0.5) * 10, "SPARK");
+                                        }
+                                    }
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.34, text: "🪙 PARKING METER! +$25", color: "#fde047", life: 1.3 });
+                                    }
+                                } else if (sp.kind === "MAILBOX") {
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.32, text: "📬 MAILBOX SMASHED!", color: "#60a5fa", life: 1.2 });
+                                    }
+                                } else if (sp.kind === "ESCOOTER_RACK") {
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 7; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "SPARK");
+                                        }
+                                    }
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.34, text: "🛴 E-SCOOTER RACK SMASHED!", color: "#a3e635", life: 1.2 });
+                                    }
+                                } else if (sp.kind === "BUS_STOP_SHELTER") {
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 10; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 18, sp.y + (Math.random() - 0.5) * 18, "SPARK");
+                                        }
+                                    }
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.38, text: "🚏 BUS STOP SHATTERED!", color: "#38bdf8", life: 1.25 });
+                                    }
+                                } else if (sp.kind === "FOOD_CART") {
+                                    if (typeof game.spawnParticle === "function") {
+                                        for (let k = 0; k < 8; k++) {
+                                            game.spawnParticle(sp.x + (Math.random() - 0.5) * 14, sp.y + (Math.random() - 0.5) * 14, "DEBRIS");
+                                        }
+                                    }
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.36, text: "🌭 STREET FOOD CART SMASHED!", color: "#fb923c", life: 1.25 });
+                                    }
+                                } else if (sp.kind === "MENU_BOARD" || sp.kind === "VELVET_ROPE" || sp.kind === "STREET_BENCH" || sp.kind === "TRAFFIC_CONE_SET") {
+                                    const msgMap = {
+                                        MENU_BOARD: "📋 MENU BOARD SMASHED!",
+                                        VELVET_ROPE: "🥂 VIP VELVET ROPE SMASHED!",
+                                        STREET_BENCH: "🪑 SIDEWALK BENCH SMASHED!",
+                                        TRAFFIC_CONE_SET: "🚧 TRAFFIC CONES SCATTERED!"
+                                    };
+                                    if (Array.isArray(game.floatingTexts)) {
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: msgMap[sp.kind] || "💥 PROP SMASH!", color: "#f472b6", life: 1.15 });
                                     }
                                 } else if (sp.kind === "STREETLIGHT_NEON") {
                                     if (typeof game.spawnParticle === "function") {
@@ -6926,7 +7042,7 @@ class WorldObjectEngine {
                                     }
                                 } else {
                                     if (Array.isArray(game.floatingTexts)) {
-                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "💥 PROP SMASH!", color: "#fde047", life: 1.1 });
+                                        game.floatingTexts.push({ x: sp.x, y: sp.y, z: 2.30, text: "📰 NEWSSTAND SMASHED!", color: "#fde047", life: 1.1 });
                                     }
                                 }
                             }
@@ -13090,14 +13206,14 @@ class WorldObjectEngine {
             }
         }
 
-        // 3. 180+ True 3D Destructible Sidewalk Street Props & 3D Water Geysers
+        // 3. 1,350+ True 3D Destructible Sidewalk Street Props & 3D Water Geysers / Spilled Litter / Shattered Glass
         if (this.streetProps && this.streetProps.length > 0) {
             const visStreetProps = typeof renderer._queryStaticChunkGrid === "function"
                 ? renderer._queryStaticChunkGrid(this.streetProps, "homeX", "homeY", minX - 80, minY - 80, maxX + 80, maxY + 80)
                 : this.streetProps;
             for (let i = 0; i < visStreetProps.length; i++) {
                 const sp = visStreetProps[i];
-                if (sp.x < minX || sp.x > maxX || sp.y < minY || sp.y > maxY) continue;
+                if (sp.x < minX - 40 || sp.x > maxX + 40 || sp.y < minY - 40 || sp.y > maxY + 40) continue;
                 const cosA = Math.cos(sp.ang);
                 const sinA = Math.sin(sp.ang);
                 const bz = sp.z || 2.0;
@@ -13118,6 +13234,149 @@ class WorldObjectEngine {
                     } else {
                         emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 7, 7, bz, bz + 0.12, [0.88, 0.22, 0.18], 1.0, 5);
                         emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 9, 5, bz + 0.06, bz + 0.09, [0.94, 0.80, 0.18], 1.0, 5);
+                    }
+                } else if (sp.kind === "TRASH_CAN" || sp.kind === "RECYCLE_BIN") {
+                    const isRec = sp.kind === "RECYCLE_BIN";
+                    const binCol = isRec
+                        ? [0.12, 0.54, 0.88]
+                        : (sp.neonPink ? [0.16, 0.56, 0.48] : [0.14, 0.38, 0.26]);
+                    const lidCol = isRec ? [0.92, 0.95, 0.99] : [0.76, 0.80, 0.86];
+                    if (sp.broken) {
+                        // Knocked-over 3D trash can body + detached dome lid + scattered 3D garbage bags, soda cans & litter!
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 9.5, bz, bz + 0.085, binCol, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 8.5, 2.5, 4.5, 8.5, bz, bz + 0.065, lidCol, 1.0, 9);
+                        const mx = (sp.homeX + sp.x) * 0.5;
+                        const my = (sp.homeY + sp.y) * 0.5;
+                        // Black/white spilled garbage bags & colorful crushed cans strewn across sidewalk/street
+                        emitDynBox(mx - 6, my + 5, cosA, sinA, 0, 0, 6.5, 5.5, 2.01, 2.055, [0.15, 0.17, 0.20], 1.0, 6);
+                        emitDynBox(mx + 7, my - 4, -sinA, cosA, 0, 0, 5.5, 4.8, 2.01, 2.050, [0.92, 0.91, 0.88], 1.0, 6);
+                        emitDynBox(sp.x - cosA * 10, sp.y - sinA * 10, cosA, sinA, 0, 3, 3.4, 2.2, 2.01, 2.035, [0.96, 0.28, 0.68], 1.0, 6);
+                        emitDynBox(sp.x - cosA * 6, sp.y - sinA * 6, -sinA, cosA, 0, -4, 3.4, 2.2, 2.01, 2.035, [0.18, 0.86, 0.96], 1.0, 6);
+                        emitDynBox(mx + 3, my + 8, 1, 0, 0, 0, 4.8, 4.2, 2.01, 2.030, [0.88, 0.68, 0.36], 1.0, 6);
+                    } else {
+                        // Upright 3D Miami Beach municipal trash receptacle / recycling bin with white liner bag rim & domed hood
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 4.6, 5.0, bz, bz + 0.13, 8, binCol, 6, true);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 5.2, 5.1, bz + 0.125, bz + 0.142, 8, [0.95, 0.96, 0.98], 6, true);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 5.0, 3.4, bz + 0.142, bz + 0.182, 8, lidCol, 9, true);
+                    }
+                } else if (sp.kind === "PARKING_METER") {
+                    if (sp.broken) {
+                        // Snapped curb flange + toppled meter pole & scattered golden coins
+                        emitDynCylinder(sp.homeX, sp.homeY, 0, 0, 2.4, 2.0, 2.0, 2.03, 6, [0.38, 0.42, 0.48], 9, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 2.4, bz, bz + 0.035, [0.64, 0.68, 0.74], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 6.5, 0, 5.5, 4.2, bz, bz + 0.055, [0.22, 0.26, 0.32], 1.0, 9);
+                        emitDynBox(sp.homeX + 5, sp.homeY - 4, 1, 0, 0, 0, 2.4, 2.4, 2.01, 2.025, [0.98, 0.82, 0.18], 1.0, 10);
+                        emitDynBox(sp.x - 4, sp.y + 4, 1, 0, 0, 0, 2.4, 2.4, 2.01, 2.025, [0.98, 0.82, 0.18], 1.0, 10);
+                    } else {
+                        // Slim 3D steel post + twin solar digital parking meter head with glowing green/cyan display
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 1.5, 1.4, bz, bz + 0.16, 6, [0.62, 0.66, 0.72], 9, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 3.8, 5.4, bz + 0.15, bz + 0.215, [0.24, 0.28, 0.34], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0.4, 0, 3.2, 4.0, bz + 0.175, bz + 0.205, [0.18, 0.94, 0.68], 1.0, 10);
+                    }
+                } else if (sp.kind === "MAILBOX") {
+                    const uspsBlue = [0.10, 0.28, 0.64];
+                    if (sp.broken) {
+                        // Toppled USPS blue mailbox + scattered white airmail envelopes on pavement
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 15, 10, bz, bz + 0.095, uspsBlue, 1.0, 6);
+                        const mx = (sp.homeX + sp.x) * 0.5;
+                        const my = (sp.homeY + sp.y) * 0.5;
+                        emitDynBox(mx - 5, my + 4, cosA, sinA, 0, 0, 4.2, 2.8, 2.01, 2.022, [0.97, 0.98, 1.0], 1.0, 6);
+                        emitDynBox(mx + 6, my - 5, -sinA, cosA, 0, 0, 4.2, 2.8, 2.01, 2.022, [0.97, 0.98, 1.0], 1.0, 6);
+                        emitDynBox(sp.x - 7, sp.y + 6, 1, 0, 0, 0, 4.0, 2.8, 2.01, 2.022, [0.97, 0.98, 1.0], 1.0, 6);
+                    } else {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10.5, 10.5, bz, bz + 0.16, uspsBlue, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10.8, 9.2, bz + 0.15, bz + 0.195, [0.14, 0.36, 0.76], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 11.0, 10.8, bz + 0.12, bz + 0.135, [0.94, 0.96, 0.99], 1.0, 6);
+                    }
+                } else if (sp.kind === "ESCOOTER_RACK") {
+                    if (sp.broken) {
+                        // Smashed docking rail + 3 scattered neon lime & cyan rental e-scooters lying on the ground
+                        emitDynBox(sp.homeX, sp.homeY, cosA, sinA, 0, 0, 6, 22, 2.0, 2.03, [0.42, 0.46, 0.52], 1.0, 9);
+                        for (let s = -1; s <= 1; s++) {
+                            const scCol = (s === 0) ? [0.16, 0.92, 0.98] : [0.58, 0.96, 0.16];
+                            const sx = sp.x + s * 8 * sinA + s * 4 * cosA;
+                            const sy = sp.y - s * 8 * cosA + s * 4 * sinA;
+                            emitDynBox(sx, sy, cosA, sinA, 0, 0, 13, 3.2, bz, bz + 0.035, [0.18, 0.20, 0.24], 1.0, 6);
+                            emitDynBox(sx, sy, -sinA, cosA, 4, 0, 12, 2.0, bz + 0.01, bz + 0.045, scCol, 1.0, 10);
+                        }
+                    } else {
+                        // Sidewalk docking bar + 3 upright Miami rental e-scooters (deck + vertical stem + handlebars + LED headlight)
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -4, 0, 3.2, 22, bz, bz + 0.04, [0.52, 0.56, 0.64], 1.0, 9);
+                        for (let s = -1; s <= 1; s++) {
+                            const syOff = s * 7.0;
+                            const scCol = (s === 0) ? [0.16, 0.92, 0.98] : [0.58, 0.96, 0.16];
+                            emitDynBox(sp.x, sp.y, cosA, sinA, 1.5, syOff, 11.5, 3.2, bz, bz + 0.032, [0.18, 0.20, 0.24], 1.0, 6);
+                            emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, syOff, 2.0, 2.0, bz + 0.03, bz + 0.175, scCol, 1.0, 9);
+                            emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, syOff, 2.0, 6.2, bz + 0.165, bz + 0.182, [0.16, 0.18, 0.22], 1.0, 9);
+                        }
+                    }
+                } else if (sp.kind === "BUS_STOP_SHELTER") {
+                    if (sp.broken) {
+                        // Shattered glass transit shelter: twisted aluminum roof frame + translucent cyan glass shards on ground
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 30, bz, bz + 0.055, [0.76, 0.80, 0.86], 1.0, 9);
+                        emitDynBox(sp.homeX - 5, sp.homeY + 6, cosA, sinA, 0, 0, 10, 12, 2.01, 2.035, [0.36, 0.84, 0.96], 0.72, 7);
+                        emitDynBox(sp.x + 6, sp.y - 7, -sinA, cosA, 0, 0, 11, 9, 2.01, 2.035, [0.36, 0.84, 0.96], 0.72, 7);
+                    } else {
+                        // 3D Miami-Dade Metrobus Glass Shelter: rear glass wall, illuminated ad/map panel, bench & overhanging cyan canopy roof
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -5.5, 0, 2.2, 28, bz, bz + 0.27, [0.28, 0.76, 0.92], 0.78, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, -13.2, 11, 2.2, bz, bz + 0.27, [0.96, 0.36, 0.74], 0.95, 10);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -2.2, 2.0, 5.0, 16, bz + 0.05, bz + 0.08, [0.82, 0.86, 0.92], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 31, bz + 0.27, bz + 0.305, [0.88, 0.92, 0.97], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 28, bz + 0.305, bz + 0.32, [0.22, 0.86, 0.96], 0.85, 7);
+                    }
+                } else if (sp.kind === "FOOD_CART") {
+                    const isPinkCart = sp.neonPink;
+                    const umbCol = isPinkCart ? [0.96, 0.32, 0.68] : [0.16, 0.84, 0.94];
+                    if (sp.broken) {
+                        // Overturned street-food cart + toppled striped umbrella + spilled food boxes
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 20, 13, bz, bz + 0.095, [0.86, 0.89, 0.94], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, -sinA, cosA, 11, 4, 18, 18, bz, bz + 0.06, umbCol, 1.0, 6);
+                        emitDynBox(sp.homeX + 6, sp.homeY - 5, 1, 0, 0, 0, 4.5, 4.5, 2.01, 2.04, [0.96, 0.72, 0.18], 1.0, 6);
+                    } else {
+                        // Stainless-steel & neon Miami street food / Cafe Cubano cart + canopy umbrella
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 19, bz, bz + 0.145, [0.88, 0.91, 0.95], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12.6, 19.6, bz + 0.06, bz + 0.10, umbCol, 1.0, 10);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 1.3, 1.3, bz + 0.145, bz + 0.29, 6, [0.78, 0.82, 0.88], 9, true);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 11.5, 2.5, bz + 0.27, bz + 0.34, 8, umbCol, 6, true);
+                    }
+                } else if (sp.kind === "MENU_BOARD") {
+                    const brdCol = sp.neonPink ? [0.96, 0.34, 0.74] : [0.18, 0.88, 0.96];
+                    if (sp.broken) {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 13, 9, bz, bz + 0.04, [0.22, 0.24, 0.28], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10, 7, bz + 0.04, bz + 0.05, brdCol, 1.0, 10);
+                    } else {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 6.5, 9.5, bz, bz + 0.145, [0.20, 0.22, 0.26], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 7.2, 8.0, bz + 0.03, bz + 0.13, brdCol, 1.0, 10);
+                    }
+                } else if (sp.kind === "VELVET_ROPE") {
+                    if (sp.broken) {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -4, 0, 14, 2.5, bz, bz + 0.035, [0.96, 0.80, 0.22], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, -sinA, cosA, 5, 3, 14, 2.5, bz, bz + 0.035, [0.96, 0.80, 0.22], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 2.2, bz, bz + 0.028, [0.88, 0.14, 0.32], 1.0, 6);
+                    } else {
+                        // Twin gold brass VIP stanchion posts + crimson velvet rope
+                        emitDynCylinder(sp.x, sp.y, -sinA * 8, cosA * 8, 2.4, 1.5, bz, bz + 0.14, 6, [0.96, 0.80, 0.22], 9, true);
+                        emitDynCylinder(sp.x, sp.y, sinA * 8, -cosA * 8, 2.4, 1.5, bz, bz + 0.14, 6, [0.96, 0.80, 0.22], 9, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 2.2, 16, bz + 0.085, bz + 0.115, [0.88, 0.14, 0.32], 1.0, 6);
+                    }
+                } else if (sp.kind === "STREET_BENCH") {
+                    if (sp.broken) {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, -4, 8, 20, bz, bz + 0.045, [0.68, 0.46, 0.26], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, -sinA, cosA, 4, 5, 6, 18, bz, bz + 0.045, [0.22, 0.78, 0.82], 1.0, 6);
+                    } else {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 8.5, 22, bz, bz + 0.075, [0.72, 0.48, 0.26], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, 0, 2.4, 22, bz + 0.075, bz + 0.135, [0.24, 0.82, 0.86], 1.0, 6);
+                    }
+                } else if (sp.kind === "TRAFFIC_CONE_SET") {
+                    if (sp.broken) {
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 18, 3.5, bz, bz + 0.04, [0.98, 0.76, 0.12], 1.0, 6);
+                        emitDynBox(sp.x - 7, sp.y + 5, cosA, sinA, 0, 0, 8, 5, bz, bz + 0.045, [0.98, 0.42, 0.08], 1.0, 6);
+                        emitDynBox(sp.homeX + 6, sp.homeY - 6, -sinA, cosA, 0, 0, 8, 5, 2.0, 2.045, [0.98, 0.42, 0.08], 1.0, 6);
+                    } else {
+                        // Striped yellow/black A-frame road horse barricade + 2 orange/white reflective traffic cones
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 3.5, 16, bz + 0.04, bz + 0.11, [0.98, 0.76, 0.12], 1.0, 6);
+                        emitDynCylinder(sp.x, sp.y, -sinA * 10, cosA * 10, 3.6, 1.2, bz, bz + 0.11, 6, [0.98, 0.42, 0.08], 6, true);
+                        emitDynCylinder(sp.x, sp.y, sinA * 10, -cosA * 10, 3.6, 1.2, bz, bz + 0.11, 6, [0.98, 0.42, 0.08], 6, true);
                     }
                 } else if (sp.kind === "STREETLIGHT_NEON") {
                     const neonCol = sp.neonPink ? [0.96, 0.34, 0.76] : [0.22, 0.88, 0.96];
@@ -13149,10 +13408,12 @@ class WorldObjectEngine {
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 16, bz + 0.28, bz + 0.32, [0.94, 0.96, 0.99], 1.0, 5);
                     }
                 } else if (sp.kind === "NEWS_STAND") {
+                    const newsCol = sp.neonPink ? [0.94, 0.32, 0.58] : [0.92, 0.64, 0.16];
                     if (sp.broken) {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 10, bz, bz + 0.07, [0.92, 0.64, 0.16], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 10, bz, bz + 0.07, newsCol, 1.0, 6);
+                        emitDynBox(sp.homeX + 5, sp.homeY - 4, cosA, sinA, 0, 0, 5.5, 4.5, 2.01, 2.022, [0.94, 0.95, 0.98], 1.0, 6);
                     } else {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz, bz + 0.16, [0.92, 0.64, 0.16], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz, bz + 0.16, newsCol, 1.0, 6);
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz + 0.11, bz + 0.16, [0.94, 0.95, 0.98], 1.0, 7);
                     }
                 }

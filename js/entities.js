@@ -5124,7 +5124,7 @@ class TrafficManager {
         this.genCarsCooldown = isMobile ? 0.72 : 0.55;
         this.genPedsCooldown = isMobile ? 0.32 : 0.12;
         this.maxTrafficCars = isMobile ? 16 : 22;
-        this.maxTrafficPeds = isMobile ? 68 : 110;
+        this.maxTrafficPeds = isMobile ? 76 : 124;
         this.carsMaxDistanceBlocks = isMobile ? 6 : 8; // mTrafficGenCarsMaxDistance
         this.pedsMaxDistanceBlocks = isMobile ? 7 : 9; // mTrafficGenPedsMaxDistance
         this._spawnPlayerCursor = 0;
@@ -5141,28 +5141,50 @@ class TrafficManager {
         }
 
         const r1 = ((bx * 73856093) ^ (by * 19349663) ^ (seed * 83492791)) >>> 0;
+        const r2 = (((r1 >>> 7) ^ (bx * 2654435761) ^ (by * 2246822519) ^ (seed * 3266489917)) >>> 0);
         const pickFrom = (arr) => arr[r1 % arr.length];
 
         const decoratePedSpec = (spec) => {
             const gt = spec.g24Type || "civ0";
-            if (!spec.carryProp && !spec.isRollerblader && !spec.isChild) {
-                if (gt === "surfer_guy" && (r1 % 3) === 0) {
+            if (gt === "vc_jogger" || spec.isJogger) {
+                spec.isJogger = true;
+                spec.speed = Math.max(spec.speed || 0, 39 + (r2 % 6));
+                if (!spec.carryProp) spec.carryProp = "JOGGER_GEAR";
+            }
+            if (!spec.isJogger && !spec.isChild && !isSand && (
+                gt === "kid_skater" ||
+                ((gt === "beach_guy_lime" || gt === "beach_guy_yellow" || gt === "surfer_guy" || gt === "g2_civ_redtee" || gt === "g2_civ_blueshorts") && (r2 % 4) === 1)
+            )) {
+                spec.isRollerblader = false;
+                spec.isSkateboarder = true;
+                spec.speed = 42 + (r2 % 5);
+            }
+            if (!spec.carryProp && !spec.isRollerblader && !spec.isSkateboarder && !spec.isChild) {
+                if (gt === "surfer_guy" && (r2 % 2) === 0) {
                     spec.carryProp = "SURFBOARD";
-                } else if ((gt === "g2_zaibatsu" || gt === "g2_yakuza" || gt === "g2_civ_greysuit") && (r1 % 2) === 0) {
+                } else if ((gt === "beach_guy_red" || gt === "beach_guy_yellow" || gt === "beach_guy_lime") && (r2 % 3) === 0) {
+                    spec.carryProp = (r2 % 2 === 0) ? "BOOMBOX" : "BEACH_COOLER";
+                } else if ((gt === "g2_zaibatsu" || gt === "g2_yakuza" || gt === "g2_civ_greysuit" || gt === "vc_crockett") && (r2 % 2) === 0) {
                     spec.carryProp = "BRIEFCASE";
-                } else if ((gt === "g2_scientist" || gt === "dockworker_orange") && (r1 % 2) === 0) {
+                } else if ((gt === "g2_scientist" || gt === "dockworker_orange") && (r2 % 2) === 0) {
                     spec.carryProp = "CLIPBOARD";
-                } else if ((gt === "g2_civ_pink" || gt === "g2_civ_lilac" || gt === "g2_civ_burgundy") && (r1 % 3) === 0) {
+                } else if ((gt === "g2_civ_pink" || gt === "g2_civ_lilac" || gt === "g2_civ_burgundy" || gt === "bikini_white" || gt === "bikini_cyan") && (r2 % 3) === 0) {
                     spec.carryProp = "SHOPPING_BAG";
-                } else if ((gt === "vc_tourist" || gt === "vc_hawaiian_red") && (r1 % 3) === 0) {
+                } else if ((gt === "vc_tourist" || gt === "vc_hawaiian_red" || gt === "bikini_pink") && (r2 % 3) === 0) {
                     spec.carryProp = "CAMERA";
+                } else if ((gt === "g2_civ_yellowtee" || gt === "g2_civ_redtee") && (r2 % 3) === 1) {
+                    spec.carryProp = "PIZZA_STACK";
+                } else if ((gt === "vc_cuban" || gt === "g2_civ_aqua" || gt === "vc_tommy") && (r2 % 3) === 1) {
+                    spec.carryProp = "COFFEE_CUP";
+                } else if ((gt === "vc_haitian" || gt === "gang") && (r2 % 3) === 0) {
+                    spec.carryProp = "BOOMBOX";
                 }
             }
-            if (spec.hasDog === undefined && spec.kind === "CIVILIAN" && !spec.isRollerblader && !spec.isChild && !isSand && spec.missionTag !== "PRISONER") {
-                if ((r1 % 24) === 7) {
+            if (spec.hasDog === undefined && spec.kind === "CIVILIAN" && !spec.isRollerblader && !spec.isSkateboarder && !spec.isChild && !isSand && spec.missionTag !== "PRISONER") {
+                if ((r2 % 11) === 3) {
                     const dogBreeds = ["GOLDEN", "FRENCHIE", "DALMATIAN", "DOBERMAN"];
                     spec.hasDog = true;
-                    spec.dogBreed = dogBreeds[(r1 >>> 5) % dogBreeds.length];
+                    spec.dogBreed = dogBreeds[(r2 >>> 4) % dogBreeds.length];
                 } else {
                     spec.hasDog = false;
                 }
@@ -5181,22 +5203,24 @@ class TrafficManager {
             return spec;
         };
 
-        // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Shirtless Surfers & Bodybuilders
+        // 1. Vice Beach Golden Sand Strollers, Bikini Beachgoers, Joggers, Shirtless Surfers & Bodybuilders
         if (isSand || (bx >= 450 && bx <= 484 && by >= 46 && by <= 375)) {
             const beachPool = [
                 "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
                 "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
-                "vc_bodybuilder", "vc_jogger", "kid_beach", "kid_girl_pink"
+                "vc_bodybuilder", "vc_jogger", "vc_jogger", "kid_beach", "kid_girl_pink"
             ];
             const gType = pickFrom(beachPool);
             const isChild = gType.startsWith("kid_");
+            const isJogger = (gType === "vc_jogger") || (!isChild && (r1 % 7) === 0);
             return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 missionTag: "BEACH",
                 shirtColor: "#f472b6",
                 hp: 35,
-                speed: (gType === "vc_jogger") ? (38 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 5))),
+                speed: isJogger ? (39 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 5))),
+                isJogger,
                 isChild
             });
         }
@@ -5217,46 +5241,50 @@ class TrafficManager {
             });
         }
 
-        // 2. Lummus Park Ocean Drive Promenade (c = 447..464): Rollerbladers, Shirtless Joggers & Bikini Promenaders
+        // 2. Lummus Park Ocean Drive Promenade (c = 447..464): Rollerbladers, Skateboarders, Joggers & Bikini Promenaders
         if (bx >= 447 && bx <= 464 && by >= 44 && by <= 362) {
             const skatePool = [
                 "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
                 "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
-                "vc_jogger", "vc_bodybuilder", "kid_skater"
+                "vc_jogger", "vc_jogger", "vc_bodybuilder", "kid_skater"
             ];
             const gType = pickFrom(skatePool);
-            const isRollerblader = bx === 448 && ((r1 % 10) < 6 || gType === "kid_skater");
+            const isRollerblader = bx === 448 && ((r1 % 10) < 4 || gType === "kid_skater");
             const isChild = gType.startsWith("kid_");
+            const isJogger = !isRollerblader && !isChild && (gType === "vc_jogger" || (r1 % 5) === 0);
             return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#00f0ff",
                 hp: 35,
-                speed: isRollerblader ? (45 + (r1 % 7)) : (gType === "vc_jogger" ? (38 + (r1 % 5)) : (23 + (r1 % 5))),
+                speed: isRollerblader ? (45 + (r1 % 7)) : (isJogger ? (40 + (r1 % 5)) : (23 + (r1 % 5))),
                 isRollerblader,
+                isJogger,
                 isChild
             });
         }
 
-        // 3. Ocean Drive, Lummus Curbside, South Beach & Española Way (bx = 408..450, by = 40..370)
+        // 3. Ocean Drive, Lummus Curbside, South Beach & Espanola Way (bx = 408..450, by = 40..370)
         if (bx >= 408 && bx <= 450 && by >= 40 && by <= 370) {
             const oceanDrivePool = [
                 "bikini_pink", "bikini_cyan", "bikini_yellow", "bikini_red", "bikini_white",
                 "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
-                "vc_jogger", "vc_bodybuilder", "vc_tourist", "g2_civ_blueshorts",
+                "vc_jogger", "vc_jogger", "vc_bodybuilder", "vc_tourist", "g2_civ_blueshorts",
                 "g2_civ_yellowtee", "g2_civ_redtee", "vc_tommy", "vc_crockett",
                 "kid_beach", "kid_girl_pink"
             ];
             const gType = pickFrom(oceanDrivePool);
-            const isRollerblader = (bx === 448 && (r1 % 6) === 0);
+            const isRollerblader = (bx === 448 && (r1 % 5) === 0);
             const isChild = gType.startsWith("kid_");
+            const isJogger = !isRollerblader && !isChild && (gType === "vc_jogger" || (r1 % 6) === 0);
             return decoratePedSpec({
                 kind: "CIVILIAN",
                 g24Type: gType,
                 shirtColor: "#ff2a85",
                 hp: 35,
-                speed: isRollerblader ? 46 : (gType === "vc_jogger" ? (38 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 6)))),
+                speed: isRollerblader ? 46 : (isJogger ? (40 + (r1 % 5)) : (isChild ? 22 : (22 + (r1 % 6)))),
                 isRollerblader,
+                isJogger,
                 isChild
             });
         }
@@ -5518,7 +5546,8 @@ class TrafficManager {
                 ];
             }
             const pair = pairs[(r >>> 3) % pairs.length];
-            const sharedSpeed = 23 + (r % 4);
+            const isJoggingDuo = (pair[0] === "vc_jogger" || pair[1] === "vc_jogger" || ((isBeach || isBoardwalk || isOceanDrive || isStarIsland) && (r % 5) === 0));
+            const sharedSpeed = isJoggingDuo ? (39 + (r % 5)) : (23 + (r % 4));
             const tag = isBeach ? "BEACH" : undefined;
             return {
                 type: "COUPLE",
@@ -5530,6 +5559,8 @@ class TrafficManager {
                         shirtColor: "#38bdf8",
                         hp: 38,
                         speed: sharedSpeed,
+                        isJogger: isJoggingDuo,
+                        carryProp: isJoggingDuo ? "JOGGER_GEAR" : undefined,
                         formationRole: "LEADER",
                         formationFwdOff: 0,
                         formationSideOff: -6
@@ -5541,6 +5572,8 @@ class TrafficManager {
                         shirtColor: "#f472b6",
                         hp: 36,
                         speed: sharedSpeed,
+                        isJogger: isJoggingDuo,
+                        carryProp: isJoggingDuo ? "JOGGER_GEAR" : undefined,
                         formationRole: "COUPLE_PARTNER",
                         formationFwdOff: -6,
                         formationSideOff: 11
@@ -5786,8 +5819,12 @@ class TrafficManager {
                 newPed.hangoutBaseAngle = mAngle;
             }
             if (spec.isRollerblader) newPed.isRollerblader = true;
+            if (spec.isSkateboarder) newPed.isSkateboarder = true;
+            if (spec.isJogger) newPed.isJogger = true;
             if (spec.isChild) newPed.isChild = true;
             if (spec.carryProp) newPed.carryProp = spec.carryProp;
+            if (spec.hasDog !== undefined) newPed.hasDog = spec.hasDog;
+            if (spec.dogBreed) newPed.dogBreed = spec.dogBreed;
             if (spec.personality) newPed.personality = spec.personality;
 
             if (m === 0) {
@@ -6269,7 +6306,10 @@ class TrafficManager {
         let vicePortPeds = 0;
         for (const ped of game.peds) {
             if (!ped.dead) {
-                totalAlivePeds++;
+                const isPermanentCompoundGuard = Boolean(ped.missionTag && ped.missionTag !== "BEACH");
+                if (!isPermanentCompoundGuard) {
+                    totalAlivePeds++;
+                }
                 const bx = Math.floor(ped.x / TILE_SIZE);
                 const by = Math.floor(ped.y / TILE_SIZE);
                 if (this.isPointInRect(bx, by, outerRect)) {
@@ -6280,7 +6320,7 @@ class TrafficManager {
                 }
             }
         }
-        const maxTotalAlivePeds = this.isMobile ? 135 : 195;
+        const maxTotalAlivePeds = this.isMobile ? 155 : 225;
         if (nearbyPeds >= this.maxTrafficPeds || totalAlivePeds >= maxTotalAlivePeds) return;
 
         const allowEdgeOnScreen = nearbyPeds < (this.isMobile ? 56 : 92);
