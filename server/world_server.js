@@ -2308,13 +2308,60 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 duration: 90
             });
         }
+        // 3-0B. Sanitize any invalid/corrupted vehicle rows (NaN/null coordinates or < 128px) and release orphaned player-driven (drv=4) cars
+        const activeDrivenVehIds = new Set();
+        for (const meta of clients.values()) {
+            if (meta.room === roomCode && !meta.isOutdated && meta.lastDrivenVehId) {
+                activeDrivenVehIds.add(meta.lastDrivenVehId);
+            }
+        }
+        for (const [vid, vrow] of Object.entries(room.vehs)) {
+            if (
+                !Array.isArray(vrow) ||
+                vrow.length < 11 ||
+                !Number.isFinite(vrow[2]) ||
+                !Number.isFinite(vrow[3]) ||
+                vrow[2] < 128 ||
+                vrow[3] < 128 ||
+                !Number.isFinite(vrow[5])
+            ) {
+                delete room.vehs[vid];
+                if (room.modifiedVehs) delete room.modifiedVehs[vid];
+                if (room.modifiedVehTs) delete room.modifiedVehTs[vid];
+                if (room.vehNav) delete room.vehNav[vid];
+                isDirty = true;
+                continue;
+            }
+            if (vrow[8] === 4 && !activeDrivenVehIds.has(vid)) {
+                vrow[8] = 0;
+                vrow[6] = 0;
+                vrow[7] = 0;
+                vrow[10] = (vrow[10] || 0) & ~2;
+                if (room.modifiedVehs && room.modifiedVehs[vid]) {
+                    room.modifiedVehs[vid][8] = 0;
+                    room.modifiedVehs[vid][6] = 0;
+                    room.modifiedVehs[vid][7] = 0;
+                    room.modifiedVehs[vid][10] = (room.modifiedVehs[vid][10] || 0) & ~2;
+                }
+                isDirty = true;
+            }
+            if (
+                (String(vid).startsWith("amb_srv_") || String(vid).startsWith("vcfd_srv_") || String(vid).startsWith("tow_srv_")) &&
+                (!room.vehNav[vid] || !room.vehNav[vid].role)
+            ) {
+                delete room.vehs[vid];
+                if (room.vehNav) delete room.vehNav[vid];
+                isDirty = true;
+            }
+        }
+
         // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
         const corpseEntries = Object.entries(room.corpses || {});
         if (corpseEntries.length > 0) {
-            const activeAmbs = allVehEntries.filter(([, r]) => Array.isArray(r) && r[1] === "MEDIC_AMBULANCE" && !(r[10] & 1));
-            if (activeAmbs.length < Math.min(3, corpseEntries.length)) {
+            const activeAmbs = Object.entries(room.vehs).filter(([, r]) => Array.isArray(r) && r[1] === "MEDIC_AMBULANCE" && !(r[10] & 1));
+            if (activeAmbs.length < Math.min(2, corpseEntries.length)) {
                 const [targetCid, targetCrow] = corpseEntries[0];
-                if (Array.isArray(targetCrow)) {
+                if (Array.isArray(targetCrow) && Number.isFinite(targetCrow[3]) && Number.isFinite(targetCrow[4])) {
                     const st = getStationCoords("MEDIC");
                     const sp = snapStationToNearestRoad(st.x, st.y);
                     const aid = `amb_srv_${nowMs.toString(36)}`;
@@ -2330,6 +2377,10 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                         role: "EMS",
                         phase: "TO_SCENE",
                         targetId: targetCid,
+                        targetBx: null,
+                        targetBy: null,
+                        turnedInIntersection: false,
+                        entryAngle: sp.angle,
                         goalX: targetCrow[3],
                         goalY: targetCrow[4],
                         homeX: sp.x,
@@ -2342,13 +2393,16 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         }
 
         // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
+        const activeFireCount = Object.values(room.vehs).filter((r) => Array.isArray(r) && r[1] === "FIRE_TRUCK" && !(r[10] & 1)).length;
+        const activeTowCount = Object.values(room.vehs).filter((r) => Array.isArray(r) && r[1] === "TOW_TRUCK" && !(r[10] & 1)).length;
         for (const [vid, vrow] of Object.entries(room.modifiedVehs || {})) {
             if (!Array.isArray(vrow) || !(vrow[10] & 1)) continue;
             const wx = vrow[2];
             const wy = vrow[3];
+            if (!Number.isFinite(wx) || !Number.isFinite(wy) || wx < 128 || wy < 128) continue;
             if (!(vrow[10] & 128)) {
                 const hasFireUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "FIRE" && nv.targetId === vid);
-                if (!hasFireUnit) {
+                if (!hasFireUnit && activeFireCount < 2) {
                     const st = getStationCoords("FIRE");
                     const sp = snapStationToNearestRoad(st.x, st.y);
                     const fid = `vcfd_srv_${nowMs.toString(36)}`;
@@ -2364,6 +2418,10 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                         role: "FIRE",
                         phase: "TO_SCENE",
                         targetId: vid,
+                        targetBx: null,
+                        targetBy: null,
+                        turnedInIntersection: false,
+                        entryAngle: sp.angle,
                         goalX: wx,
                         goalY: wy,
                         homeX: sp.x,
@@ -2374,7 +2432,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 }
             } else {
                 const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
-                if (!hasTowUnit) {
+                if (!hasTowUnit && activeTowCount < 2) {
                     const st = getStationCoords("TOW");
                     const sp = snapStationToNearestRoad(st.x, st.y);
                     const tid = `tow_srv_${nowMs.toString(36)}`;
@@ -2390,6 +2448,10 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                         role: "TOW",
                         phase: "TO_SCENE",
                         targetId: vid,
+                        targetBx: null,
+                        targetBy: null,
+                        turnedInIntersection: false,
+                        entryAngle: sp.angle,
                         goalX: wx,
                         goalY: wy,
                         homeX: sp.x,
@@ -2407,6 +2469,11 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     for (const [vid, row] of allVehEntries) {
         seq++;
         if (!Array.isArray(row) || row.length < 11) continue;
+        if (!Number.isFinite(row[2]) || !Number.isFinite(row[3]) || row[2] < 128 || row[3] < 128) {
+            delete room.vehs[vid];
+            if (room.vehNav) delete room.vehNav[vid];
+            continue;
+        }
 
         const drvCode = row[8] || 0;
         const flags = row[10] || 0;
@@ -2423,20 +2490,20 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 targetBy: null,
                 turnSeed: ((seq * 0.6180339887) % 1.0),
                 turnedInIntersection: false,
-                entryAngle: row[5] || 0
+                entryAngle: Number.isFinite(row[5]) ? row[5] : 0
             };
             room.vehNav[vid] = nav;
         }
 
         let x = row[2];
         let y = row[3];
-        let z = row[4] || 2.0;
-        let a = row[5] || 0;
+        let z = Number.isFinite(row[4]) ? row[4] : 2.0;
+        let a = Number.isFinite(row[5]) ? row[5] : 0;
         const specKey = row[1] || "MINT_STALLION";
         const sirenActive = Boolean(flags & 2);
 
         // Handle Municipal Fleet scene work & station return (EMS, FIRE, TOW)
-        if (nav.role && nav.goalX !== undefined && nav.goalY !== undefined) {
+        if (nav.role && Number.isFinite(nav.goalX) && Number.isFinite(nav.goalY)) {
             const distGoal = Math.hypot(nav.goalX - x, nav.goalY - y);
             if (nav.phase === "TO_SCENE" && distGoal < 125) {
                 row[6] = 0;
@@ -2495,8 +2562,10 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         const by = Math.max(1, Math.min(510, Math.floor(y / TS)));
 
         if (
-            nav.targetBx === null ||
-            nav.targetBy === null ||
+            typeof nav.targetBx !== "number" ||
+            typeof nav.targetBy !== "number" ||
+            !Number.isFinite(nav.targetBx) ||
+            !Number.isFinite(nav.targetBy) ||
             (bx === nav.targetBx && by === nav.targetBy && Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) < 26) ||
             Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) > TS * 2.6
         ) {
@@ -2506,8 +2575,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 nav.turnedInIntersection = false;
                 nav.entryAngle = a;
             }
-            const nextStep = (nav.role && typeof nav.goalX === "number" && typeof nav.goalY === "number")
-                ? serverMap.chooseDirectedRoadBlock(bx, by, a, nav.goalX, nav.goalY, z, nav.turnedInIntersection, nav.entryAngle)
+            const nextStep = (nav.role && Number.isFinite(nav.goalX) && Number.isFinite(nav.goalY))
+                ? serverMap.chooseTargetGuidedRoadBlock(bx, by, a, nav.goalX, nav.goalY, z, nav.turnedInIntersection, nav.entryAngle)
                 : serverMap.chooseNextRoadBlock(bx, by, a, z, nav.turnSeed, nav.turnedInIntersection, nav.entryAngle);
             if (nextStep) {
                 nav.targetBx = nextStep.bx;
@@ -2523,15 +2592,15 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 const nearestRd = snapStationToNearestRoad(x, y);
                 const rbx = Math.floor(nearestRd.x / TS);
                 const rby = Math.floor(nearestRd.y / TS);
-                nav.targetBx = bx + Math.sign(rbx - bx);
-                nav.targetBy = by + (rbx === bx ? Math.sign(rby - by) : 0);
-                nav.targetAngle = Math.atan2(nearestRd.y - y, nearestRd.x - x);
+                nav.targetBx = bx + (rbx !== bx ? Math.sign(rbx - bx) : Math.round(Math.cos(a)));
+                nav.targetBy = by + (rbx === bx && rby !== by ? Math.sign(rby - by) : (rbx === bx ? Math.round(Math.sin(a)) : 0));
+                nav.targetAngle = (nearestRd.x !== x || nearestRd.y !== y) ? Math.atan2(nearestRd.y - y, nearestRd.x - x) : a;
             }
         }
 
         const tx = (nav.targetBx + 0.5) * TS;
         const ty = (nav.targetBy + 0.5) * TS;
-        const desiredAng = Math.atan2(ty - y, tx - x);
+        const desiredAng = (tx !== x || ty !== y) ? Math.atan2(ty - y, tx - x) : a;
         let angDiff = desiredAng - a;
         while (angDiff > Math.PI) angDiff -= Math.PI * 2;
         while (angDiff < -Math.PI) angDiff += Math.PI * 2;
@@ -2541,16 +2610,18 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
 
         // Check red traffic light when approaching intersection (unless emergency siren is active)
         let targetSpd = getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive);
+        let stoppedAtRedLight = false;
         if (!sirenActive && serverMap.isRedLightForApproach) {
             const hdx = Math.round(Math.cos(a));
             const hdy = Math.round(Math.sin(a));
             if ((hdx !== 0 || hdy !== 0) && serverMap.isRedLightForApproach(bx, by, hdx, hdy, room.trafficLightTimer, z)) {
                 targetSpd = 0;
+                stoppedAtRedLight = true;
             }
         }
 
-        // Check lead vehicle spacing in spatial hash
-        if (targetSpd > 0) {
+        // Check lead vehicle spacing in spatial hash (only for same-direction traffic or parked obstacles; bypass after 4.0s if blocked by a stationary car)
+        if (targetSpd > 0 && (nav.stuckTicks || 0) <= 40) {
             const cfx = Math.cos(a);
             const cfy = Math.sin(a);
             const gx = x >> 8;
@@ -2563,18 +2634,28 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                     for (let k = 0; k < bucket.length; k++) {
                         const other = bucket[k];
                         if (other === row) continue;
+                        if (!Number.isFinite(other[2]) || !Number.isFinite(other[3])) continue;
                         const odx = other[2] - x;
                         const ody = other[3] - y;
                         const fwd = odx * cfx + ody * cfy;
                         const lat = Math.abs(-odx * cfy + ody * cfx);
-                        if (fwd > 8 && fwd < 90 && lat < 24) {
+                        if (fwd > 8 && fwd < 86 && lat < 22) {
                             const otherSpd = Math.hypot(other[6] || 0, other[7] || 0);
-                            targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.85);
+                            const otherAng = Number.isFinite(other[5]) ? other[5] : a;
+                            // Ignore oncoming cars moving in the opposite lane so opposite flows never deadlock
+                            if (otherSpd > 5 && Math.cos(otherAng - a) < -0.15) continue;
+                            targetSpd = fwd < 54 ? 0 : Math.min(targetSpd, otherSpd * 0.85);
                             if (targetSpd === 0) blockedByLead = true;
                         }
                     }
                 }
             }
+        }
+        if (targetSpd === 0 && !stoppedAtRedLight) {
+            nav.stuckTicks = (nav.stuckTicks || 0) + 1;
+            if (nav.stuckTicks > 55) nav.stuckTicks = 0;
+        } else if (targetSpd > 0) {
+            nav.stuckTicks = 0;
         }
 
         const vx = Math.cos(a) * targetSpd;

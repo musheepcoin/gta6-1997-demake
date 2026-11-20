@@ -2481,6 +2481,8 @@ class Vehicle {
                     const pNext = game._pedGridNext;
                     const checkPedAhead = (ped) => {
                         if (!ped || ped.dead) return;
+                        // An active Traffic Warden waving cars through from behind the safety cone taper is directing flow, not jaywalking!
+                        if (ped.isTrafficWarden && ped.isDirectingTraffic) return;
                         const dx = ped.x - this.x;
                         const dy = ped.y - this.y;
                         if (Math.abs(dx) > 96 + extraFrontReach || Math.abs(dy) > 96 + extraFrontReach) return;

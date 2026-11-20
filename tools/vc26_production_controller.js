@@ -2569,9 +2569,69 @@ function runSimulations() {
         console.log("");
     }
 
+    // =========================================================================
+    // SCENARIO 45: LIVE SERVER DISPATCH ROUTING & TRAFFIC WARDEN STAND-DOWN AUDIT
+    // - Verifies `chooseDirectedRoadBlock` / `chooseTargetGuidedRoadBlock` parity
+    //   for server-side EMS/FIRE/TOW responder routing (never NaN / null).
+    // - Verifies that a destroyed wreck actively hooked by a Tow Truck (`towedByTruck`)
+    //   is immediately de-escalated from stationary `activeBottlenecks`.
+    // - Verifies that on-foot VCPD Traffic Wardens stand behind the cone taper
+    //   (`flaggerX, flaggerY`) and stand down (`isTrafficWarden = false`) once
+    //   the obstruction is hooked/cleared so they never remain as human roadblocks!
+    // =========================================================================
+    {
+        console.log("--- SCENARIO 45: LIVE SERVER DISPATCH ROUTING & TRAFFIC WARDEN STAND-DOWN AUDIT ---");
+        const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        g.setWantedLevel(0);
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+
+        // 1. Server-side `chooseDirectedRoadBlock` parity check
+        const directedStep = g.map.chooseDirectedRoadBlock(425, 309, Math.PI * 0.5, 444.5 * 64, 260.0 * 64, 2.0, false, Math.PI * 0.5);
+        assert(
+            Boolean(directedStep && Number.isFinite(directedStep.bx) && Number.isFinite(directedStep.by) && Number.isFinite(directedStep.angle)),
+            `Dedicated Server chooseDirectedRoadBlock returns finite road step without NaN (bx=${directedStep ? directedStep.bx : "null"}, by=${directedStep ? directedStep.by : "null"})`
+        );
+
+        // 2. Spawn a burned wreck on Ocean Drive (444.5, 260.0) and verify Traffic Warden dispatch + safe flaggerX/flaggerY cone-taper post
+        g.player.x = 443.2 * 64;
+        g.player.y = 260.0 * 64;
+        g.renderer.camX = g.player.x;
+        g.renderer.camY = g.player.y;
+        const wreckCar = sandbox.makeVeh("audit_wreck_standdown", "REGAL_SEDAN", 444.5 * 64, 260.0 * 64, Math.PI * 0.5);
+        wreckCar.destroyed = true;
+        wreckCar.fireExtinguished = true;
+        wreckCar.abandonedTimer = 15.0;
+        g.vehicles.push(wreckCar);
+
+        g.director.updateNavigableLaneTracker(0.4, true);
+        const bn = g.director.laneTracker.activeBottlenecks[0];
+        const activeWarden = g.peds.find((p) => p && !p.dead && p.isTrafficWarden);
+        assert(
+            Boolean(bn && Number.isFinite(bn.flaggerX) && Number.isFinite(bn.flaggerY) && activeWarden),
+            `Wreck bottleneck computes safe cone-taper flagger post out of open bypass lane and dispatches Traffic Warden (flaggerX=${bn ? Math.round(bn.flaggerX) : "none"}, warden=${activeWarden ? activeWarden.id : "none"})`
+        );
+
+        // 3. Simulate Tow Truck hooking the wreck (`wreckCar.towedByTruck = towTruck`) and verify bottleneck resolution + Warden Stand-Down!
+        const towTruck = sandbox.makeVeh("audit_tow_standdown", "TOW_TRUCK", 444.5 * 64, 258.8 * 64, -Math.PI * 0.5);
+        towTruck.driver = "AI_TOW";
+        towTruck.towingVehicle = wreckCar;
+        wreckCar.towedByTruck = towTruck;
+        g.vehicles.push(towTruck);
+
+        g.director.updateNavigableLaneTracker(0.4, true);
+        stepSec(0.2);
+        const remainingWardens = g.peds.filter((p) => p && !p.dead && (p.isTrafficWarden || p.isDirectingTraffic));
+        assert(
+            g.director.laneTracker.activeBottlenecks.length === 0 && remainingWardens.length === 0,
+            `Once Tow Truck hooks wreck, bottleneck is de-escalated (activeBottlenecks=${g.director.laneTracker.activeBottlenecks.length}) and Traffic Warden stands down cleanly (remainingWardens=${remainingWardens.length})`
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 44 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL, LANE TRACKER & TRAFFIC WARDEN AI SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 45 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL, LANE TRACKER & LIVE TRAFFIC RECOVERY SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

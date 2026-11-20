@@ -14977,6 +14977,8 @@ class LeonidaGame {
                                 const clearSide = (ped.wardenBottleneck && ped.wardenBottleneck.clearSide) ? ped.wardenBottleneck.clearSide : 1;
                                 returnCar.aiPullOverOffset = clearSide * 24;
                                 returnCar.aiPullOverTimer = 2.6;
+                                this.director.laneTracker.totalWardenDirectives = (this.director.laneTracker.totalWardenDirectives || 0) + 1;
+                                this.director.blackboard.totalTrafficWardenDirectives = this.director.laneTracker.totalWardenDirectives;
                                 this.director.laneTracker.totalWardenBoardings = (this.director.laneTracker.totalWardenBoardings || 0) + 1;
                                 this.director.blackboard.totalTrafficWardenBoardings = this.director.laneTracker.totalWardenBoardings;
                             }
@@ -14993,17 +14995,19 @@ class LeonidaGame {
                         ped.x += Math.cos(ped.angle) * runBackSpd * dt;
                         ped.y += Math.sin(ped.angle) * runBackSpd * dt;
                     } else if (ped.isTrafficWarden && ped.wardenBottleneck) {
-                        // In-Game Traffic AI Warden physically walks to a non-boardable bottleneck (wreck obstruction or multi-car intersection deadlock)
-                        // and regulates traffic on foot with his high-vis vest & glowing orange traffic baton!
+                        // In-Game Traffic AI Warden physically walks to the safe cone-taper flagger position (flaggerX, flaggerY)
+                        // behind the obstruction (never blocking the open bypass lane) and regulates traffic with his LED baton!
                         const bn = ped.wardenBottleneck;
-                        const distBn = Math.hypot(bn.x - ped.x, bn.y - ped.y);
-                        if (distBn > 58) {
+                        const flagX = (typeof bn.flaggerX === "number") ? bn.flaggerX : bn.x;
+                        const flagY = (typeof bn.flaggerY === "number") ? bn.flaggerY : bn.y;
+                        const distBn = Math.hypot(flagX - ped.x, flagY - ped.y);
+                        if (distBn > 24) {
                             const wardenSpd = 88;
                             ped.speed = wardenSpd;
                             const wardenWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function")
-                                ? PedNav.routeWaypoint(this, ped, bn.x, bn.y)
+                                ? PedNav.routeWaypoint(this, ped, flagX, flagY)
                                 : null;
-                            ped.angle = this.steerPedWithObstacleFeelers(ped, wardenWp ? wardenWp.x : bn.x, wardenWp ? wardenWp.y : bn.y, bn.obstacleVeh || null);
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, wardenWp ? wardenWp.x : flagX, wardenWp ? wardenWp.y : flagY, bn.obstacleVeh || null);
                             ped.x += Math.cos(ped.angle) * wardenSpd * dt;
                             ped.y += Math.sin(ped.angle) * wardenSpd * dt;
                         } else {

@@ -1486,13 +1486,14 @@ class ViceWorldDirector {
                 if (Math.abs(Math.sin(v.angle || 0)) >= Math.abs(Math.cos(v.angle || 0))) nsQueueDemand++;
                 else ewQueueDemand++;
             }
-            const isWreck = Boolean(v.destroyed);
-            const isAbandoned = !isWreck && v.driver === null && (v.abandonedTimer || 0) >= 2.5;
-            const isTowManeuver = !isWreck && v.driver === "AI_TOW" && spd < 24;
-            const isStalledTraffic = !isWreck && v.driver !== null && v.driver !== "PLAYER" &&
+            const isWreck = Boolean(v.destroyed && !v.towedByTruck);
+            const isAbandoned = !isWreck && !v.towedByTruck && v.driver === null && (v.abandonedTimer || 0) >= 2.5;
+            const isTowManeuver = !isWreck && v.driver === "AI_TOW" && !v.towingVehicle && spd < 24;
+            const isStalledTraffic = !isWreck && !v.towedByTruck && v.driver !== null && v.driver !== "PLAYER" &&
                 spd < 12 &&
                 v.aiState !== "STOPPED_LIGHT" &&
                 v.aiState !== "CURB_PARKED" &&
+                (v.wardenHoldTimer || 0) <= 0 &&
                 ((v.gridlockTimer || 0) >= 1.1 || (v.yieldTimer || 0) >= 1.2 || v.aiState === "YIELDING" || (v.blockedTimer || 0) >= 1.1);
 
             if (!isWreck && !isAbandoned && !isTowManeuver && !isStalledTraffic) continue;
@@ -1617,6 +1618,9 @@ class ViceWorldDirector {
                 { x: obsX - fCos * 58 - pCos * c.clearSide * 3,  y: obsY - fSin * 58 - pSin * c.clearSide * 3,  z: c.z },
                 { x: obsX - fCos * 32 + pCos * c.clearSide * 7,  y: obsY - fSin * 32 + pSin * c.clearSide * 7,  z: c.z }
             ];
+            // Safe Flagger Stand Position: behind the cone taper on the obstructed lane side, never blocking the open bypass lane!
+            c.flaggerX = obsX - fCos * 42 - pCos * c.clearSide * 18;
+            c.flaggerY = obsY - fSin * 42 - pSin * c.clearSide * 18;
             activeBottlenecks.push(c);
         }
 
@@ -1632,6 +1636,39 @@ class ViceWorldDirector {
         // Assign or dispatch a physical in-game VCPD Traffic Warden entity for each actionable bottleneck
         for (let i = 0; i < activeBottlenecks.length; i++) {
             this.dispatchTrafficWardenForBottleneck(activeBottlenecks[i]);
+        }
+
+        // Stand-Down Protocol: release any Traffic Warden whose bottleneck has been cleared so they resume normal sidewalk patrol!
+        if (Array.isArray(g.peds)) {
+            for (let pi = 0; pi < g.peds.length; pi++) {
+                const ped = g.peds[pi];
+                if (!ped || ped.dead || !ped.isTrafficWarden) continue;
+                const hasBoardTarget = Boolean(
+                    ped._boardingVeh &&
+                    !ped._boardingVeh.destroyed &&
+                    ped._boardingVeh.driver === null &&
+                    !ped._boardingVeh.towedByTruck &&
+                    g.vehicles.includes(ped._boardingVeh)
+                );
+                let matchedBn = null;
+                for (let bi = 0; bi < activeBottlenecks.length; bi++) {
+                    const ab = activeBottlenecks[bi];
+                    if (ab.wardenId === ped.id) {
+                        matchedBn = ab;
+                        break;
+                    }
+                }
+                if (matchedBn) {
+                    ped.wardenBottleneck = matchedBn;
+                } else if (!hasBoardTarget) {
+                    ped.isTrafficWarden = false;
+                    ped.isReliefDriver = false;
+                    ped.isDirectingTraffic = false;
+                    ped.wardenBottleneck = null;
+                    ped.carryProp = null;
+                    ped.wandWaveTimer = 0;
+                }
+            }
         }
     }
 
@@ -1762,6 +1799,22 @@ class ViceWorldDirector {
         const obsVeh = (bn && bn.obstacleVeh && !bn.obstacleVeh.towedByTruck)
             ? bn.obstacleVeh
             : ((ped._boardingVeh && !ped._boardingVeh.towedByTruck) ? ped._boardingVeh : null);
+        const hasActiveObstruction = Boolean(
+            obsVeh &&
+            !obsVeh.towedByTruck &&
+            Array.isArray(g.vehicles) &&
+            g.vehicles.includes(obsVeh) &&
+            (obsVeh.destroyed || obsVeh.driver === null)
+        );
+        if (!hasActiveObstruction && (!bn || !Array.isArray(this.laneTracker.activeBottlenecks) || !this.laneTracker.activeBottlenecks.includes(bn))) {
+            ped.isTrafficWarden = false;
+            ped.isReliefDriver = false;
+            ped.isDirectingTraffic = false;
+            ped.wardenBottleneck = null;
+            ped.carryProp = null;
+            ped.wandWaveTimer = 0;
+            return;
+        }
         const targetX = obsVeh ? obsVeh.x : (bn ? bn.x : ped.x);
         const targetY = obsVeh ? obsVeh.y : (bn ? bn.y : ped.y);
         const distToTarget = Math.hypot(targetX - ped.x, targetY - ped.y);
@@ -1795,7 +1848,7 @@ class ViceWorldDirector {
                         this.blackboard.totalTrafficWardenDirectives = this.laneTracker.totalWardenDirectives;
                     }
                     // If the vehicle is wedged behind an obstacle with gridlockTimer > 0.8, command a physical reverse-and-steer maneuver
-                    if (Math.abs(v.speed || 0) < 8 && ((v.gridlockTimer || 0) > 0.8 || (v.yieldTimer || 0) > 1.4)) {
+                    if (Math.abs(v.speed || 0) < 8 && (v.wardenHoldTimer || 0) <= 0 && ((v.gridlockTimer || 0) > 0.8 || (v.yieldTimer || 0) > 1.4)) {
                         v.gridlockReverseTimer = Math.max(v.gridlockReverseTimer || 0, 1.35);
                         v.gridlockEscapeDir = clearSide;
                         v.gridlockEscapeTimer = Math.max(v.gridlockEscapeTimer || 0, 2.8);
@@ -1805,9 +1858,10 @@ class ViceWorldDirector {
             }
 
             // Real-World Alternating One-Lane Flagging:
-            // While vehicles from the obstructed lane are actively bypassing onto the single remaining lane,
-            // hold approaching oncoming traffic 45..155px before the pinch point so they never collide head-on!
-            if (bypassingSameDirCount > 0) {
+            // While an active stationary obstacle blocks one lane and vehicles from the obstructed lane are bypassing onto the single remaining lane,
+            // hold approaching oncoming traffic 38..155px before the pinch point on an alternating 4.5s window so neither direction deadlocks!
+            const inHoldPhase = (Math.floor(((g.elapsedTime || 0) + (ped.animTime || 0)) / 4.5) % 2) === 0;
+            if (hasActiveObstruction && bypassingSameDirCount > 0 && inHoldPhase) {
                 for (let i = 0; i < g.vehicles.length; i++) {
                     const v = g.vehicles[i];
                     if (!v || v.destroyed || v.driver !== "AI_TRAFFIC" || v === obsVeh) continue;
@@ -1845,6 +1899,8 @@ class ViceWorldDirector {
                 obsVeh.aiPullOverTimer = 2.6;
                 ped._boardedVehicle = true;
                 ped.dead = true;
+                this.laneTracker.totalWardenDirectives++;
+                this.blackboard.totalTrafficWardenDirectives = this.laneTracker.totalWardenDirectives;
                 this.laneTracker.totalWardenBoardings++;
                 this.blackboard.totalTrafficWardenBoardings = this.laneTracker.totalWardenBoardings;
                 this.emitEvent("TRAFFIC_WARDEN_CLEARED_VEHICLE", {

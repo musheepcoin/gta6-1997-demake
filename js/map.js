@@ -5872,6 +5872,10 @@ class LeonidaMap {
         return score;
     }
 
+    chooseDirectedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks = 2.0, turnedInIntersection = false, entryAngle = null) {
+        return this.chooseTargetGuidedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks, turnedInIntersection, entryAngle);
+    }
+
     chooseTargetGuidedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks = 2.0, turnedInIntersection = false, entryAngle = null) {
         const dirs = this.getAllowedRoadDirections(bx, by, zBlocks);
         const cardinals = [
