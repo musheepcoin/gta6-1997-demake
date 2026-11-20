@@ -11122,6 +11122,28 @@ class RetroRenderer {
             }
         }
 
+        // 4A-bis. Real-World FDOT Road Ranger / VCPD Traffic Control 3D Safety Taper Cones & Night Flares
+        if (game.director && game.director.laneTracker && Array.isArray(game.director.laneTracker.activeBottlenecks)) {
+            const bns = game.director.laneTracker.activeBottlenecks;
+            for (let bi = 0; bi < bns.length; bi++) {
+                const bn = bns[bi];
+                if (!bn || !Array.isArray(bn.taperCones)) continue;
+                for (let ci = 0; ci < bn.taperCones.length; ci++) {
+                    const cn = bn.taperCones[ci];
+                    if (cn.x < minX || cn.x > maxX || cn.y < minY || cn.y > maxY) continue;
+                    const cz = cn.z || 2.0;
+                    // Rubber base + fluorescent orange cone body + white reflective collar + pulsing amber LED beacon
+                    this.pushSolidQuad3D(cn.x, cn.y, cz + 0.008, 6.2, 6.2, 0.25, 0.12, 0.13, 0.16, 0.94, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(cn.x, cn.y, cz + 0.016, 4.6, 4.6, 0, 1.0, 0.36, 0.04, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    this.pushSolidQuad3D(cn.x, cn.y, cz + 0.022, 2.6, 2.6, 0, 0.97, 0.98, 1.0, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    const beaconPulse = 0.5 + 0.5 * Math.sin(this.time * 9.0 + ci * 1.4);
+                    if (beaconPulse > 0.45) {
+                        this.pushSolidQuad3D(cn.x, cn.y, cz + 0.026, 3.2 + beaconPulse * 3.0, 3.2 + beaconPulse * 3.0, this.time * 2.0, 1.0, 0.65, 0.08, 0.55, SPRITE_DRAW_ORDER.HUD_ARROW);
+                    }
+                }
+            }
+        }
+
         const jason = game.jason;
         if (jason && !jason.inVehicle) {
             const jInPool = Boolean(this.map && this.map.isSwimmingPoolAt && this.map.isSwimmingPoolAt(jason.x, jason.y));

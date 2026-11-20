@@ -2509,9 +2509,10 @@ function runSimulations() {
         g.director.updateNavigableLaneTracker(0.4, true);
         const lt = g.director.laneTracker;
         const upstreamScore = g.map.getLaneCongestionScore(444, 256, 0, 1, 5);
+        const hasTaperCones = Boolean(lt.activeBottlenecks[0] && Array.isArray(lt.activeBottlenecks[0].taperCones) && lt.activeBottlenecks[0].taperCones.length === 3);
         assert(
-            lt.congestedTilesCount >= 4 && lt.activeBottlenecks.length >= 1 && upstreamScore >= 18,
-            `NavigableLaneFlowTracker maps lane obstruction to .CMP road tiles & back-propagates congestion upstream (congestedTiles=${lt.congestedTilesCount}, bottlenecks=${lt.activeBottlenecks.length}, upstreamScore=${Math.round(upstreamScore)})`
+            lt.congestedTilesCount >= 4 && lt.activeBottlenecks.length >= 1 && upstreamScore >= 18 && hasTaperCones,
+            `NavigableLaneFlowTracker maps lane obstruction, back-propagates congestion upstream & deploys 3D Road Ranger Safety Cone Taper (congestedTiles=${lt.congestedTilesCount}, upstreamScore=${Math.round(upstreamScore)}, taperCones=${hasTaperCones})`
         );
 
         // 2. Verify a physical in-game VCPD Traffic Warden entity (`isTrafficWarden = true`, `carryProp = "TRAFFIC_WAND"`) was dispatched off-screen
@@ -2527,6 +2528,43 @@ function runSimulations() {
         assert(
             lt.totalWardenDirectives >= 1 && lt.totalWardenBoardings >= 1 && abandonedLaneCar.driver === "AI_TRAFFIC",
             `Traffic Warden physically directs stalled queue around obstacle (directives=${lt.totalWardenDirectives}) and walks to door to board & drive away the lane-blocking vehicle (boardings=${lt.totalWardenBoardings}, newDriver=${abandonedLaneCar.driver})`
+        );
+
+        // 4. Verify Real-World 3M Opticom Emergency Signal Preemption & 2-Unit Police Scene Parking Cap
+        g.trafficLightTimer = 8.0; // Normal EW=GREEN, NS=RED phase
+        g.signalPreemptionTimer = 0;
+        g.signalPreemptionAxis = null;
+        assert(g.isNSGreen() === false, "Before 3M Opticom Preemption, North-South signal at timer=8.0s is RED");
+        // Place an active VCPD Cruiser with sirenActive approaching a North-South stop-line intersection
+        let testStopBx = 444, testStopBy = 250;
+        for (let r = 180; r < 300; r++) {
+            if (g.map.getBlockInfo(444, r, 1).lid === 25) {
+                testStopBy = r - 1;
+                break;
+            }
+        }
+        const sirenUnit = sandbox.makeVeh("opticom_cop", "VCPD_CRUISER", (testStopBx + 0.5) * 64, (testStopBy + 0.5) * 64, Math.PI * 0.5);
+        sirenUnit.driver = "AI_COP";
+        sirenUnit.sirenActive = true;
+        g.vehicles.push(sirenUnit);
+        g.director.updateNavigableLaneTracker(0.4, true);
+        assert(
+            g.signalPreemptionAxis === "NS" && g.isNSGreen() === true,
+            `Real-World 3M Opticom Signal Preemption switches North-South traffic light to GREEN ahead of approaching siren unit (axis=${g.signalPreemptionAxis}, isNSGreen=${g.isNSGreen()})`
+        );
+
+        // Verify 2-Unit Police Scene Cap: 3rd cruiser within 165px of 2 already-parked cruisers does NOT bail out and block the street
+        const parkedCopA = sandbox.makeVeh("scene_cop_a", "VCPD_CRUISER", 444.5 * 64, 240.0 * 64, Math.PI * 0.5);
+        parkedCopA.driver = null;
+        const parkedCopB = sandbox.makeVeh("scene_cop_b", "VCPD_CRUISER", 445.5 * 64, 241.3 * 64, -Math.PI * 0.5);
+        parkedCopB.driver = null;
+        const arrivingCopC = sandbox.makeVeh("scene_cop_c", "VCPD_CRUISER", 444.5 * 64, 242.1 * 64, Math.PI * 0.5);
+        arrivingCopC.driver = "AI_COP";
+        g.vehicles.push(parkedCopA, parkedCopB, arrivingCopC);
+        const canThirdCopPark = arrivingCopC.alignCurbsideAndCheckSpacing(g.map, g, 68, { x: 444.5 * 64, y: 240.5 * 64 });
+        assert(
+            canThirdCopPark === false,
+            `Real-World Police Scene Cap prevents a 3rd cruiser from bailing out inside a 165px cluster where 2 cruisers are already deployed (canThirdCopPark=${canThirdCopPark})`
         );
         console.log("");
     }

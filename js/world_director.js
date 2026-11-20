@@ -1399,7 +1399,14 @@ class ViceWorldDirector {
         const g = this.game;
         if (!g || !g.map || !Array.isArray(g.vehicles)) return;
         const lt = this.laneTracker;
-        lt.scanAccumSec = (lt.scanAccumSec || 0) + Math.max(0, dt || 0);
+        const stepDt = Math.max(0, dt || 0);
+        lt.scanAccumSec = (lt.scanAccumSec || 0) + stepDt;
+        if ((g.signalPreemptionTimer || 0) > 0) {
+            g.signalPreemptionTimer = Math.max(0, g.signalPreemptionTimer - stepDt);
+            if (g.signalPreemptionTimer <= 0) {
+                g.signalPreemptionAxis = null;
+            }
+        }
 
         // Step active Traffic Warden entities every frame for smooth physical walking, wand waving & door boarding
         if (Array.isArray(g.peds)) {
@@ -1432,6 +1439,9 @@ class ViceWorldDirector {
 
         const rawIncidents = [];
         const pVeh = g.player ? g.player.inVehicle : null;
+        let opticomAxis = null;
+        let nsQueueDemand = 0;
+        let ewQueueDemand = 0;
 
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
@@ -1442,7 +1452,40 @@ class ViceWorldDirector {
             const nav = typeof g.map.getNavigationBlock === "function" ? g.map.getNavigationBlock(bx, by, vz) : null;
             if (!nav || nav.groundType !== roadType || nav.isRailway) continue;
 
+            // Real-World 3M Opticom Infrared Signal Preemption:
+            // If an active emergency responder (Police, Ambulance, Fire Engine, or Tow Truck with sirenActive)
+            // is within 1..3 tiles of a signalized intersection stop-line, preempt the traffic light to GREEN on its axis
+            // so queued civilian cars at the red light ahead roll forward and clear the intersection!
+            const isPrioritySiren = !v.destroyed && Boolean(
+                v.sirenActive ||
+                (v.driver === "AI_TOW" && (v.towTarget || v.towingVehicle))
+            );
+            if (isPrioritySiren && !opticomAxis && typeof g.map.getBlockInfo === "function") {
+                const fDx = Math.round(Math.cos(v.angle || 0));
+                const fDy = Math.round(Math.sin(v.angle || 0));
+                for (let look = 0; look <= 4; look++) {
+                    const lbx = bx + fDx * look;
+                    const lby = by + fDy * look;
+                    const blk1 = g.map.getBlockInfo(lbx, lby, 1);
+                    const dirsAtLook = typeof g.map.getAllowedRoadDirections === "function"
+                        ? g.map.getAllowedRoadDirections(lbx, lby, vz)
+                        : [];
+                    const isJunctionAhead =
+                        (blk1 && blk1.lid === 25) ||
+                        dirsAtLook.length >= 2 ||
+                        (g.map.isStopLineBlock && g.map.isStopLineBlock(lbx, lby));
+                    if (isJunctionAhead) {
+                        opticomAxis = Math.abs(Math.sin(v.angle || 0)) >= Math.abs(Math.cos(v.angle || 0)) ? "NS" : "EW";
+                        break;
+                    }
+                }
+            }
+
             const spd = Math.abs(v.speed || 0);
+            if (!v.destroyed && v.driver === "AI_TRAFFIC" && spd < 14) {
+                if (Math.abs(Math.sin(v.angle || 0)) >= Math.abs(Math.cos(v.angle || 0))) nsQueueDemand++;
+                else ewQueueDemand++;
+            }
             const isWreck = Boolean(v.destroyed);
             const isAbandoned = !isWreck && v.driver === null && (v.abandonedTimer || 0) >= 2.5;
             const isTowManeuver = !isWreck && v.driver === "AI_TOW" && spd < 24;
@@ -1486,6 +1529,25 @@ class ViceWorldDirector {
                         ? "ABANDONED_VEHICLE"
                         : (isTowManeuver ? "TOW_RECOVERY_MANEUVER" : "INTERSECTION_GRIDLOCK"))
             });
+        }
+
+        // Apply 3M Opticom Emergency Preemption or SCATS Adaptive Queue Demand to city traffic signals
+        if (opticomAxis) {
+            if (g.signalPreemptionAxis !== opticomAxis || (g.signalPreemptionTimer || 0) <= 0.4) {
+                lt.totalSignalPreemptions = (lt.totalSignalPreemptions || 0) + 1;
+            }
+            g.signalPreemptionAxis = opticomAxis;
+            g.signalPreemptionTimer = 2.6;
+        } else if ((g.signalPreemptionTimer || 0) <= 0) {
+            if (nsQueueDemand >= ewQueueDemand + 4 && !g.isNSGreen()) {
+                g.signalPreemptionAxis = "NS";
+                g.signalPreemptionTimer = 2.2;
+                lt.totalSignalPreemptions = (lt.totalSignalPreemptions || 0) + 1;
+            } else if (ewQueueDemand >= nsQueueDemand + 4 && !g.isEWGreen()) {
+                g.signalPreemptionAxis = "EW";
+                g.signalPreemptionTimer = 2.2;
+                lt.totalSignalPreemptions = (lt.totalSignalPreemptions || 0) + 1;
+            }
         }
 
         lt.congestedTilesCount = congMap.size;
@@ -1542,6 +1604,19 @@ class ViceWorldDirector {
             const obsX = c.obstacleVeh ? c.obstacleVeh.x : c.x;
             const obsY = c.obstacleVeh ? c.obstacleVeh.y : c.y;
             c.clearSide = this.computeOptimalBypassSideAt(tileCenterX, tileCenterY, c.flowAng, obsX, obsY, c.z);
+
+            // Real-World FDOT Road Ranger Safety Cone Taper:
+            // Place 3 physical 3D orange-and-white reflective traffic cones upstream of the obstruction
+            // in a diagonal taper to channel approaching drivers smoothly into the open bypass lane!
+            const fCos = Math.cos(c.flowAng || 0);
+            const fSin = Math.sin(c.flowAng || 0);
+            const pCos = -fSin;
+            const pSin = fCos;
+            c.taperCones = [
+                { x: obsX - fCos * 86 - pCos * c.clearSide * 12, y: obsY - fSin * 86 - pSin * c.clearSide * 12, z: c.z },
+                { x: obsX - fCos * 58 - pCos * c.clearSide * 3,  y: obsY - fSin * 58 - pSin * c.clearSide * 3,  z: c.z },
+                { x: obsX - fCos * 32 + pCos * c.clearSide * 7,  y: obsY - fSin * 32 + pSin * c.clearSide * 7,  z: c.z }
+            ];
             activeBottlenecks.push(c);
         }
 
@@ -1692,22 +1767,30 @@ class ViceWorldDirector {
         const distToTarget = Math.hypot(targetX - ped.x, targetY - ped.y);
         const clearSide = (bn && bn.clearSide) ? bn.clearSide : 1;
 
-        // 1. When within 175px of the jam, wave the glowing orange traffic baton & issue physical steering/reverse directives to stalled AI drivers!
+        // 1. When within 175px of the jam, wave the glowing orange traffic baton & issue physical steering/reverse/alternating-hold directives!
         if (distToTarget < 175 && Array.isArray(g.vehicles)) {
             ped.isDirectingTraffic = true;
             ped.wandWaveTimer = 0.85;
+            const flowAng = (bn && typeof bn.flowAng === "number") ? bn.flowAng : (obsVeh ? (obsVeh.angle || 0) : (ped.angle || 0));
+            const fCos = Math.cos(flowAng);
+            const fSin = Math.sin(flowAng);
+            let bypassingSameDirCount = 0;
+
             for (let i = 0; i < g.vehicles.length; i++) {
                 const v = g.vehicles[i];
                 if (!v || v.destroyed || !v.driver || v.driver === "PLAYER" || v === obsVeh) continue;
-                const dv = Math.hypot(v.x - ped.x, v.y - ped.y);
-                if (dv > 165) continue;
+                const dv = Math.hypot(v.x - targetX, v.y - targetY);
+                if (dv > 175) continue;
+                const dirCos = Math.cos((v.angle || 0) - flowAng);
 
-                // Direct stalled or slow approaching vehicles onto the open lateral corridor around the bottleneck
-                if (Math.abs(v.speed || 0) < 38) {
+                if (dirCos >= -0.35) {
+                    bypassingSameDirCount++;
+                    // Early Cone-Taper Guidance: channel approaching or stalled vehicles smoothly along the diagonal cone taper onto the open lane
                     const targetOff = clearSide * 27;
                     if (Math.abs((v.aiPullOverOffset || 0) - targetOff) > 4 || (v.aiPullOverTimer || 0) < 1.2) {
                         v.aiPullOverOffset = targetOff;
                         v.aiPullOverTimer = Math.max(v.aiPullOverTimer || 0, 3.4);
+                        v.aiTurnSignal = clearSide;
                         this.laneTracker.totalWardenDirectives++;
                         this.blackboard.totalTrafficWardenDirectives = this.laneTracker.totalWardenDirectives;
                     }
@@ -1717,6 +1800,27 @@ class ViceWorldDirector {
                         v.gridlockEscapeDir = clearSide;
                         v.gridlockEscapeTimer = Math.max(v.gridlockEscapeTimer || 0, 2.8);
                         v.yieldTimer = 0;
+                    }
+                }
+            }
+
+            // Real-World Alternating One-Lane Flagging:
+            // While vehicles from the obstructed lane are actively bypassing onto the single remaining lane,
+            // hold approaching oncoming traffic 45..155px before the pinch point so they never collide head-on!
+            if (bypassingSameDirCount > 0) {
+                for (let i = 0; i < g.vehicles.length; i++) {
+                    const v = g.vehicles[i];
+                    if (!v || v.destroyed || v.driver !== "AI_TRAFFIC" || v === obsVeh) continue;
+                    const dirCos = Math.cos((v.angle || 0) - flowAng);
+                    if (dirCos >= -0.45) continue;
+                    // Oncoming vehicle travels along (-fCos, -fSin), so it is approaching the obstacle when (v - target) dot (fCos, fSin) > 38
+                    const alongAhead = (v.x - targetX) * fCos + (v.y - targetY) * fSin;
+                    const latDist = Math.abs(-(v.x - targetX) * fSin + (v.y - targetY) * fCos);
+                    if (alongAhead > 38 && alongAhead < 155 && latDist < 42) {
+                        if ((v.wardenHoldTimer || 0) <= 0.2) {
+                            this.laneTracker.totalAlternatingHolds = (this.laneTracker.totalAlternatingHolds || 0) + 1;
+                        }
+                        v.wardenHoldTimer = Math.max(v.wardenHoldTimer || 0, 1.25);
                     }
                 }
             }

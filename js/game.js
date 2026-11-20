@@ -577,6 +577,9 @@ class LeonidaGame {
 
 
     getNSTrafficLightState() {
+        // Real-World 3M Opticom Emergency Signal Preemption & SCATS Adaptive Demand Override:
+        if (this.signalPreemptionAxis === "NS" && (this.signalPreemptionTimer || 0) > 0) return "GREEN";
+        if (this.signalPreemptionAxis === "EW" && (this.signalPreemptionTimer || 0) > 0) return "RED";
         const ph = ((this.trafficLightTimer || 0) % 12.0 + 12.0) % 12.0;
         if (ph < 4.6) return "GREEN";
         if (ph < 6.0) return "AMBER"; // GREEN -> AMBER (Orange) -> RED
@@ -585,6 +588,9 @@ class LeonidaGame {
     }
 
     getEWTrafficLightState() {
+        // Real-World 3M Opticom Emergency Signal Preemption & SCATS Adaptive Demand Override:
+        if (this.signalPreemptionAxis === "EW" && (this.signalPreemptionTimer || 0) > 0) return "GREEN";
+        if (this.signalPreemptionAxis === "NS" && (this.signalPreemptionTimer || 0) > 0) return "RED";
         const ph = ((this.trafficLightTimer || 0) % 12.0 + 12.0) % 12.0;
         if (ph < 4.6) return "RED";
         if (ph < 6.0) return "AMBER"; // RED -> AMBER (Orange) -> GREEN

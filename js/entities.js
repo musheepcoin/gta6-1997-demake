@@ -1682,11 +1682,29 @@ class Vehicle {
         if (this.aiCurbParkCooldown > 0) {
             this.aiCurbParkCooldown = Math.max(0, this.aiCurbParkCooldown - dt);
         }
+        if ((this.wardenHoldTimer || 0) > 0) {
+            this.wardenHoldTimer = Math.max(0, this.wardenHoldTimer - dt);
+        }
         if (this.aiPullOverTimer > 0) {
             this.aiPullOverTimer = Math.max(0, this.aiPullOverTimer - dt);
         } else if (this.aiPullOverOffset) {
             this.aiPullOverOffset *= Math.pow(0.06, dt);
             if (Math.abs(this.aiPullOverOffset) < 0.4) this.aiPullOverOffset = 0;
+        }
+        // Real-World Traffic Warden / Flagger Alternating 1-Lane STOP Signal:
+        // When an on-foot Traffic Warden holds opposing traffic while clearing a single-lane bottleneck, hold cleanly until signaled through!
+        if (!isPanicked && (this.wardenHoldTimer || 0) > 0) {
+            this.aiState = "STOPPED_LIGHT";
+            const hMult = Math.pow(0.008, dt);
+            this.vx *= hMult;
+            this.vy *= hMult;
+            this.speed *= hMult;
+            if (Math.abs(this.speed) < 18) {
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 0;
+            }
+            return { throttle: 0, steer: 0, handbrake: true };
         }
 
         // 1B. Emergency Corridor / Siren Detection (Ambulances, Tow Trucks, Fire Engines & Police)
@@ -2509,7 +2527,15 @@ class Vehicle {
 
         // 5. Smooth Forward-Only Speed Regulation (Maintains a realistic sprite-length-aware bumper-to-bumper cushion!)
         const involvesLongVeh = Boolean((this.w || 62) >= 75 || (closestEntity && (closestEntity.w || 62) >= 75));
-        const minStopGap = this.isMotorcycle ? 18 : (involvesLongVeh ? 32 : 26);
+        // Real-World Tow Truck Work-Zone Buffer: give an actively maneuvering Tow Truck 92px of clearance so it can reverse & K-turn to hook a wreck!
+        const isManeuveringTowAhead = Boolean(
+            closestEntity &&
+            closestEntity.driver === "AI_TOW" &&
+            closestEntity.towTarget &&
+            !closestEntity.towingVehicle &&
+            Math.hypot(closestEntity.x - closestEntity.towTarget.x, closestEntity.y - closestEntity.towTarget.y) < 220
+        );
+        const minStopGap = isManeuveringTowAhead ? 92 : (this.isMotorcycle ? 18 : (involvesLongVeh ? 32 : 26));
         const followHorizon = Math.max(155, minStopGap + Math.max(0, this.speed || 0) * (this.isHeavyVehicle ? 0.90 : 0.72) + 48);
         if (sirenYield || crossTrafficYield) {
             this.aiState = sirenYield ? "YIELD_SIREN" : "FOLLOWING";
@@ -2980,19 +3006,40 @@ class Vehicle {
     }
 
     // Helper: checks spacing against other stopped emergency/police units so responders never stack on top of each other
+    // or seal off an entire 2-lane street with 4-5 abandoned patrol cars at the exact same spot!
     alignCurbsideAndCheckSpacing(map, game, minSpacing = 68, tacticalTarget = null) {
+        let nearbyStoppedResponders = 0;
         if (game && Array.isArray(game.vehicles)) {
             for (const ov of game.vehicles) {
                 if (!ov || ov === this || ov.destroyed) continue;
-                const isOtherStoppedResponder = (ov.isPolice || ov.isEmergency) && Math.abs(ov.speed || 0) < 20;
-                if (isOtherStoppedResponder && Math.hypot(ov.x - this.x, ov.y - this.y) < minSpacing) {
+                const isOtherStoppedResponder = (ov.isPolice || ov.isEmergency) && (ov.driver === null || Math.abs(ov.speed || 0) < 20);
+                if (!isOtherStoppedResponder) continue;
+                const dMe = Math.hypot(ov.x - this.x, ov.y - this.y);
+                if (dMe < minSpacing) {
                     return false;
                 }
+                if (dMe < 165) {
+                    nearbyStoppedResponders++;
+                }
             }
+        }
+        // Real-World Police Scene Management: cap parked/deployed cruisers within a 165px cluster at 2 units
+        // so additional patrol units remain mobile or stage further back instead of sealing off every lane!
+        if (nearbyStoppedResponders >= 2) {
+            return false;
         }
         const onRoad = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
         if (onRoad && this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
             this.angle = this.aiChosenDir.angle;
+            // Pull slightly toward the right-hand curb (+12px) when parking to deploy officers so the center lane remains passable
+            const rCos = -Math.sin(this.angle);
+            const rSin = Math.cos(this.angle);
+            const curbX = this.x + rCos * 12;
+            const curbY = this.y + rSin * 12;
+            if (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(curbX, curbY, 14, this.z || 2.0).hit) {
+                this.x = curbX;
+                this.y = curbY;
+            }
         } else if (!onRoad && tacticalTarget) {
             const toTarg = Math.atan2(tacticalTarget.y - this.y, tacticalTarget.x - this.x);
             const sideSign = ((String(this.id).charCodeAt(String(this.id).length - 1) || 0) % 2 === 0) ? 1 : -1;
@@ -3082,10 +3129,10 @@ class Vehicle {
 
         if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
             const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68, wantedTarget);
-            if (!spacingOk && this.aiBailTimer < 0.65) {
-                this.aiBailTimer += dt * 0.4;
+            if (!spacingOk) {
+                this.aiBailTimer = 0;
                 const offRoadHere = map && map.isRoadAtPixel ? !map.isRoadAtPixel(this.x, this.y) : false;
-                return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.42, false, offRoadHere);
+                return this.computeTargetRoadOrFeelerControls(dt, map, game, wantedTarget.x, wantedTarget.y, 0, 0, 0.48, false, offRoadHere);
             }
             this.aiBailTimer += dt;
             const brakeMult = Math.pow(0.001, dt);
