@@ -2828,7 +2828,8 @@ setInterval(() => {
                 const isDestroyed = Boolean(vrow[10] & 1);
                 const isUnoccupiedResponderOrDynamic = (vrow[8] === 0) && (isDynamicVehicleId(vid) || isTransientResponderRow(vid, vrow));
                 const isUnoccupiedOther = (vrow[8] === 0);
-                // Realism: wrecks and parked player cars never evaporate on a timer - only a physical Tow Truck removes them (server tow dispatches after 2 min)\n                const maxVehAge = isDestroyed ? 0 : (isUnoccupiedResponderOrDynamic ? 45000 : 0);
+                // Realism: wrecks and parked player cars never evaporate on a timer - only a physical Tow Truck removes them (server tow dispatches after 2 min)
+                const maxVehAge = isDestroyed ? 0 : (isUnoccupiedResponderOrDynamic ? 45000 : 0);
                 if (maxVehAge > 0 && (nowMs - vts) > maxVehAge) {
                     delete rv.modifiedVehs[vid];
                     delete rv.modifiedVehTs[vid];
