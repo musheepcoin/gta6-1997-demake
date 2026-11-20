@@ -9140,6 +9140,68 @@ class LeonidaGame {
 
     }
 
+    emitPedFootprints(ent, dt = 0.016) {
+        if (!ent || ent.dead || ent.isSwimming || (ent.jumpTimer || 0) > 0 || !this.map) return;
+        if ((ent._bloodyShoesTimer || 0) > 0) {
+            ent._bloodyShoesTimer = Math.max(0, ent._bloodyShoesTimer - dt);
+        }
+        // Check if stepping through a fresh corpse blood puddle (authentic GTA 1 & GTA 2 bloody footprints!)
+        if (Array.isArray(this.peds) && (ent === this.player || (this.player && Math.abs(ent.x - this.player.x) < 420 && Math.abs(ent.y - this.player.y) < 320))) {
+            for (let i = 0; i < this.peds.length; i++) {
+                const cp = this.peds[i];
+                if (cp && cp.dead && (cp.deadTimer || 0) < 35 && Math.abs(cp.x - ent.x) < 15 && Math.abs(cp.y - ent.y) < 15) {
+                    ent._bloodyShoesTimer = 3.6;
+                    break;
+                }
+            }
+        }
+        const moved = ent._lastFootX === undefined ? 999 : Math.hypot(ent.x - ent._lastFootX, ent.y - ent._lastFootY);
+        if (moved < 10.5) return;
+        ent._lastFootX = ent.x;
+        ent._lastFootY = ent.y;
+
+        const hasBlood = (ent._bloodyShoesTimer || 0) > 0;
+        const onSand = typeof TILE !== "undefined" && this.map.getTileAtPixel && this.map.getTileAtPixel(ent.x, ent.y) === TILE.SAND;
+        if (!hasBlood && !onSand) return;
+
+        ent._footSide = ((ent._footSide || 1) * -1);
+        const ang = ent.angle || 0;
+        const lat = 2.6 * ent._footSide;
+        const fx = ent.x - Math.sin(ang) * lat;
+        const fy = ent.y + Math.cos(ang) * lat;
+        const fz = ent.z !== undefined ? ent.z : 2.0;
+
+        if (hasBlood) {
+            this.addSkidmark(fx, fy, {
+                z: fz,
+                angle: ang,
+                w: 3.4,
+                h: 2.0,
+                r: 0.58,
+                g: 0.04,
+                b: 0.07,
+                alpha: Math.min(0.68, 0.24 + (ent._bloodyShoesTimer / 3.6) * 0.44),
+                life: 10.0,
+                maxLife: 10.0,
+                surface: "BLOOD_FOOT"
+            });
+        } else if (onSand) {
+            this.addSkidmark(fx, fy, {
+                z: fz,
+                angle: ang,
+                w: 3.2,
+                h: 1.9,
+                r: 0.56,
+                g: 0.44,
+                b: 0.25,
+                alpha: 0.46,
+                life: 11.0,
+                maxLife: 11.0,
+                surface: "SAND_FOOT"
+            });
+        }
+    }
+
 
 
     spawnParticle(x, y, kind = "SPARK") {
@@ -12568,6 +12630,9 @@ class LeonidaGame {
                 p.z = postWater.inWater
                     ? Math.max(2.0, this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0, false))
                     : this.map.getHeightAtPixel(p.x, p.y, p.z || 2.0);
+                if (p.isMoving && !postWater.inWater) {
+                    this.emitPedFootprints(p, dt);
+                }
 
                 // --- SWIMMING & DEEP OCEAN ("HAUTE MER") RIPTIDE / SHARK DANGER SYSTEM ---
                 const wasSwimming = Boolean(p.isSwimming);
@@ -17010,6 +17075,9 @@ class LeonidaGame {
 
             if (pedMovedThisFrame || ped.x !== pedStartX || ped.y !== pedStartY) {
                 ped.z = this.map.getHeightAtPixel(ped.x, ped.y, ped.z || 2.0);
+                if (p && Math.abs(ped.x - p.x) < 420 && Math.abs(ped.y - p.y) < 320) {
+                    this.emitPedFootprints(ped, dt);
+                }
             }
 
         }

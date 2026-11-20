@@ -452,15 +452,42 @@ class RetroRenderer {
                 return texture2D(uTex, uv).rgb;
             }
             vec3 styleBeachSand(vec3 baseSand) {
-                float warp = sin(vWorldPos.z * 1.73 + vWorldPos.x * 0.89) * 0.85;
-                float r1 = sin(vWorldPos.x * 5.83 + vWorldPos.z * 2.91 + warp);
-                float r2 = cos(vWorldPos.x * 14.37 - vWorldPos.z * 8.19 + sin(vWorldPos.x * 3.17) * 0.7);
-                float r3 = sin(vWorldPos.x * 29.3 + vWorldPos.z * 17.9);
-                float duneWave = r1 * 0.52 + r2 * 0.33 + r3 * 0.15;
-                vec3 sandCrest = vec3(0.99, 0.91, 0.71);
-                vec3 sandTrough = vec3(0.91, 0.78, 0.55);
-                vec3 targetSand = mix(sandTrough, sandCrest, clamp(0.54 + duneWave * 0.24, 0.0, 1.0));
-                return mix(baseSand, targetSand, 0.48);
+                vec2 p = vWorldPos.xz;
+                float macroDune = aNoise(p * 0.55) * 0.62 + aNoise(p * 1.45 + 11.3) * 0.38;
+                float warp = sin(p.y * 1.73 + p.x * 0.89) * 0.85 + (macroDune - 0.5) * 1.4;
+                float r1 = sin(p.x * 5.83 + p.y * 2.91 + warp);
+                float r2 = cos(p.x * 14.37 - p.y * 8.19 + sin(p.x * 3.17) * 0.7);
+                float r3 = sin(p.x * 29.3 + p.y * 17.9);
+                float duneWave = r1 * 0.50 + r2 * 0.34 + r3 * 0.16;
+                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.055;
+                float shellSparkle = step(0.984, aHash(floor(p * 84.0) + 7.0)) * 0.065;
+                vec3 sandCrest = vec3(0.92, 0.81, 0.59);
+                vec3 sandTrough = vec3(0.78, 0.64, 0.43);
+                float duneMix = clamp(0.48 + duneWave * 0.28 + (macroDune - 0.5) * 0.24, 0.0, 1.0);
+                vec3 targetSand = mix(sandTrough, sandCrest, duneMix) + fineGrain + vec3(shellSparkle, shellSparkle * 0.92, shellSparkle * 0.76);
+                return mix(baseSand * 0.88, clamp(targetSand, 0.0, 0.96), 0.72);
+            }
+            vec3 pavementSurface(vec3 src, vec2 p) {
+                if (uMobileFast > 0.5) return src;
+                // Crisp 4x4 world-space architectural sidewalk flagstone & South Beach terrazzo joints + 3D chamfered bevels
+                vec2 grid4 = p * 4.0;
+                vec2 cellId = floor(grid4);
+                vec2 sub = fract(grid4);
+                float slabHash = aHash(cellId);
+                float fineGrain = (aHash(floor(p * 48.0)) - 0.5) * 0.036;
+                float medMottle = (aNoise(p * 3.2 + 19.0) - 0.5) * 0.042;
+
+                float jointX = min(sub.x, 1.0 - sub.x);
+                float jointY = min(sub.y, 1.0 - sub.y);
+                float minJoint = min(jointX, jointY);
+                float groove = smoothstep(0.022, 0.068, minJoint);
+                // Sun-facing top/left chamfer highlight vs bottom/right joint shadow for crisp 2.5D stone relief
+                float bevelHi = (1.0 - smoothstep(0.05, 0.16, sub.x)) * 0.028 + (1.0 - smoothstep(0.05, 0.16, sub.y)) * 0.028;
+                float bevelLo = (1.0 - smoothstep(0.05, 0.16, 1.0 - sub.x)) * 0.026 + (1.0 - smoothstep(0.05, 0.16, 1.0 - sub.y)) * 0.026;
+
+                vec3 baseCol = src * (0.94 + (slabHash - 0.5) * 0.055) + fineGrain + medMottle + bevelHi - bevelLo;
+                vec3 mortarCol = src * vec3(0.71, 0.69, 0.66);
+                return clamp(mix(mortarCol, baseCol, 0.22 + 0.78 * groove), 0.0, 0.96);
             }
             float coastalSandDrift(vec2 p) {
                 float w = sin(p.y * 0.72 + 0.4) * 0.50 + cos(p.y * 1.65 - 0.9) * 0.32 + (aNoise(vec2(p.y * 2.3, 5.0)) - 0.5) * 0.36;
@@ -599,8 +626,9 @@ class RetroRenderer {
                     }
                     float isSand = 0.0;
                     if (vWorldPos.y < 2.2 && c.a > 0.02) {
-                        // World-space multi-block Miami beach sand wind-ripples & tropical St. Augustine park lawn undulation!
-                        isSand = clamp((c.r - c.b - 0.14) * 6.5, 0.0, 1.0) * smoothstep(0.54, 0.76, c.r);
+                        // World-space multi-block Miami beach sand wind-ripples, 2.5D Terrazzo Sidewalk Pavers & tropical St. Augustine park lawn!
+                        float sandWarmth = (vWorldPos.x >= 449.0) ? 0.14 : 0.22;
+                        isSand = clamp((c.r - c.b - sandWarmth) * 7.5, 0.0, 1.0) * smoothstep(0.60, 0.78, c.r);
                         float isGrass = clamp((c.g - c.r - 0.14) * 7.5, 0.0, 1.0) * clamp((c.g - c.b - 0.12) * 7.5, 0.0, 1.0);
                         if (isSand > 0.01) {
                             if (uMobileFast < 0.5) c.rgb = mix(c.rgb, styleBeachSand(c.rgb), isSand);
@@ -614,6 +642,8 @@ class RetroRenderer {
                             vec3 turfSunlit = vec3(0.42, 0.81, 0.36);
                             vec3 targetTurf = mix(turfShadow, turfSunlit, clamp(0.52 + turfWave * 0.26, 0.0, 1.0));
                             c.rgb = mix(c.rgb, targetTurf, isGrass * 0.34);
+                        } else if (!isRoad && !isShoreTile && uMobileFast < 0.5) {
+                            c.rgb = pavementSurface(c.rgb, vWorldPos.xz);
                         }
 
                         // Coral promenade footpath meeting beach sand on the East: organic wind-blown sand drift over pavers
@@ -797,24 +827,24 @@ class RetroRenderer {
                     if (dayAmt > 0.01 && c.a > 0.02) {
                         vec4 lm = texture2D(uDayLightTex, vWorldPos.xz / 512.0);
                         float onGround = clamp(2.75 - vWorldPos.y, 0.0, 1.0);
-                        float sandMask = clamp(isSand + step(0.82, min(c.r, min(c.g, c.b))), 0.0, 1.0);
-                        float bldAO = lm.g * onGround * (1.0 - sandMask * 0.88);
+                        float sandMask = clamp(isSand, 0.0, 1.0);
+                        float bldAO = lm.g * onGround * (1.0 - sandMask * 0.45);
                         float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
-                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.85);
-                        float totalShade = clamp(max(bldShadow * 0.96, bldAO * 0.74), 0.0, 1.0);
+                        float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * (1.0 - sandMask * 0.35);
+                        float totalShade = clamp(max(bldShadow * 0.96, bldAO * 0.78), 0.0, 1.0);
                         if (isRoad) {
                             // True 3D building cast shadows project cleanly across asphalt streets while keeping curb AO subtle
-                            bldAO *= 0.22;
-                            totalShade = clamp(bldShadow * 0.82 + bldAO * 0.25, 0.0, 1.0);
+                            bldAO *= 0.24;
+                            totalShade = clamp(bldShadow * 0.84 + bldAO * 0.26, 0.0, 1.0);
                         }
 
-                        vec3 sunlitTint = mix(vec3(1.19, 1.10, 0.90), vec3(1.06, 1.03, 0.96), sandMask);
-                        vec3 shadowTint = mix(vec3(0.50, 0.62, 0.85), vec3(0.88, 0.85, 0.78), sandMask);
+                        vec3 sunlitTint = mix(vec3(1.14, 1.08, 0.94), vec3(1.03, 1.00, 0.94), sandMask);
+                        vec3 shadowTint = mix(vec3(0.50, 0.62, 0.85), vec3(0.68, 0.72, 0.84), sandMask);
                         if (isRoad) {
                             sunlitTint = vec3(1.11, 1.07, 0.98);
-                            shadowTint = vec3(0.58, 0.67, 0.85);
+                            shadowTint = vec3(0.56, 0.66, 0.85);
                         }
-                        vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
+                        vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.24);
                         float isElevatedRoof = step(2.85, vWorldPos.y);
                         if (isElevatedRoof > 0.5 && waterCoverage < 0.05) {
                             // Preserve turquoise rooftop swimming pools (lid 35), and style all building roofs
@@ -827,8 +857,8 @@ class RetroRenderer {
                                 getBuildingStyleColors(rStyle, bWallCol, bTrimCol, bRoofCol, bAccentCol);
 
                                 float tierSeed = fract(floor(vWorldPos.y + 0.1) * 0.37 + rStyle * 0.13);
-                                vec3 archDeckBase = bRoofCol * (0.96 + 0.08 * (tierSeed - 0.5));
-                                vec3 cleanRoof = archDeckBase * (0.91 + 0.14 * (roofLum - 0.5));
+                                vec3 archDeckBase = bRoofCol * (0.95 + 0.08 * (tierSeed - 0.5));
+                                vec3 cleanRoof = archDeckBase * (0.90 + 0.16 * (roofLum - 0.5));
                                 vec2 rf = fract(vWorldPos.xz);
                                 vec2 subRf = fract(vWorldPos.xz * 2.0);
                                 float edgeD = min(min(rf.x, 1.0 - rf.x), min(rf.y, 1.0 - rf.y));
@@ -837,26 +867,69 @@ class RetroRenderer {
                                 float paverJoint  = smoothstep(0.020, 0.052, subD);
                                 float paverBevel  = smoothstep(0.052, 0.085, subD) - smoothstep(0.085, 0.12, subD);
                                 float grainSum = 0.0;
+                                float isClayRoof = step(abs(rStyle - 2.0), 0.4) + step(abs(rStyle - 9.0), 0.4) + step(abs(rStyle - 0.0), 0.4);
                                 if (uMobileFast < 0.5) {
                                     float fineGrain = (fract(sin(dot(floor(vWorldPos.xz * 64.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.040;
                                     float medGrain  = (fract(sin(dot(floor(vWorldPos.xz * 16.0), vec2(39.346, 11.135))) * 43758.5453) - 0.5) * 0.022;
                                     grainSum = fineGrain + medGrain;
                                     // Mediterranean clay barrel-tile roof ripple on terracotta/coral roof styles (0, 2, 5, 9)
-                                    if (abs(rStyle - 2.0) < 0.4 || abs(rStyle - 9.0) < 0.4 || abs(rStyle - 0.0) < 0.4) {
-                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.024 + step(0.84, fract(vWorldPos.z * 4.0)) * (-0.032);
+                                    if (isClayRoof > 0.5) {
+                                        float clayRib = sin(vWorldPos.x * 37.699) * 0.026 + step(0.84, fract(vWorldPos.z * 4.0)) * (-0.034);
                                         grainSum += clayRib;
                                     }
                                 }
                                 // Crisp outer parapet coping border tinted toward the building's facade/trim color
-                                float copingBand = 1.0 - smoothstep(0.055, 0.095, edgeD);
-                                vec3 copingTint = mix(bWallCol, bTrimCol, 0.55);
-                                cleanRoof = mix(cleanRoof, copingTint, copingBand * 0.52);
+                                float copingBand = 1.0 - smoothstep(0.058, 0.098, edgeD);
+                                vec3 copingTint = mix(bWallCol, bTrimCol, 0.58);
+                                cleanRoof = mix(cleanRoof, copingTint, copingBand * 0.58);
+
+                                // 3D Inner Parapet Step Drop-Shadow along sun-facing North/West parapet walls
+                                float innerStepShad = (smoothstep(0.068, 0.095, rf.y) * (1.0 - smoothstep(0.095, 0.175, rf.y))
+                                    + smoothstep(0.068, 0.095, rf.x) * (1.0 - smoothstep(0.095, 0.165, rf.x))) * (1.0 - copingBand);
+
+                                // Procedural 2.5D Rooftop Architectural Details (Glass Skylights & Twin HVAC Condenser Units)
+                                if (uMobileFast < 0.5 && isClayRoof < 0.5 && edgeD > 0.17) {
+                                    float tileSeed = aHash(floor(vWorldPos.xz));
+                                    if (tileSeed > 0.64) {
+                                        // Recessed Architectural Glass Skylight with 3D Mullion Frame & Diagonal Miami Sky Reflection
+                                        vec2 skD = abs(rf - vec2(0.50, 0.50));
+                                        float skMax = max(skD.x, skD.y);
+                                        if (skMax < 0.25) {
+                                            if (skMax > 0.21) {
+                                                cleanRoof = mix(bTrimCol * 0.88, vec3(0.32, 0.36, 0.42), step(0.23, skMax));
+                                            } else {
+                                                float mull = step(min(skD.x, skD.y), 0.016);
+                                                float diagGlint = smoothstep(0.06, 0.0, abs((rf.x - 0.5) + (rf.y - 0.5) - 0.06));
+                                                vec3 skyGlass = mix(vec3(0.14, 0.32, 0.48), vec3(0.46, 0.78, 0.94), 0.35 + 0.55 * diagGlint);
+                                                cleanRoof = mix(skyGlass, bTrimCol * 0.82, mull);
+                                            }
+                                        } else if (max(abs(rf.x - 0.53), abs(rf.y - 0.53)) < 0.25) {
+                                            innerStepShad = max(innerStepShad, 0.65);
+                                        }
+                                    } else if (tileSeed < 0.28) {
+                                        // Galvanized Steel Rooftop HVAC Condenser Unit + Circular Dark Fan Grille + 3D Drop Shadow
+                                        vec2 hvD = abs(rf - vec2(0.48, 0.48));
+                                        if (hvD.x < 0.16 && hvD.y < 0.12) {
+                                            float hvEdge = max(hvD.x / 0.16, hvD.y / 0.12);
+                                            float fanR = length(rf - vec2(0.43, 0.48));
+                                            vec3 hvacMetal = vec3(0.68, 0.72, 0.76) * (0.86 + 0.18 * step(hvEdge, 0.86));
+                                            if (fanR < 0.065) {
+                                                float blade = 0.5 + 0.5 * sin(atan(rf.y - 0.48, rf.x - 0.43) * 4.0);
+                                                hvacMetal = mix(vec3(0.14, 0.17, 0.22), vec3(0.36, 0.40, 0.46), blade * step(0.018, fanR));
+                                            }
+                                            cleanRoof = hvacMetal;
+                                        } else if (abs(rf.x - 0.515) < 0.16 && abs(rf.y - 0.515) < 0.12) {
+                                            innerStepShad = max(innerStepShad, 0.75);
+                                        }
+                                    }
+                                }
 
                                 // Directional solar rim highlight along sun-facing roof edges
-                                float sunEdgeRim = (1.0 - smoothstep(0.0, 0.14, rf.y)) * 0.045;
+                                float sunEdgeRim = (1.0 - smoothstep(0.0, 0.14, rf.y)) * 0.048;
                                 c.rgb = (cleanRoof + grainSum + paverBevel * 0.025 + sunEdgeRim)
                                     * mix(0.84, 1.0, outerGutter)
-                                    * mix(0.90, 1.0, paverJoint);
+                                    * mix(0.90, 1.0, paverJoint)
+                                    * (1.0 - clamp(innerStepShad, 0.0, 1.0) * 0.18);
                             } else {
                                 // Luxury Miami Art Deco Rooftop & Resort Swimming Pool (lid 35):
                                 // Travertine perimeter coping rim, cobalt ceramic waterline trim, mosaic tile floor & animated solar caustics!
@@ -1885,6 +1958,61 @@ class RetroRenderer {
                                     }
                                 }
                             }
+                        }
+
+                        // Apply GTA 2 (1999) 3ds Max Metallic Clearcoat Dome, Sapphire Windshield Reflection & Crisp Chassis Contour
+                        const remasterVehicleSpriteGta2 = (vRect) => {
+                            if (!Array.isArray(vRect) || vRect.length < 4) return;
+                            const [vx, vy, vw, vh] = vRect;
+                            if (vw <= 4 || vh <= 4 || vx < 0 || vy < 0 || vx + vw > W || vy + vh > H) return;
+                            for (let ly = 0; ly < vh; ly++) {
+                                const ny = ((ly + 0.5) / vh) * 2.0 - 1.0;
+                                for (let lx = 0; lx < vw; lx++) {
+                                    const p = ((vy + ly) * W + (vx + lx)) * 4;
+                                    if (d[p + 3] < 16) continue;
+                                    const isPerim =
+                                        lx === 0 || lx === vw - 1 || ly === 0 || ly === vh - 1 ||
+                                        d[((vy + ly) * W + (vx + lx - 1)) * 4 + 3] < 16 ||
+                                        d[((vy + ly) * W + (vx + lx + 1)) * 4 + 3] < 16 ||
+                                        d[((vy + ly - 1) * W + (vx + lx)) * 4 + 3] < 16 ||
+                                        d[((vy + ly + 1) * W + (vx + lx)) * 4 + 3] < 16;
+                                    const r = d[p];
+                                    const g = d[p + 1];
+                                    const b = d[p + 2];
+                                    if (isPerim) {
+                                        d[p] = (r * 0.72) | 0;
+                                        d[p + 1] = (g * 0.72) | 0;
+                                        d[p + 2] = (b * 0.76) | 0;
+                                        continue;
+                                    }
+                                    const nx = ((lx + 0.5) / vw) * 2.0 - 1.0;
+                                    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+                                    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+                                    if (lum < 82 && sat < 36 && Math.abs(ny) < 0.64 && Math.abs(nx) < 0.78) {
+                                        // Glossy GTA 2 Sapphire-Tinted Windshield & Cabin Glass with Diagonal Miami Sky Reflection
+                                        const diag = Math.max(0.0, 1.0 - Math.abs(nx * 0.85 + ny * 1.15) * 2.8);
+                                        d[p] = Math.min(255, Math.round(r * 0.85 + 14 + diag * 38));
+                                        d[p + 1] = Math.min(255, Math.round(g * 0.94 + 26 + diag * 54));
+                                        d[p + 2] = Math.min(255, Math.round(b * 1.12 + 44 + diag * 72));
+                                    } else {
+                                        // 3ds Max Cylindrical Hood/Roof Clearcoat Dome + Lateral Fender Shading + 18% Leonida Paint Vibrance
+                                        const dome = Math.max(0.0, 1.0 - nx * nx * 0.86 - ny * ny * 0.22);
+                                        const shadeMult = 0.88 + 0.20 * dome;
+                                        const crownSpec = (dome * dome * dome) * 14.0;
+                                        const avg = (r + g + b) * 0.3333;
+                                        const vr = avg + (r - avg) * 1.18;
+                                        const vg = avg + (g - avg) * 1.18;
+                                        const vb = avg + (b - avg) * 1.18;
+                                        d[p] = Math.min(255, Math.max(0, Math.round(vr * shadeMult + crownSpec)));
+                                        d[p + 1] = Math.min(255, Math.max(0, Math.round(vg * shadeMult + crownSpec)));
+                                        d[p + 2] = Math.min(255, Math.max(0, Math.round(vb * shadeMult + crownSpec)));
+                                    }
+                                }
+                            }
+                        };
+                        remasterVehicleSpriteGta2(ve.base);
+                        if (Array.isArray(ve.remaps)) {
+                            for (const rm of ve.remaps) remasterVehicleSpriteGta2(rm);
                         }
                     }
                 }
@@ -11611,11 +11739,23 @@ class RetroRenderer {
                 }
             }
 
-            // Siren Overlays (eSpriteDrawOrder_CarRoof) — when driven or parked at an active scene with siren active
-            if (!v.destroyed && (v.driver || v.sirenActive) && v.isEmergency && v.sirenActive && sirens.length > 0) {
-                const sIdx = Math.floor(this.time * 10) % sirens.length;
-                const sRect = sirens[sIdx];
-                if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF, 1, 1, 1, 1, totalPitchZ);
+            // Siren Overlays (eSpriteDrawOrder_CarRoof) + GTA 2 Direct3D Strobing Red/Blue Ground Light Wash Pools!
+            if (!v.destroyed && (v.driver || v.sirenActive) && v.isEmergency && v.sirenActive) {
+                if (sirens.length > 0) {
+                    const sIdx = Math.floor(this.time * 10) % sirens.length;
+                    const sRect = sirens[sIdx];
+                    if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF, 1, 1, 1, 1, totalPitchZ);
+                }
+                const strobePhase = Math.sin(this.time * 14.0 + (v.sirenPhase || 0));
+                const leftRed = strobePhase >= 0;
+                const latWash = (v.h || 24) * 0.72;
+                const lx = v.x - sinA * latWash;
+                const ly = v.y + cosA * latWash;
+                const rx = v.x + sinA * latWash;
+                const ry = v.y - cosA * latWash;
+                const washAlpha = 0.18 + nfGlobal * 0.16;
+                this.pushSolidQuad3D(lx, ly, vz - 0.020, 24.0, 16.0, v.angle, leftRed ? 1.0 : 0.05, leftRed ? 0.10 : 0.65, leftRed ? 0.22 : 1.0, washAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(rx, ry, vz - 0.020, 24.0, 16.0, v.angle, leftRed ? 0.05 : 1.0, leftRed ? 0.65 : 0.10, leftRed ? 1.0 : 0.22, washAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
             // Tow Truck 3D Hydraulic Wheel-Lift Stinger Cradle, Twin Safety Chains & Taut Braided Winch Cable
@@ -13689,14 +13829,14 @@ class RetroRenderer {
         if (!p.inVehicle && Array.isArray(game.vehicles)) {
             for (let vi = 0; vi < game.vehicles.length; vi++) {
                 const v = game.vehicles[vi];
-                if (!v || v.destroyed || (!v._worldModified && !v.createdByEngine && !v.respectCount)) continue;
-                if (Math.hypot(v.x - p.x, v.y - p.y) < 105) {
+                if (!v || v.destroyed || v.driver !== null || (!v.createdByEngine && !(v.respectCount > 0))) continue;
+                if (Math.hypot(v.x - p.x, v.y - p.y) < 68) {
                     const vSc = this.worldToScreen(v.x, v.y, v.z || 2.0);
-                    const rTag = `🚗 ${v.name} • ⭐${v.respectCount || 0} RESPECT • [Y] SALUTE (+$100)`;
-                    const rbw = Math.max(144, ctx.measureText(rTag).width + 20);
-                    this.drawArcadeCapsule(ctx, Math.round(vSc.x - rbw * 0.5), Math.round(vSc.y - 34), rbw, 21, "rgba(8, 12, 26, 0.94)", "#39ff14", 6, 1.7);
+                    const rTag = `⭐${v.respectCount || 0} RESPECT • [Y] SALUTE`;
+                    const rbw = Math.max(112, ctx.measureText(rTag).width + 18);
+                    this.drawArcadeCapsule(ctx, Math.round(vSc.x - rbw * 0.5), Math.round(vSc.y - 30), rbw, 19, "rgba(8, 12, 26, 0.94)", "#39ff14", 6, 1.6);
                     ctx.fillStyle = "#39ff14";
-                    ctx.fillText(rTag, vSc.x, vSc.y - 24);
+                    ctx.fillText(rTag, vSc.x, vSc.y - 20);
                     break;
                 }
             }

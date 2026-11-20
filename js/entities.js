@@ -4669,7 +4669,31 @@ class Vehicle {
         const curSpeed = Math.hypot(this.vx, this.vy);
         if (curSpeed < 10) return;
 
-        const style = this.getSurfaceTrackStyle(this.x, this.y, map, Boolean(this.drifting));
+        // Check if tires roll over a fresh blood puddle (authentic GTA 1 & GTA 2 crimson blood tire tracks!)
+        if ((this._bloodyTiresTimer || 0) > 0) {
+            this._bloodyTiresTimer = Math.max(0, this._bloodyTiresTimer - 0.04);
+        }
+        if (game && Array.isArray(game.peds) && (this.driver === "PLAYER" || (game.player && Math.abs(this.x - game.player.x) < 640))) {
+            for (let pi = 0; pi < game.peds.length; pi++) {
+                const cp = game.peds[pi];
+                if (cp && cp.dead && (cp.deadTimer || 0) < 35 && Math.abs(cp.x - this.x) < 24 && Math.abs(cp.y - this.y) < 24) {
+                    this._bloodyTiresTimer = 4.2;
+                    break;
+                }
+            }
+        }
+
+        const hasBloodTires = (this._bloodyTiresTimer || 0) > 0;
+        const style = hasBloodTires
+            ? {
+                surface: "BLOOD",
+                r: 0.58,
+                g: 0.04,
+                b: 0.07,
+                alpha: Math.min(0.72, 0.25 + (this._bloodyTiresTimer / 4.2) * 0.48),
+                maxLife: 14.0
+            }
+            : this.getSurfaceTrackStyle(this.x, this.y, map, Boolean(this.drifting));
         if (!style) return;
 
         // Distance-gate track segments so marks form smooth continuous ribbons regardless of framerate
@@ -4688,10 +4712,42 @@ class Vehicle {
         const frontAng = this.angle + (this.steerAngleRad || 0) * 0.68;
         const rearAng = this.angle;
         const vz = this.z !== undefined ? this.z : 2.0;
-        const isOffroad = style.surface !== "ROAD";
+        const isOffroad = style.surface !== "ROAD" && style.surface !== "BLOOD";
+
+        // Emit golden sand-spray or drift tire-smoke puffs behind rear tires (GTA 6 Vice Beach & Street Drift vibe)
+        if (game && Array.isArray(game.particles) && (this.driver === "PLAYER" || (game.player && Math.abs(this.x - game.player.x) < 620))) {
+            const onBeachSand = style.surface === "SAND" || (typeof TILE !== "undefined" && map.getTileAtPixel && map.getTileAtPixel(this.x, this.y) === TILE.SAND);
+            if (onBeachSand && curSpeed > 58 && game.particles.length < 220) {
+                const spX = this.x - fx * ((this.w || 48) * 0.42) + (Math.random() - 0.5) * 10;
+                const spY = this.y - fy * ((this.w || 48) * 0.42) + (Math.random() - 0.5) * 10;
+                game.particles.push({
+                    x: spX,
+                    y: spY,
+                    vx: -this.vx * 0.18 + (Math.random() - 0.5) * 28,
+                    vy: -this.vy * 0.18 + (Math.random() - 0.5) * 28,
+                    size: 4.5 + Math.random() * 3.5,
+                    color: "#e6c687",
+                    life: 0.34,
+                    maxLife: 0.34
+                });
+            } else if (this.drifting && curSpeed > 82 && game.particles.length < 220) {
+                const smX = this.x - fx * ((this.w || 48) * 0.40) + (Math.random() - 0.5) * 12;
+                const smY = this.y - fy * ((this.w || 48) * 0.40) + (Math.random() - 0.5) * 12;
+                game.particles.push({
+                    x: smX,
+                    y: smY,
+                    vx: -this.vx * 0.12 + (Math.random() - 0.5) * 22,
+                    vy: -this.vy * 0.12 + (Math.random() - 0.5) * 22,
+                    size: 5.5 + Math.random() * 4.5,
+                    color: "#cbd5e1",
+                    life: 0.38,
+                    maxLife: 0.38
+                });
+            }
+        }
 
         const pushWheelMark = (wx, wy, ang, segLen, tireWidth, alphaMult = 1.0) => {
-            const wStyle = this.getSurfaceTrackStyle(wx, wy, map, Boolean(this.drifting)) || style;
+            const wStyle = hasBloodTires ? style : (this.getSurfaceTrackStyle(wx, wy, map, Boolean(this.drifting)) || style);
             if (!wStyle) return;
             game.addSkidmark(wx, wy, {
                 z: vz,

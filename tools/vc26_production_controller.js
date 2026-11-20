@@ -1490,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_229"), "ViceCreationEngine (v101_229) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_230"), "ViceCreationEngine (v101_230) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2226,6 +2226,58 @@ function runSimulations() {
             "Beveled/Rounded Arcade Capsule HUD renderer (drawArcadeCapsule) & 3D Flash District Arena Skybeam execute with zero errors"
         );
 
+        // 2. Verify GTA 1/2 + GTA 6 Physical Terrain Feedback: Beach Sand Footprints (SAND_FOOT), Blood Footprints (BLOOD_FOOT), Blood Tire Tracks (BLOOD) & Sand-Spray Particles
+        const beachX = 466.5 * 64;
+        const beachY = 276.5 * 64;
+        g.player.inVehicle = null;
+        g.player.x = beachX;
+        g.player.y = beachY;
+        g.player.vx = 95;
+        g.player.vy = 0;
+        g.player.angle = 0;
+        g.player._lastFootX = beachX - 24;
+        g.player._lastFootY = beachY;
+        g.skidmarks.length = 0;
+        g.emitPedFootprints(g.player, 0.05);
+        assert(
+            g.skidmarks.some((tr) => tr.surface === "SAND_FOOT"),
+            "Walking on Vice Beach sand emits alternating 2.5D depressed sand footprints (SAND_FOOT)"
+        );
+
+        // Spawn a fresh corpse puddle at the player's feet and verify crimson GTA 1/2 blood footprints + blood tire tracks
+        g.peds.push({
+            id: "corpse_blood_test_42",
+            x: beachX + 4,
+            y: beachY,
+            z: 2.0,
+            dead: true,
+            deadTimer: 2.0
+        });
+        g.player._lastFootX = beachX - 24;
+        g.player._lastFootY = beachY;
+        g.emitPedFootprints(g.player, 0.05);
+        assert(
+            g.skidmarks.some((tr) => tr.surface === "BLOOD_FOOT"),
+            "Walking through a fresh corpse puddle stains boots and leaves authentic GTA 1 / GTA 2 crimson blood footprints (BLOOD_FOOT)"
+        );
+
+        neonCar.x = beachX + 4;
+        neonCar.y = beachY;
+        neonCar.z = 2.0;
+        neonCar.speed = 180;
+        neonCar.vx = 180;
+        neonCar.vy = 0;
+        neonCar._lastTrackX = beachX - 24;
+        neonCar._lastTrackY = beachY;
+        g.particles.length = 0;
+        neonCar.emitWheelTracks(g.map, g);
+        assert(
+            g.skidmarks.some((tr) => tr.surface === "BLOOD") &&
+            g.particles.some((pt) => pt.color === "#e6c687"),
+            "Driving over a fresh corpse puddle on beach sand leaves crimson GTA 1/2 blood tire tracks (BLOOD) and kicks up golden Vice Beach sand-spray particles (#e6c687)"
+        );
+        g.peds.pop();
+
         g.player.inVehicle = null;
         g.activeFlashEvent = null;
         g.creationEngine.clearAllCreations();
@@ -2323,11 +2375,13 @@ function runSimulations() {
     console.log("================================================================================");
     if (allPassed) {
         console.log("  🎉 ALL 43 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL & POLICE SCENARIOS PASSED 100%!");
+        console.log("================================================================================");
+        process.exit(0);
     } else {
         console.error("  ⚠️ SOME SIMULATION ASSERTIONS FAILED!");
+        console.log("================================================================================");
         process.exit(1);
     }
-    console.log("================================================================================");
 }
 
 runSimulations();
