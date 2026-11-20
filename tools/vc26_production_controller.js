@@ -1490,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_233"), "ViceCreationEngine (v101_233) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_234"), "ViceCreationEngine (v101_234) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
@@ -2365,6 +2365,27 @@ function runSimulations() {
         assert(
             pickup.hp < hpBefore,
             `VCPD officer opens fire on fleeing getaway vehicle and damages vehicle hull (HP ${hpBefore} -> ${Math.round(pickup.hp)})`
+        );
+
+        // Verify natural 24h Asymmetric Arcade Day -> Golden Afternoon -> Sunset -> Night -> Dawn progression & [N] override persistence across WORLD_SYNC
+        g.worldMinutes = 16 * 60 + 55; // 16:55 (approaching 17:00)
+        stepSec(10.0); // Advances past 17:00 without snapping back to 10:00!
+        assert(
+            g.worldMinutes > 17 * 60 && g.getTimePhaseInfo().sunsetFactor > 0.25,
+            `Natural 24h Arcade Clock progresses smoothly past 17:00 into Golden Hour / Sunset (worldMinutes=${g.worldMinutes.toFixed(1)}, phase=${g.getTimePhaseInfo().phase})`
+        );
+        g._lastServerWorldMinutes = 750; // Server at 12:30 DAY
+        g.worldMinutes = 750;
+        g.localTimeOffsetMins = 0;
+        g.advanceTimeOfDayPhase(); // Day -> 16:45 GOLDEN
+        g.advanceTimeOfDayPhase(); // Golden -> 18:45 DUSK
+        g.advanceTimeOfDayPhase(); // Dusk -> 22:30 NIGHT
+        if (g.net && typeof g.net.applyWorldSync === "function") {
+            g.net.applyWorldSync({ id: "server_sim", wm: 751, tl: 4.0 });
+        }
+        assert(
+            g.getTimePhaseInfo().phase === "NIGHT" && g.renderer.nightFactor > 0.9,
+            `Manual [N] phase toggle to NEON NIGHT persists across incoming server_sim WORLD_SYNC ticks (phase=${g.getTimePhaseInfo().phase}, nightFactor=${g.renderer.nightFactor.toFixed(2)})`
         );
 
         g.player.inVehicle = null;

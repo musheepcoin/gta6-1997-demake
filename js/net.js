@@ -2583,7 +2583,11 @@ class ViceNetworkManager {
         const g = this.game;
 
         if (typeof pkt.wm === "number") {
-            g.worldMinutes = pkt.wm;
+            g._lastServerWorldMinutes = pkt.wm;
+            g.worldMinutes = (((pkt.wm + (g.localTimeOffsetMins || 0)) % 1440) + 1440) % 1440;
+            if (typeof g.syncDayNightCycle === "function") {
+                g.syncDayNightCycle();
+            }
         }
         if (typeof pkt.tl === "number") {
             const curTl = ((g.trafficLightTimer || 0) % 24.0 + 24.0) % 24.0;

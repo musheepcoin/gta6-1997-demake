@@ -212,6 +212,8 @@ class LeonidaGame {
         // Starts at 12:00 (Sunny midday on Ocean Drive)
 
         this.worldMinutes = 12 * 60;
+        this._lastServerWorldMinutes = 12 * 60;
+        this.localTimeOffsetMins = 0;
 
         this.timeScale = 1.0;
 
@@ -340,6 +342,21 @@ class LeonidaGame {
 
 
 
+    getArcadeClockRate(hourInput) {
+        const hour = (typeof hourInput === "number")
+            ? (((hourInput % 24) + 24) % 24)
+            : ((((this.worldMinutes % 1440) + 1440) % 1440) / 60.0);
+        // Asymmetric Arcade Day/Night Curve (~14 min full 24h cycle: ~76% bright day/golden/sunset, ~24% crisp neon night):
+        // - 07:45..16:00 Sunny Day (495m): 1.50 min/s (~5m30s real time)
+        // - 16:00..20:15 Afternoon Golden Hour & Pink-Gold Sunset (255m): 1.15 min/s (~3m40s real time)
+        // - 20:15..05:15 Neon Night (540m): 2.70 min/s (~3m20s real time)
+        // - 05:15..07:45 Atlantic Dawn (150m): 1.65 min/s (~1m30s real time)
+        if (hour >= 20.25 || hour < 5.25) return 2.70;
+        if (hour >= 16.0 && hour < 20.25) return 1.15;
+        if (hour >= 5.25 && hour < 7.75) return 1.65;
+        return 1.50;
+    }
+
     getTimePhaseInfo() {
 
         const mins = ((this.worldMinutes % 1440) + 1440) % 1440;
@@ -376,11 +393,15 @@ class LeonidaGame {
 
 
 
-        // Warm Vice City Sunset (17:15..20:15, peak 18:45) & Sunrise (05:15..07:45, peak 06:30) factor
+        // Warm Vice City Golden Afternoon (16:00..17:45) -> Pink-Gold Sunset (17:45..20:15, peak 18:45) & Sunrise (05:15..07:45, peak 06:30) factor
 
         let sunsetFactor = 0.0;
 
-        if (hour >= 17.25 && hour <= 20.25) {
+        if (hour >= 16.0 && hour < 17.25) {
+
+            sunsetFactor = smooth((hour - 16.0) / 1.25) * 0.45;
+
+        } else if (hour >= 17.25 && hour <= 20.25) {
 
             const d = Math.abs(hour - 18.75) / 1.5;
 
@@ -410,7 +431,7 @@ class LeonidaGame {
 
             dockLabel = "🌅 DAWN [N]";
 
-        } else if (hour >= 7.5 && hour < 17.75) {
+        } else if (hour >= 7.5 && hour < 16.0) {
 
             phase = "DAY";
 
@@ -418,7 +439,15 @@ class LeonidaGame {
 
             dockLabel = "☀️ DAY [N]";
 
-        } else if (hour >= 17.75 && hour < 20.25) {
+        } else if (hour >= 16.0 && hour < 18.0) {
+
+            phase = "GOLDEN";
+
+            icon = "🌤️";
+
+            dockLabel = "🌤️ PM [N]";
+
+        } else if (hour >= 18.0 && hour < 20.25) {
 
             phase = "DUSK";
 
@@ -486,15 +515,23 @@ class LeonidaGame {
 
 
 
-        if (hour >= 7.5 && hour < 17.5) {
+        if (hour >= 7.5 && hour < 16.0) {
 
-            nextMins = 18 * 60 + 30; // 18:30 Golden Sunset
+            nextMins = 16 * 60 + 45; // 16:45 Golden Afternoon
+
+            banner = "🌤️ GOLDEN AFTERNOON";
+
+            color = "#fbbf24";
+
+        } else if (hour >= 16.0 && hour < 18.0) {
+
+            nextMins = 18 * 60 + 45; // 18:45 Vice City Sunset
 
             banner = "🌇 VICE CITY SUNSET";
 
             color = "#fb7185";
 
-        } else if (hour >= 17.5 && hour < 20.0) {
+        } else if (hour >= 18.0 && hour < 20.25) {
 
             nextMins = 22 * 60 + 30; // 22:30 Neon Night
 
@@ -504,7 +541,7 @@ class LeonidaGame {
 
         } else {
 
-            // From Night or Dawn (hour >= 20.0 || hour < 7.5), jump straight back to bright 12:30 Sunny Daylight!
+            // From Night or Dawn (hour >= 20.25 || hour < 7.5), jump straight back to bright 12:30 Sunny Daylight!
             nextMins = 12 * 60 + 30;
 
             banner = "☀️ LEONIDA DAYLIGHT";
@@ -516,6 +553,8 @@ class LeonidaGame {
 
 
         this.worldMinutes = nextMins;
+        const baseSrvMins = (typeof this._lastServerWorldMinutes === "number") ? this._lastServerWorldMinutes : nextMins;
+        this.localTimeOffsetMins = ((nextMins - baseSrvMins) % 1440 + 1440) % 1440;
 
         this.syncDayNightCycle();
 
@@ -11913,14 +11952,10 @@ class LeonidaGame {
 
 
 
-        // Advance Live 24-Hour Smartphone Clock & Smooth Day / Sunset / Night / Sunrise Cycle
-        // Keep daytime sessions in bright Florida sunlight (09:00..16:50) unless the player explicitly toggles Sunset/Night with [N]!
+        // Advance Live 24-Hour Smartphone Clock & Asymmetric Arcade Day / Afternoon / Sunset / Night / Dawn Cycle (~14 min real-time 24h cycle)
         const prevHr = (((this.worldMinutes % 1440) + 1440) % 1440) / 60.0;
-        this.worldMinutes = (this.worldMinutes + dt * 0.35 * (this.timeScale || 1.0)) % 1440;
-        const nextHr = (((this.worldMinutes % 1440) + 1440) % 1440) / 60.0;
-        if (prevHr < 17.0 && nextHr >= 17.0) {
-            this.worldMinutes = 10 * 60;
-        }
+        const clockRate = (typeof this.getArcadeClockRate === "function") ? this.getArcadeClockRate(prevHr) : 1.50;
+        this.worldMinutes = (this.worldMinutes + dt * clockRate * (this.timeScale || 1.0)) % 1440;
 
         this.syncDayNightCycle();
 

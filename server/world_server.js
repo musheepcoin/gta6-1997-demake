@@ -2177,13 +2177,14 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
     const TS = global.TILE_SIZE || 64;
 
     // 1. Advance traffic lights (24s cycle) and 24-hour world clock continuously on the Dedicated Server 24/7
+    // Asymmetric Arcade 24h Cycle (~14 min real time: 1.50 min/s Day, 1.15 min/s Golden/Sunset, 2.70 min/s Night, 1.65 min/s Dawn)
     room.trafficLightTimer = ((room.trafficLightTimer || 0) + dt) % 24.0;
     const prevHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
-    room.worldMinutes = Math.round((((room.worldMinutes || 720) + dt * 0.35) % 1440) * 100) / 100;
-    const nextHr = (((room.worldMinutes % 1440) + 1440) % 1440) / 60.0;
-    if (prevHr < 17.0 && nextHr >= 17.0) {
-        room.worldMinutes = 600;
-    }
+    let srvClockRate = 1.50;
+    if (prevHr >= 20.25 || prevHr < 5.25) srvClockRate = 2.70;
+    else if (prevHr >= 16.0 && prevHr < 20.25) srvClockRate = 1.15;
+    else if (prevHr >= 5.25 && prevHr < 7.75) srvClockRate = 1.65;
+    room.worldMinutes = Math.round((((room.worldMinutes || 720) + dt * srvClockRate) % 1440) * 100) / 100;
 
     if (!room.vehNav) room.vehNav = {};
     if (!room.pedNav) room.pedNav = {};
