@@ -11943,21 +11943,26 @@ class RetroRenderer {
 
             // Siren Overlays (eSpriteDrawOrder_CarRoof) + GTA 2 Direct3D Strobing Red/Blue Ground Light Wash Pools!
             if (!v.destroyed && (v.driver || v.sirenActive) && v.isEmergency && v.sirenActive) {
+                // Single shared strobe clock so roof sprite, ground wash and night light pool always flash in perfect sync
+                const strobeRedOn = Math.sin(this.time * 15.0 + (v.sirenPhase || 0)) >= 0;
                 if (sirens.length > 0) {
-                    const sIdx = Math.floor(this.time * 10) % sirens.length;
+                    const sIdx = strobeRedOn ? 0 : (sirens.length > 1 ? 1 : 0);
                     const sRect = sirens[sIdx];
                     if (sRect) this.pushAtlasSprite3D(sRect, v.x, v.y, vz + airZ + 0.015, rot, vScale, SPRITE_DRAW_ORDER.CAR_ROOF, 1, 1, 1, 1, totalPitchZ);
                 }
-                const strobePhase = Math.sin(this.time * 14.0 + (v.sirenPhase || 0));
-                const leftRed = strobePhase >= 0;
-                const latWash = (v.h || 24) * 0.72;
-                const lx = v.x - sinA * latWash;
-                const ly = v.y + cosA * latWash;
-                const rx = v.x + sinA * latWash;
-                const ry = v.y - cosA * latWash;
-                const washAlpha = 0.18 + nfGlobal * 0.16;
-                this.pushSolidQuad3D(lx, ly, vz - 0.020, 24.0, 16.0, v.angle, leftRed ? 1.0 : 0.05, leftRed ? 0.10 : 0.65, leftRed ? 0.22 : 1.0, washAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(rx, ry, vz - 0.020, 24.0, 16.0, v.angle, leftRed ? 0.05 : 1.0, leftRed ? 0.65 : 0.10, leftRed ? 1.0 : 0.22, washAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                const leftRed = strobeRedOn;
+                // Soft ground wash: 3 stacked, shrinking, low-alpha quads centred on the roof lightbar (no hard-edged rectangles,
+                // and slightly ABOVE the road surface so it is never z-clipped underneath the asphalt)
+                const washSide = leftRed ? -1 : 1;
+                const wx0 = v.x - sinA * washSide * 7.0;
+                const wy0 = v.y + cosA * washSide * 7.0;
+                const wr = leftRed ? 1.0 : 0.10;
+                const wg = leftRed ? 0.10 : 0.62;
+                const wb = leftRed ? 0.22 : 1.0;
+                const washBase = 0.05 + nfGlobal * 0.07;
+                this.pushSolidQuad3D(wx0, wy0, vz + 0.004, 78.0, 62.0, v.angle, wr, wg, wb, washBase * 0.45, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(wx0, wy0, vz + 0.005, 54.0, 42.0, v.angle, wr, wg, wb, washBase * 0.65, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(wx0, wy0, vz + 0.006, 32.0, 24.0, v.angle, wr, wg, wb, washBase * 0.9, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
 
             // Tow Truck 3D Hydraulic Wheel-Lift Stinger Cradle, Twin Safety Chains & Taut Braided Winch Cable
@@ -13137,11 +13142,11 @@ class RetroRenderer {
                     addLightPool(activeSc.x, activeSc.y, 118 * pxScale, "rgba(255, 190, 35, 0.94)", "rgba(235, 120, 10, 0.40)");
                     highResFlares.push({ x: activeSc.x, y: activeSc.y, r: 21 * pxScale, col: "rgba(255, 210, 50, 0.88)" });
                 } else if (redOn) {
-                    addLightPool(lSc.x, lSc.y, 128 * pxScale, "rgba(255, 35, 75, 0.96)", "rgba(220, 15, 50, 0.42)");
-                    highResFlares.push({ x: lSc.x, y: lSc.y, r: 22 * pxScale, col: "rgba(255, 40, 80, 0.85)" });
+                    addLightPool(lSc.x, lSc.y, 78 * pxScale, "rgba(255, 35, 75, 0.62)", "rgba(220, 15, 50, 0.16)");
+                    highResFlares.push({ x: lSc.x, y: lSc.y, r: 14 * pxScale, col: "rgba(255, 40, 80, 0.80)" });
                 } else {
-                    addLightPool(rScSiren.x, rScSiren.y, 128 * pxScale, "rgba(30, 165, 255, 0.96)", "rgba(10, 95, 235, 0.42)");
-                    highResFlares.push({ x: rScSiren.x, y: rScSiren.y, r: 22 * pxScale, col: "rgba(45, 185, 255, 0.85)" });
+                    addLightPool(rScSiren.x, rScSiren.y, 78 * pxScale, "rgba(30, 165, 255, 0.62)", "rgba(10, 95, 235, 0.16)");
+                    highResFlares.push({ x: rScSiren.x, y: rScSiren.y, r: 14 * pxScale, col: "rgba(45, 185, 255, 0.80)" });
                 }
             }
         }
