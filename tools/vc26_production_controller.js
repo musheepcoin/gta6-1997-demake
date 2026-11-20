@@ -2439,7 +2439,7 @@ function runSimulations() {
         g.player.inVehicle = null;
         g.setWantedLevel(0);
 
-        // Verify Coherent VCPD Cruiser Recovery & Anti-Pileup Tow Truck Policy on Ocean Drive (even when player is standing nearby at ~120px!)
+        // Verify 100% Physical (Zero-Cheat) VCPD Relief Officer Walk-to-Door Boarding & Tow Truck Rear-Boom K-Turn Hooking
         g.vehicles.length = 0;
         g.peds.length = 0;
         g.player.dead = false;
@@ -2448,18 +2448,37 @@ function runSimulations() {
         g.player.y = 260.0 * 64;
         const emptyCop1 = sandbox.makeVeh("cop_pile_1", "VCPD_CRUISER", 444.5 * 64, 260.0 * 64, Math.PI * 0.5);
         emptyCop1.driver = null;
-        emptyCop1.abandonedTimer = 22.0;
-        emptyCop1._worldModified = true;
-        const emptyCop2 = sandbox.makeVeh("cop_pile_2", "VCPD_CRUISER", 445.5 * 64, 260.0 * 64, -Math.PI * 0.5);
-        emptyCop2.driver = null;
-        emptyCop2.abandonedTimer = 22.0;
-        emptyCop2._worldModified = true;
-        g.vehicles.push(emptyCop1, emptyCop2);
-        stepSec(2.0);
-        const towForIntactCop = g.vehicles.some((v) => v.driver === "AI_TOW" && (v.towTarget === emptyCop1 || v.towTarget === emptyCop2 || v.towingVehicle === emptyCop1 || v.towingVehicle === emptyCop2));
+        emptyCop1.abandonedTimer = 15.0;
+        g.vehicles.push(emptyCop1);
+        // Step 1.0s: relief officer spawns off-screen (> 420px away) and cruiser MUST STILL be driverless (zero ghost-car self-driving!)
+        stepSec(1.0);
+        const reliefOfficerSpawned = g.peds.some((p) => p && !p.dead && p.kind === "COP" && p._boardingVeh === emptyCop1);
+        const stillParkedWhileWalking = (emptyCop1.driver === null);
+        // Step 6.5s: relief officer physically jogs all the way to the cruiser door (< boardDist), opens door, and boards it!
+        stepSec(6.5);
         assert(
-            emptyCop1.driver === "AI_TRAFFIC" && emptyCop2.driver === "AI_TRAFFIC" && !towForIntactCop,
-            `Unoccupied VCPD Cruisers on Ocean Drive are recovered back onto patrol even while player is nearby (~85px) and never targeted by civilian Tow Trucks (cop1=${emptyCop1.driver}, cop2=${emptyCop2.driver}, towForIntactCop=${towForIntactCop})`
+            reliefOfficerSpawned && stillParkedWhileWalking && emptyCop1.driver === "AI_TRAFFIC",
+            `100% Physical VCPD Cruiser Recovery: stays parked while off-screen relief officer walks to door (spawned=${reliefOfficerSpawned}, stayedParked=${stillParkedWhileWalking}) and drives off only after physical boarding (driver=${emptyCop1.driver})`
+        );
+
+        // Now test Tow Truck Physical Rear-Boom K-Turn Hooking when road ahead of target wreck is blocked by another car
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        const blockerCar = sandbox.makeVeh("pile_blocker", "VCPD_CRUISER", 445.5 * 64, 258.2 * 64, -Math.PI * 0.5);
+        blockerCar.driver = null;
+        const targetWreck = sandbox.makeVeh("pile_wreck", "REGAL_SEDAN", 445.5 * 64, 259.4 * 64, -Math.PI * 0.5);
+        targetWreck.destroyed = true;
+        targetWreck.fireExtinguished = true;
+        targetWreck.abandonedTimer = 25.0;
+        const towTruck = sandbox.makeVeh("tow_kturn", "TOW_TRUCK", 445.5 * 64, 261.2 * 64, -Math.PI * 0.5);
+        towTruck.driver = "AI_TOW";
+        towTruck.towTarget = targetWreck;
+        g.vehicles.push(blockerCar, targetWreck, towTruck);
+        stepSec(9.5);
+        const rearAligned = ((targetWreck.x - towTruck.x) * Math.cos(towTruck.angle) + (targetWreck.y - towTruck.y) * Math.sin(towTruck.angle)) < 0;
+        assert(
+            towTruck.towingVehicle === targetWreck && rearAligned,
+            `100% Physical Tow Truck Rear-Boom K-Turn: executes 3-point turn with wheels before blocked pileup, backs rear boom to wreck, and hooks with wreck behind rear boom (towing=${Boolean(towTruck.towingVehicle)}, rearAligned=${rearAligned})`
         );
         console.log("");
     }
