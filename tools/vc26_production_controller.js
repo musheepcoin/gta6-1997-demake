@@ -1162,7 +1162,7 @@ function runSimulations() {
         let validAudioFiles = 0;
         const missingAudio = [];
         for (const [, key, relPath] of audioEntries) {
-            const fullPath = path.join(ROOT, relPath);
+            const fullPath = path.join(ROOT, relPath.split("?")[0]); // ignore cache-bust query strings
             if (fs.existsSync(fullPath)) {
                 const st = fs.statSync(fullPath);
                 const buf = fs.readFileSync(fullPath);
