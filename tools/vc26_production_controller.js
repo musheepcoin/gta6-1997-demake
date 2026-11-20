@@ -163,6 +163,7 @@ function createGameInstance(cmpBuf, forceFresh = false) {
     g.renderer.camX = g.player.x;
     g.renderer.camY = g.player.y;
     g.started = true;
+    g.wreckTowDelay = 12.0; // tests use the fast 12s tow reaction; real game uses 90s
     g.player.respawnGraceUntil = 0;
 
     const stepSec = (seconds, onTick = null) => {

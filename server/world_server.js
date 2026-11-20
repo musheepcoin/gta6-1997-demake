@@ -571,8 +571,24 @@ let isDirty = false;
 
 function loadPersistentState() {
     try {
-        if (fs.existsSync(STATE_FILE)) {
-            const raw = fs.readFileSync(STATE_FILE, "utf8");
+        let raw = null;
+        let parsedFromFile = null;
+        for (const candidate of [STATE_FILE, `${STATE_FILE}.bak`, `${STATE_FILE}.tmp`]) {
+            if (!fs.existsSync(candidate)) continue;
+            try {
+                const txt = fs.readFileSync(candidate, "utf8");
+                const obj = JSON.parse(txt);
+                if (obj && typeof obj === "object") {
+                    raw = txt;
+                    parsedFromFile = candidate;
+                    break;
+                }
+            } catch (e) {
+                console.warn(`[WORLD-DB] ${candidate} unreadable (${e.message}), trying next backup...`);
+            }
+        }
+        if (raw) {
+            if (parsedFromFile !== STATE_FILE) console.warn(`[WORLD-DB] Recovered world from backup ${parsedFromFile}`);
             const parsed = JSON.parse(raw);
             if (parsed && typeof parsed === "object") {
                 const nowMs = Date.now();
@@ -616,8 +632,10 @@ function loadPersistentState() {
                             for (const [vid, vrow] of Object.entries(rawModVehs)) {
                                 if (!Array.isArray(vrow) || vrow.length < 11) continue;
                                 if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
-                                // Strip destroyed wrecks and transient traffic/cop/mission cars from modifiedVehs on server startup
-                                if ((vrow[10] & 1) || isDynamicVehicleId(vid) || isTransientResponderRow(vid, vrow)) {
+                                if (!Number.isFinite(vrow[2]) || !Number.isFinite(vrow[3]) || !Number.isFinite(vrow[5])) continue;
+                                // PERMANENT WORLD: destroyed wrecks (and parked player cars) survive restarts exactly where they were left.
+                                // Only transient traffic/cop/mission/responder cars that are NOT wrecks are dropped on startup.
+                                if (!(vrow[10] & 1) && (isDynamicVehicleId(vid) || isTransientResponderRow(vid, vrow))) {
                                     migratedAny = true;
                                     continue;
                                 }
@@ -633,8 +651,9 @@ function loadPersistentState() {
                                     if (!Array.isArray(vrow) || vrow.length < 11) continue;
                                     if ((vrow[2] || 0) < 128 || (vrow[3] || 0) < 128) continue;
                                     if (cleanModVehs[vid]) continue;
-                                    // Only keep autonomous server traffic (srv_trf_*) across server restarts; purge stale client emergency/pursuit/traffic cars!
-                                    if (!String(vid).startsWith("srv_trf_")) {
+                                    // PERMANENT WORLD: keep every autonomous vehicle at its last position across restarts;
+                                    // only purge transient responders/pursuit/mission cars (identified by id prefix).
+                                    if (!Number.isFinite(vrow[3]) || !Number.isFinite(vrow[5]) || (isDynamicVehicleId(vid) && !String(vid).startsWith("srv_trf_")) || isTransientResponderRow(vid, null)) {
                                         migratedAny = true;
                                         continue;
                                     }
@@ -661,8 +680,8 @@ function loadPersistentState() {
                                 modifiedVehs: cleanModVehs,
                                 modifiedVehTs: cleanModTs,
                                 smashedProps: Object.assign({}, existing.smashedProps, (rv.smashedProps && typeof rv.smashedProps === "object") ? rv.smashedProps : {}),
-                                corpses: {},
-                                corpseTs: {},
+                                corpses: (rv.corpses && typeof rv.corpses === "object") ? rv.corpses : {},
+                                corpseTs: (rv.corpseTs && typeof rv.corpseTs === "object") ? rv.corpseTs : {},
                                 robbedVaults: Object.assign({}, existing.robbedVaults || {}, (rv.robbedVaults && typeof rv.robbedVaults === "object") ? rv.robbedVaults : {}),
                                 turfStandings: Object.assign({}, existing.turfStandings, (rv.turfStandings && typeof rv.turfStandings === "object") ? rv.turfStandings : {}),
                                 creationOps: Object.assign({}, existing.creationOps || {}, (rv.creationOps && typeof rv.creationOps === "object") ? rv.creationOps : {}),
@@ -711,6 +730,16 @@ function savePersistentStateNow() {
         fs.writeFileSync(tmpFile, payload, "utf8");
         if (fs.existsSync(STATE_FILE)) {
             try { fs.copyFileSync(STATE_FILE, bakFile); } catch (_e) {}
+            // Rolling hourly snapshot (keep last 24) so a corrupted world can always be rolled back
+            try {
+                const hourTag = new Date().toISOString().slice(0, 13).replace(/[-T:]/g, "");
+                const snapFile = path.join(DATA_DIR, `world_state.${hourTag}.snap.json`);
+                if (!fs.existsSync(snapFile)) {
+                    fs.copyFileSync(STATE_FILE, snapFile);
+                    const snaps = fs.readdirSync(DATA_DIR).filter((f) => /^world_state\.\d+\.snap\.json$/.test(f)).sort();
+                    while (snaps.length > 24) fs.unlinkSync(path.join(DATA_DIR, snaps.shift()));
+                }
+            } catch (_e) {}
         }
         fs.renameSync(tmpFile, STATE_FILE);
         isDirty = false;
@@ -1287,7 +1316,7 @@ function handleClientPacket(socket, pkt) {
         }
         // Keep all modifiedVehs (capped at 120 most recent) so parked/wrecked cars across the city never vanish!
         const modKeys = Object.keys(room.modifiedVehs);
-        if (modKeys.length > 120) {
+        if (modKeys.length > 400) {
             const oldVid = modKeys[0];
             delete room.modifiedVehs[oldVid];
             delete room.modifiedVehTs[oldVid];
@@ -1725,6 +1754,7 @@ const server = http.createServer((req, res) => {
                 persistedVehicles: allVehs.length,
                 autonomousMovingVehicles: movingVehs.length,
                 playerModifiedVehicles: Object.keys(rv.modifiedVehs || {}).length,
+                persistedWrecks: allVehs.filter((row) => Array.isArray(row) && (row[10] & 1)).length,
                 activePedestrians: Object.keys(rv.peds || {}).length,
                 smashedPropsCount: Object.keys(rv.smashedProps || {}).length,
                 corpsesCount: Object.keys(rv.corpses || {}).length,
@@ -2800,7 +2830,7 @@ setInterval(() => {
         if (rv.smashedProps) {
             for (const [pk, pv] of Object.entries(rv.smashedProps)) {
                 const isCorpse = pv && typeof pv.pType === "string" && pv.pType.startsWith("CORPSE:");
-                const maxAge = isCorpse ? 180000 : 300000;
+                const maxAge = isCorpse ? 600000 : 1800000;
                 if (pv && pv.ts && (nowMs - pv.ts) > maxAge) {
                     delete rv.smashedProps[pk];
                     isDirty = true;
@@ -2812,7 +2842,7 @@ setInterval(() => {
         if (rv.corpses && rv.corpseTs) {
             for (const cid of Object.keys(rv.corpses)) {
                 const cts = rv.corpseTs[cid] || 0;
-                if (cts && (nowMs - cts) > 180000) {
+                if (cts && (nowMs - cts) > 600000) {
                     delete rv.corpses[cid];
                     delete rv.corpseTs[cid];
                     isDirty = true;

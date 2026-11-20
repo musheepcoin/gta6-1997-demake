@@ -3850,7 +3850,7 @@ class Vehicle {
 
         const isValidTowCandidate = (v) => {
             if (!v || v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) return false;
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > 12.0;
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > ((game && game.wreckTowDelay) || 90.0);
             const isAbandoned = !v.destroyed &&
                 v.driver === null &&
                 (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : (v.isPolice ? 42.0 : 35.0));
@@ -6248,7 +6248,10 @@ class TrafficManager {
             // Also never locally delete the Dedicated Server's persistent autonomous fleet (srv_trf_* / _serverDriven)!
             const isRecentParkedMod = v._worldModified && !v.destroyed && v.driver === null && !isAbandonedOrWreck;
             const isServerPersistentFleet = Boolean(v._serverDriven || (typeof v.id === "string" && v.id.startsWith("srv_trf_")));
-            if (!canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || isRecentParkedMod || isServerPersistentFleet) continue;
+            // PERMANENT WORLD: wrecks and player-modified parked cars are NEVER culled/recycled by distance or timers (and never broadcast as removed to the server);
+            // only a physical Tow Truck may remove them.
+            const isPermanentWorldObject = Boolean(v.destroyed || (v._worldModified && v.driver === null));
+            if (isPermanentWorldObject || !canRecycle || v === game.scurveHeroCar || v.missionTag || v.driver === "REMOTE" || isRecentParkedMod || isServerPersistentFleet) continue;
 
             const bx = Math.floor(v.x / TILE_SIZE);
             const by = Math.floor(v.y / TILE_SIZE);
