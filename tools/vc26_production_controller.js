@@ -1138,12 +1138,12 @@ function runSimulations() {
         }
         assert(validDispatches === 24, `Multi-District 4-Agency Dispatch Matrix passed 24/24 district×agency spawns (actual: ${validDispatches}/24)`);
 
-        // 3. In-Engine Production Self-Audit (12/12 Subsystems)
+        // 3. In-Engine Production Self-Audit (13/13 Subsystems)
         const auditRes = g.director.runProductionSelfAudit();
         if (!auditRes.ok) {
             console.log("  [DEBUG Failed Self-Audit Checks]:", auditRes.checks.filter((c) => !c.ok));
         }
-        assert(auditRes.ok === true && auditRes.passedCount === 12, `ViceWorldDirector.runProductionSelfAudit() passed ${auditRes.passedCount}/${auditRes.totalCount} subsystem contracts`);
+        assert(auditRes.ok === true && auditRes.passedCount === 13, `ViceWorldDirector.runProductionSelfAudit() passed ${auditRes.passedCount}/${auditRes.totalCount} subsystem contracts`);
 
         // 4. 24/7 Vehicle Ledger Garbage Collection Verification
         for (let k = 0; k < 120; k++) {
@@ -2483,9 +2483,57 @@ function runSimulations() {
         console.log("");
     }
 
+    // ------------------------------------------------------------------------
+    // SCENARIO 44: NAVIGABLE LANE FLOW TRACKER, UPSTREAM DETOURS & IN-GAME TRAFFIC WARDEN AI ENTITY
+    // ------------------------------------------------------------------------
+    console.log("--- SCENARIO 44: NAVIGABLE LANE FLOW TRACKER, UPSTREAM DETOURS & IN-GAME TRAFFIC WARDEN AI ENTITY ---");
+    {
+        const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        g.player.x = 443.2 * 64;
+        g.player.y = 260.0 * 64;
+
+        // 1. Place an abandoned civilian vehicle obstructing a live traffic lane on Ocean Drive (bx=444, by=260)
+        // and a stalled civilian vehicle caught behind it
+        const abandonedLaneCar = sandbox.makeVeh("lane_obs_1", "REGAL_SEDAN", 444.5 * 64, 260.5 * 64, Math.PI * 0.5);
+        abandonedLaneCar.driver = null;
+        abandonedLaneCar.abandonedTimer = 4.2;
+        const stalledQueueCar = sandbox.makeVeh("stalled_q_1", "BANSHEE_GT", 444.5 * 64, 259.3 * 64, Math.PI * 0.5);
+        stalledQueueCar.driver = "AI_TRAFFIC";
+        stalledQueueCar.speed = 0;
+        stalledQueueCar.gridlockTimer = 1.6;
+        g.vehicles.push(abandonedLaneCar, stalledQueueCar);
+
+        // Run NavigableLaneFlowTracker scan
+        g.director.updateNavigableLaneTracker(0.4, true);
+        const lt = g.director.laneTracker;
+        const upstreamScore = g.map.getLaneCongestionScore(444, 256, 0, 1, 5);
+        assert(
+            lt.congestedTilesCount >= 4 && lt.activeBottlenecks.length >= 1 && upstreamScore >= 18,
+            `NavigableLaneFlowTracker maps lane obstruction to .CMP road tiles & back-propagates congestion upstream (congestedTiles=${lt.congestedTilesCount}, bottlenecks=${lt.activeBottlenecks.length}, upstreamScore=${Math.round(upstreamScore)})`
+        );
+
+        // 2. Verify a physical in-game VCPD Traffic Warden entity (`isTrafficWarden = true`, `carryProp = "TRAFFIC_WAND"`) was dispatched off-screen
+        const warden = g.peds.find((p) => p && !p.dead && p.isTrafficWarden && p.carryProp === "TRAFFIC_WAND");
+        assert(
+            Boolean(warden && warden.wardenBottleneck && abandonedLaneCar.driver === null),
+            `In-Game VCPD Traffic Warden AI entity disguised as physical street officer with 3D Traffic Baton spawned off-screen while car stays parked (warden=${warden ? warden.id : "none"}, prop=${warden ? warden.carryProp : "none"})`
+        );
+
+        // 3. Step simulation so the Traffic Warden physically walks to the bottleneck, waves his wand to direct the stalled car laterally,
+        // and physically walks up to the abandoned car's door, opens it, climbs in, and clears the lane!
+        stepSec(6.5);
+        assert(
+            lt.totalWardenDirectives >= 1 && lt.totalWardenBoardings >= 1 && abandonedLaneCar.driver === "AI_TRAFFIC",
+            `Traffic Warden physically directs stalled queue around obstacle (directives=${lt.totalWardenDirectives}) and walks to door to board & drive away the lane-blocking vehicle (boardings=${lt.totalWardenBoardings}, newDriver=${abandonedLaneCar.driver})`
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 43 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL & POLICE SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 44 FULL-GAME AUDIT, PRODUCTION CONTROLLER, CREATION ENGINE, MMO, 2.5D SOCIAL, LANE TRACKER & TRAFFIC WARDEN AI SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

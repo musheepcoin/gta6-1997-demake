@@ -5856,6 +5856,22 @@ class LeonidaMap {
         return false;
     }
 
+    getLaneCongestionScore(bx, by, dx, dy, lookaheadTiles = 6) {
+        if (!this.laneCongestionMap || this.laneCongestionMap.size === 0) return 0;
+        let score = 0;
+        for (let s = 1; s <= lookaheadTiles; s++) {
+            const tx = bx + dx * s;
+            const ty = by + dy * s;
+            if (tx < 0 || tx >= MAP_COLS || ty < 0 || ty >= MAP_ROWS) break;
+            const key = (ty << 16) | (tx & 0xffff);
+            const w = this.laneCongestionMap.get(key) || 0;
+            if (w > 0) {
+                score += w * (1.15 - s * 0.12);
+            }
+        }
+        return score;
+    }
+
     chooseTargetGuidedRoadBlock(bx, by, currentAngle, targetX, targetY, zBlocks = 2.0, turnedInIntersection = false, entryAngle = null) {
         const dirs = this.getAllowedRoadDirections(bx, by, zBlocks);
         const cardinals = [
@@ -5893,10 +5909,14 @@ class LeonidaMap {
             const lookX = (bx + d.dx * 4 + 0.5) * TILE_SIZE;
             const lookY = (by + d.dy * 4 + 0.5) * TILE_SIZE;
             const distToTarget = Math.hypot(targetX - lookX, targetY - lookY);
+            const congestionPenalty = distToTarget > 320
+                ? Math.min(420, this.getLaneCongestionScore(bx, by, d.dx, d.dy, 5) * 6.5)
+                : 0;
             const penalty =
                 (exitsIntersection ? 0 : 25000) +
                 (isUturn ? 50000 : 0) +
-                (isTurn && turnedInIntersection ? 35000 : 0);
+                (isTurn && turnedInIntersection ? 35000 : 0) +
+                congestionPenalty;
 
             candidates.push({
                 ...d,
@@ -5953,7 +5973,8 @@ class LeonidaMap {
             const straightValid = !isTurn
                 ? this.doesStraightLeadToValidExit(bx, by, d.dx, d.dy, zBlocks, turnedInIntersection, entryAngle)
                 : false;
-            const entry = { ...d, bx: nx, by: ny, absDiff, isTurn, isUturn, exitsIntersection, straightValid };
+            const congestionScore = this.getLaneCongestionScore(bx, by, d.dx, d.dy, 6);
+            const entry = { ...d, bx: nx, by: ny, absDiff, isTurn, isUturn, exitsIntersection, straightValid, congestionScore };
             if (nb.groundType === GROUND_TYPE.ROAD) {
                 roadCandidates.push(entry);
             } else if (nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER) {
@@ -5969,7 +5990,8 @@ class LeonidaMap {
             isTurn: Math.abs(this.normalizeAngleDiff(d.angle, currentAngle)) > 0.45,
             isUturn: Math.abs(this.normalizeAngleDiff(d.angle, currentAngle)) > 2.4,
             exitsIntersection: true,
-            straightValid: true
+            straightValid: true,
+            congestionScore: 0
         })));
 
         const nonUturn = pool.filter((c) => !c.isUturn);
@@ -5990,6 +6012,25 @@ class LeonidaMap {
 
         if (pool.length === 1) {
             return pool[0];
+        }
+
+        // Navigable Lane Flow Tracker Detour:
+        // If one or more outgoing road branches ahead are congested/obstructed (congestionScore >= 12)
+        // and an alternative legal outgoing branch is clear, divert ambient traffic onto the clear branch!
+        let minCongestion = Infinity;
+        let maxCongestion = 0;
+        for (let i = 0; i < pool.length; i++) {
+            const cs = pool[i].congestionScore || 0;
+            if (cs < minCongestion) minCongestion = cs;
+            if (cs > maxCongestion) maxCongestion = cs;
+        }
+        if (maxCongestion >= 12 && minCongestion <= maxCongestion * 0.45) {
+            const clearBranches = pool.filter((c) => (c.congestionScore || 0) <= minCongestion + 6);
+            if (clearBranches.length > 0) {
+                this.totalIntersectionDetours = (this.totalIntersectionDetours || 0) + 1;
+                clearBranches.sort((a, b) => a.absDiff - b.absDiff);
+                return clearBranches[0];
+            }
         }
 
         // Sort by closeness to current heading (straight first, 90-deg turns second)

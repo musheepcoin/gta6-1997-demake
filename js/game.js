@@ -14915,7 +14915,7 @@ class LeonidaGame {
 
                     // Post-shootout scene cleanup OR Squad Re-Boarding for Distant Pursuit:
                     // VCPD officers walk/run back to their patrol cruiser (or nearest unoccupied police car), climb in, and drive off!
-                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && ped.homeCruiser._gridEpoch === this._gridEpoch)
+                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && (ped.homeCruiser._gridEpoch === this._gridEpoch || ped.isTrafficWarden))
                         ? ped.homeCruiser
                         : ((ped._boardingVeh && !ped._boardingVeh.destroyed && ped._boardingVeh.driver === null && !ped._boardingVeh.towedByTruck)
                             ? ped._boardingVeh
@@ -14939,7 +14939,10 @@ class LeonidaGame {
                                             !v.destroyed &&
                                             v.driver === null &&
                                             !v.towedByTruck &&
-                                            (v.isPolice || v.wasCriminalCar)
+                                            !v.isStaticParked &&
+                                            !v.isCurbParked &&
+                                            !v.isEstateCar &&
+                                            (v.isPolice || v.wasCriminalCar || ped.isTrafficWarden)
                                         ) {
                                             const d = Math.hypot(v.x - ped.x, v.y - ped.y);
                                             if (d < bestCarDist) {
@@ -14957,18 +14960,25 @@ class LeonidaGame {
                         ped._boardingVeh = returnCar;
                         const boardDist = Math.max(46, (returnCar.w || 48) * 0.54 + 14);
                         if (bestCarDist < boardDist) {
-                            returnCar.driver = this.wantedLevel > 0 ? "AI_COP" : "AI_TRAFFIC";
+                            returnCar.driver = (returnCar.isPolice && this.wantedLevel > 0) ? "AI_COP" : "AI_TRAFFIC";
                             returnCar.noDeployCooldown = 4.8;
                             returnCar.wasCriminalCar = false;
-                            returnCar.sirenActive = Boolean(this.wantedLevel > 0);
+                            returnCar.sirenActive = Boolean(returnCar.isPolice && this.wantedLevel > 0);
                             returnCar.lastPlayerDriven = false;
                             returnCar.abandonedTimer = 0;
                             returnCar.doorOpenTimer = 0.44;
+                            if (ped.isTrafficWarden && this.director && this.director.laneTracker) {
+                                const clearSide = (ped.wardenBottleneck && ped.wardenBottleneck.clearSide) ? ped.wardenBottleneck.clearSide : 1;
+                                returnCar.aiPullOverOffset = clearSide * 24;
+                                returnCar.aiPullOverTimer = 2.6;
+                                this.director.laneTracker.totalWardenBoardings = (this.director.laneTracker.totalWardenBoardings || 0) + 1;
+                                this.director.blackboard.totalTrafficWardenBoardings = this.director.laneTracker.totalWardenBoardings;
+                            }
                             ped._boardedVehicle = true;
                             ped.dead = true;
                             continue;
                         }
-                        const runBackSpd = this.wantedLevel > 0 ? 102 : 90;
+                        const runBackSpd = this.wantedLevel > 0 ? 102 : 92;
                         ped.speed = runBackSpd;
                         const copBackWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function")
                             ? PedNav.routeWaypoint(this, ped, returnCar.x, returnCar.y)
@@ -14976,6 +14986,26 @@ class LeonidaGame {
                         ped.angle = this.steerPedWithObstacleFeelers(ped, copBackWp ? copBackWp.x : returnCar.x, copBackWp ? copBackWp.y : returnCar.y, returnCar);
                         ped.x += Math.cos(ped.angle) * runBackSpd * dt;
                         ped.y += Math.sin(ped.angle) * runBackSpd * dt;
+                    } else if (ped.isTrafficWarden && ped.wardenBottleneck) {
+                        // In-Game Traffic AI Warden physically walks to a non-boardable bottleneck (wreck obstruction or multi-car intersection deadlock)
+                        // and regulates traffic on foot with his high-vis vest & glowing orange traffic baton!
+                        const bn = ped.wardenBottleneck;
+                        const distBn = Math.hypot(bn.x - ped.x, bn.y - ped.y);
+                        if (distBn > 58) {
+                            const wardenSpd = 88;
+                            ped.speed = wardenSpd;
+                            const wardenWp = (typeof PedNav !== "undefined" && typeof PedNav.routeWaypoint === "function")
+                                ? PedNav.routeWaypoint(this, ped, bn.x, bn.y)
+                                : null;
+                            ped.angle = this.steerPedWithObstacleFeelers(ped, wardenWp ? wardenWp.x : bn.x, wardenWp ? wardenWp.y : bn.y, bn.obstacleVeh || null);
+                            ped.x += Math.cos(ped.angle) * wardenSpd * dt;
+                            ped.y += Math.sin(ped.angle) * wardenSpd * dt;
+                        } else {
+                            ped.speed = 0;
+                            ped.isDirectingTraffic = true;
+                            ped.wandWaveTimer = 0.85;
+                            ped.angle = Math.atan2(bn.y - ped.y, bn.x - ped.x) + Math.sin((this.elapsedTime || 0) * 3.5) * 0.45;
+                        }
                     } else {
                         // Routine VCPD / Penitentiary / Airport / SERA foot patrol when no wanted player or active criminal is nearby
                         ped.speed = 28;

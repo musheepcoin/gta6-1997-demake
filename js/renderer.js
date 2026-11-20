@@ -10896,6 +10896,30 @@ class RetroRenderer {
                         const clY = drawPedY + pCos * 5.8;
                         this.pushSolidQuad3D(clX, clY, pz + 0.010, 6.8, 4.4, ped.angle, 0.92, 0.22, 0.20, 0.98, pedDrawOrder);
                         this.pushSolidQuad3D(clX, clY, pz + 0.012, 6.4, 3.8, ped.angle, 0.97, 0.98, 1.0, 0.98, pedDrawOrder);
+                    } else if (cProp === "TRAFFIC_WAND" || ped.isTrafficWarden) {
+                        // VCPD Traffic Control Warden / Miami-Dade Road Ranger:
+                        // 1) High-visibility fluorescent lime-yellow safety vest (#b8f528) with silver reflective cross-stripes
+                        this.pushSolidQuad3D(drawPedX, drawPedY, pz + 0.010, 6.2, 7.4, ped.angle, 0.72, 0.96, 0.16, 0.94, pedDrawOrder);
+                        this.pushSolidQuad3D(drawPedX, drawPedY, pz + 0.011, 6.2, 1.5, ped.angle, 0.94, 0.97, 1.0, 0.96, pedDrawOrder);
+                        // 2) Waving 3D Glowing Orange LED Traffic Baton in right hand + traffic-guidance pulse ring
+                        const isWaving = Boolean(ped.isDirectingTraffic || (ped.wandWaveTimer || 0) > 0);
+                        const waveSweep = isWaving ? Math.sin(this.time * 9.5 + (ped.animSeed || 0) * 7.0) * 0.68 : 0.15;
+                        const wandAng = ped.angle + waveSweep;
+                        const wCos = Math.cos(wandAng);
+                        const wSin = Math.sin(wandAng);
+                        const handBaseX = drawPedX + pCos * 3.8 - pSin * 4.4;
+                        const handBaseY = drawPedY + pSin * 3.8 + pCos * 4.4;
+                        const batonCenterX = handBaseX + wCos * 4.2;
+                        const batonCenterY = handBaseY + wSin * 4.2;
+                        // Black grip handle + bright glowing neon-orange LED wand tube
+                        this.pushSolidQuad3D(handBaseX + wCos * 1.1, handBaseY + wSin * 1.1, pz + 0.015, 2.4, 1.6, wandAng, 0.12, 0.14, 0.18, 0.98, pedDrawOrder);
+                        this.pushSolidQuad3D(batonCenterX, batonCenterY, pz + 0.017, 7.6, 2.2, wandAng, 1.0, 0.38, 0.06, 0.98, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        this.pushSolidQuad3D(batonCenterX, batonCenterY, pz + 0.018, 6.2, 1.1, wandAng, 1.0, 0.86, 0.35, 0.96, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        if (isWaving) {
+                            const pulseP = ((this.time * 2.4 + (ped.animSeed || 0)) % 1.0 + 1.0) % 1.0;
+                            const pulseR = 6.0 + pulseP * 14.0;
+                            this.pushSolidQuad3D(batonCenterX, batonCenterY, pz + 0.019, pulseR, pulseR, this.time * 2.5, 1.0, 0.48, 0.08, (1.0 - pulseP) * 0.42, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        }
                     }
                 }
             }
@@ -13995,6 +14019,24 @@ class RetroRenderer {
                     ctx.fillText(rTag, vSc.x, vSc.y - 20);
                     break;
                 }
+            }
+        }
+
+        // 5B. Diegetic Overhead Capsule Badge for Active In-Game VCPD Traffic Warden / Road Ranger Entity
+        if (Array.isArray(game.peds)) {
+            for (let pi = 0; pi < game.peds.length; pi++) {
+                const ped = game.peds[pi];
+                if (!ped || ped.dead || !ped.isTrafficWarden) continue;
+                if (Math.hypot(ped.x - pObj.x, ped.y - pObj.y) > 460) continue;
+                const wSc = this.worldToScreen(ped.x, ped.y, (ped.z || 2.0) + 0.18);
+                if (wSc.x < -80 || wSc.x > W + 80 || wSc.y < -60 || wSc.y > H + 60) continue;
+                const wTag = ped._boardingVeh
+                    ? "🚦 TRAFFIC WARDEN • CLEARING LANE"
+                    : (ped.isDirectingTraffic ? "🚦 TRAFFIC WARDEN • DIRECTING FLOW" : "🚦 VCPD TRAFFIC WARDEN");
+                const wbw = Math.max(128, ctx.measureText(wTag).width + 18);
+                this.drawArcadeCapsule(ctx, Math.round(wSc.x - wbw * 0.5), Math.round(wSc.y - 26), wbw, 19, "rgba(12, 20, 10, 0.94)", "#a3e635", 6, 1.6);
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(wTag, wSc.x, wSc.y - 16.5);
             }
         }
 

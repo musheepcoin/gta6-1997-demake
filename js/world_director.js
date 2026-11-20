@@ -76,7 +76,25 @@ class ViceWorldDirector {
             totalMedicDispatches: 0,
             totalFireDispatches: 0,
             totalTowDispatches: 0,
-            totalAnomaliesHealed: 0
+            totalAnomaliesHealed: 0,
+            totalLaneBottlenecks: 0,
+            totalIntersectionDetours: 0,
+            totalTrafficWardensDispatched: 0,
+            totalTrafficWardenDirectives: 0,
+            totalTrafficWardenBoardings: 0
+        };
+
+        // 2C. Real-Time Navigable Lane Flow Tracker & In-Game Traffic AI Warden State
+        this.laneTracker = {
+            scanAccumSec: 0,
+            congestedTilesCount: 0,
+            activeBottlenecks: [],
+            activeWardensCount: 0,
+            totalBottlenecksDetected: 0,
+            totalBottlenecksResolved: 0,
+            totalWardensDispatched: 0,
+            totalWardenDirectives: 0,
+            totalWardenBoardings: 0
         };
 
         // 2B. GTA 6 Modern-Arcade State (Exotic GPS Trackers, Focus Mode, Street Hold-Ups, @LeonidaFeed Social Ticker, Spike Strips, Takeovers)
@@ -1302,11 +1320,14 @@ class ViceWorldDirector {
             activePoliceCruisers: 0,
             activeSwatUnits: 0,
             activeFootCops: 0,
+            activeTrafficWardens: 0,
             activeAmbulances: 0,
             activeFireTrucks: 0,
             activeTowTrucks: 0,
             pending911Callers: 0,
-            activeSpikeStrips: Array.isArray(this.spikeStrips) ? this.spikeStrips.length : 0
+            activeSpikeStrips: Array.isArray(this.spikeStrips) ? this.spikeStrips.length : 0,
+            activeLaneBottlenecks: (this.laneTracker && Array.isArray(this.laneTracker.activeBottlenecks)) ? this.laneTracker.activeBottlenecks.length : 0,
+            congestedRoadTiles: (this.laneTracker && this.laneTracker.congestedTilesCount) || 0
         };
         if (!g) return stats;
         if (Array.isArray(g.vehicles)) {
@@ -1330,10 +1351,406 @@ class ViceWorldDirector {
                 const ped = g.peds[i];
                 if (!ped || ped.dead) continue;
                 if (ped.kind === "COP") stats.activeFootCops++;
+                if (ped.isTrafficWarden) stats.activeTrafficWardens++;
                 if ((ped.calling911Timer || 0) > 0) stats.pending911Callers++;
             }
         }
         return stats;
+    }
+
+    /* ========================================================================
+       3B. NAVIGABLE LANE FLOW TRACKER & IN-GAME TRAFFIC WARDEN AI ENTITY
+       ------------------------------------------------------------------------
+       - Continuously tracks every navigable .CMP road tile & lane flow vector
+       - Back-propagates lane obstructions & stalled queues 1..6 tiles upstream
+         into map.laneCongestionMap so upstream intersections divert traffic
+       - Diagnoses physical bottlenecks (WRECK_OBSTRUCTION, ABANDONED_VEHICLE,
+         TOW_RECOVERY_MANEUVER, INTERSECTION_GRIDLOCK) and computes the open
+         lateral bypass corridor (clearSide = -1 | +1)
+       - Dispatches a physical in-game VCPD Traffic Warden / Road Ranger entity
+         (high-vis safety vest + glowing orange 3D traffic baton) who walks to
+         the jam, waves stalled drivers around the obstacle, and physically
+         walks to the door of any intact abandoned lane-blocking car to board
+         it and drive it clear (100% physical, zero teleport/ghost-car cheats!)
+       ======================================================================== */
+    computeOptimalBypassSideAt(x, y, roadAngle, obstacleX, obstacleY, z = 2.0) {
+        const g = this.game;
+        const rCos = Math.cos(roadAngle || 0);
+        const rSin = Math.sin(roadAngle || 0);
+        // Perpendicular vector (+1 = right of road heading, -1 = left of road heading)
+        const pCos = -rSin;
+        const pSin = rCos;
+        const latOffset = (obstacleX - x) * pCos + (obstacleY - y) * pSin;
+        let preferSide = latOffset >= 0 ? -1 : 1;
+        if (g && g.map && typeof g.map.resolveCircleBuildingCollision === "function") {
+            const testDist = 27;
+            const prefX = x + pCos * (preferSide * testDist);
+            const prefY = y + pSin * (preferSide * testDist);
+            const altX = x + pCos * (-preferSide * testDist);
+            const altY = y + pSin * (-preferSide * testDist);
+            const prefHit = g.map.resolveCircleBuildingCollision(prefX, prefY, 15, z).hit;
+            const altHit = g.map.resolveCircleBuildingCollision(altX, altY, 15, z).hit;
+            if (prefHit && !altHit) preferSide = -preferSide;
+        }
+        return preferSide;
+    }
+
+    updateNavigableLaneTracker(dt, forceScan = false) {
+        const g = this.game;
+        if (!g || !g.map || !Array.isArray(g.vehicles)) return;
+        const lt = this.laneTracker;
+        lt.scanAccumSec = (lt.scanAccumSec || 0) + Math.max(0, dt || 0);
+
+        // Step active Traffic Warden entities every frame for smooth physical walking, wand waving & door boarding
+        if (Array.isArray(g.peds)) {
+            let activeWardens = 0;
+            for (let i = 0; i < g.peds.length; i++) {
+                const ped = g.peds[i];
+                if (!ped || ped.dead || !ped.isTrafficWarden) continue;
+                activeWardens++;
+                this.updateTrafficWardenBehavior(ped, dt);
+            }
+            lt.activeWardensCount = activeWardens;
+        }
+
+        if (!forceScan && lt.scanAccumSec < 0.35) return;
+        lt.scanAccumSec = 0;
+
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        const roadType = (typeof GROUND_TYPE !== "undefined" && GROUND_TYPE.ROAD !== undefined) ? GROUND_TYPE.ROAD : 2;
+        if (!g.map.laneCongestionMap) {
+            g.map.laneCongestionMap = new Map();
+        } else {
+            g.map.laneCongestionMap.clear();
+        }
+        const congMap = g.map.laneCongestionMap;
+        const addTileCongestion = (bx, by, weight) => {
+            if (bx < 1 || bx >= 511 || by < 1 || by >= 511 || weight <= 0) return;
+            const key = (by << 16) | (bx & 0xffff);
+            congMap.set(key, Math.min(120, (congMap.get(key) || 0) + weight));
+        };
+
+        const rawIncidents = [];
+        const pVeh = g.player ? g.player.inVehicle : null;
+
+        for (let i = 0; i < g.vehicles.length; i++) {
+            const v = g.vehicles[i];
+            if (!v || v === pVeh || v.towedByTruck || v.isStaticParked || v.isCurbParked || v.isEstateCar) continue;
+            const bx = Math.floor(v.x / tileSize);
+            const by = Math.floor(v.y / tileSize);
+            const vz = v.z || 2.0;
+            const nav = typeof g.map.getNavigationBlock === "function" ? g.map.getNavigationBlock(bx, by, vz) : null;
+            if (!nav || nav.groundType !== roadType || nav.isRailway) continue;
+
+            const spd = Math.abs(v.speed || 0);
+            const isWreck = Boolean(v.destroyed);
+            const isAbandoned = !isWreck && v.driver === null && (v.abandonedTimer || 0) >= 2.5;
+            const isTowManeuver = !isWreck && v.driver === "AI_TOW" && spd < 24;
+            const isStalledTraffic = !isWreck && v.driver !== null && v.driver !== "PLAYER" &&
+                spd < 12 &&
+                v.aiState !== "STOPPED_LIGHT" &&
+                v.aiState !== "CURB_PARKED" &&
+                ((v.gridlockTimer || 0) >= 1.1 || (v.yieldTimer || 0) >= 1.2 || v.aiState === "YIELDING" || (v.blockedTimer || 0) >= 1.1);
+
+            if (!isWreck && !isAbandoned && !isTowManeuver && !isStalledTraffic) continue;
+
+            const baseWeight = isWreck ? 38 : (isAbandoned ? 28 : (isTowManeuver ? 20 : 14));
+            addTileCongestion(bx, by, baseWeight);
+
+            // Back-propagate lane congestion 1..5 tiles UPSTREAM against the tile's allowed traffic flow direction
+            // so upstream intersections immediately know this outgoing branch is obstructed!
+            const dirs = typeof g.map.getAllowedRoadDirections === "function"
+                ? g.map.getAllowedRoadDirections(bx, by, vz)
+                : [];
+            const flowAng = dirs.length > 0 ? dirs[0].angle : (v.angle || 0);
+            const upDx = -Math.round(Math.cos(flowAng));
+            const upDy = -Math.round(Math.sin(flowAng));
+            if (upDx !== 0 || upDy !== 0) {
+                for (let s = 1; s <= 5; s++) {
+                    addTileCongestion(bx + upDx * s, by + upDy * s, Math.round(baseWeight * (1.0 - s * 0.16)));
+                }
+            }
+
+            rawIncidents.push({
+                veh: v,
+                bx,
+                by,
+                x: v.x,
+                y: v.y,
+                z: vz,
+                flowAng,
+                weight: baseWeight,
+                kind: isWreck
+                    ? "WRECK_OBSTRUCTION"
+                    : (isAbandoned
+                        ? "ABANDONED_VEHICLE"
+                        : (isTowManeuver ? "TOW_RECOVERY_MANEUVER" : "INTERSECTION_GRIDLOCK"))
+            });
+        }
+
+        lt.congestedTilesCount = congMap.size;
+        this.blackboard.totalIntersectionDetours = g.map.totalIntersectionDetours || 0;
+
+        // Cluster nearby lane incidents (within 185px) into diagnosed Traffic Bottlenecks
+        const clusters = [];
+        for (let i = 0; i < rawIncidents.length; i++) {
+            const inc = rawIncidents[i];
+            let merged = null;
+            for (let c = 0; c < clusters.length; c++) {
+                if (Math.hypot(clusters[c].x - inc.x, clusters[c].y - inc.y) < 185) {
+                    merged = clusters[c];
+                    break;
+                }
+            }
+            if (!merged) {
+                merged = {
+                    id: `bn_${inc.bx}_${inc.by}`,
+                    bx: inc.bx,
+                    by: inc.by,
+                    x: inc.x,
+                    y: inc.y,
+                    z: inc.z,
+                    flowAng: inc.flowAng,
+                    cause: inc.kind,
+                    severity: inc.weight,
+                    obstacleVeh: (inc.kind === "WRECK_OBSTRUCTION" || inc.kind === "ABANDONED_VEHICLE") ? inc.veh : null,
+                    stalledVehicles: (inc.veh.driver && inc.veh.driver !== "PLAYER") ? [inc.veh] : []
+                };
+                clusters.push(merged);
+            } else {
+                merged.severity += inc.weight;
+                if (inc.kind === "WRECK_OBSTRUCTION" || (inc.kind === "ABANDONED_VEHICLE" && merged.cause !== "WRECK_OBSTRUCTION")) {
+                    merged.cause = inc.kind;
+                    merged.obstacleVeh = inc.veh;
+                    merged.x = inc.x;
+                    merged.y = inc.y;
+                }
+                if (inc.veh.driver && inc.veh.driver !== "PLAYER" && !merged.stalledVehicles.includes(inc.veh)) {
+                    merged.stalledVehicles.push(inc.veh);
+                }
+            }
+        }
+
+        const prevCount = Array.isArray(lt.activeBottlenecks) ? lt.activeBottlenecks.length : 0;
+        const activeBottlenecks = [];
+        for (let i = 0; i < clusters.length; i++) {
+            const c = clusters[i];
+            // Only promote to an actionable bottleneck if there's a physical obstruction (wreck/abandoned car) OR >= 2 stalled vehicles
+            if (!c.obstacleVeh && c.stalledVehicles.length < 2 && c.severity < 24) continue;
+            const tileCenterX = (c.bx + 0.5) * tileSize;
+            const tileCenterY = (c.by + 0.5) * tileSize;
+            const obsX = c.obstacleVeh ? c.obstacleVeh.x : c.x;
+            const obsY = c.obstacleVeh ? c.obstacleVeh.y : c.y;
+            c.clearSide = this.computeOptimalBypassSideAt(tileCenterX, tileCenterY, c.flowAng, obsX, obsY, c.z);
+            activeBottlenecks.push(c);
+        }
+
+        if (activeBottlenecks.length > prevCount) {
+            const added = activeBottlenecks.length - prevCount;
+            lt.totalBottlenecksDetected += added;
+            this.blackboard.totalLaneBottlenecks = lt.totalBottlenecksDetected;
+        } else if (prevCount > activeBottlenecks.length) {
+            lt.totalBottlenecksResolved += (prevCount - activeBottlenecks.length);
+        }
+        lt.activeBottlenecks = activeBottlenecks;
+
+        // Assign or dispatch a physical in-game VCPD Traffic Warden entity for each actionable bottleneck
+        for (let i = 0; i < activeBottlenecks.length; i++) {
+            this.dispatchTrafficWardenForBottleneck(activeBottlenecks[i]);
+        }
+    }
+
+    dispatchTrafficWardenForBottleneck(bn) {
+        const g = this.game;
+        if (!g || !bn || !Array.isArray(g.peds)) return null;
+
+        // 1. Check if an active Traffic Warden or nearby calm on-foot VCPD officer is already within 560px
+        let assignedWarden = null;
+        let bestDist = 560;
+        for (let i = 0; i < g.peds.length; i++) {
+            const ped = g.peds[i];
+            if (!ped || ped.dead) continue;
+            if (ped.isTrafficWarden) {
+                const d = Math.hypot(ped.x - bn.x, ped.y - bn.y);
+                if (d < 620) {
+                    ped.wardenBottleneck = bn;
+                    if (bn.obstacleVeh && !bn.obstacleVeh.destroyed && bn.obstacleVeh.driver === null && !bn.obstacleVeh.towedByTruck) {
+                        ped._boardingVeh = bn.obstacleVeh;
+                    }
+                    bn.wardenId = ped.id;
+                    return ped;
+                }
+            }
+            if (ped.kind === "COP" && !ped.inCombat && !ped.missionTag && (!ped._boardingVeh || ped._boardingVeh === bn.obstacleVeh)) {
+                const d = Math.hypot(ped.x - bn.x, ped.y - bn.y);
+                if (d < bestDist) {
+                    bestDist = d;
+                    assignedWarden = ped;
+                }
+            }
+        }
+
+        if (assignedWarden) {
+            assignedWarden.isTrafficWarden = true;
+            assignedWarden.wardenRole = "VCPD TRAFFIC WARDEN";
+            assignedWarden.carryProp = "TRAFFIC_WAND";
+            assignedWarden.wardenBottleneck = bn;
+            if (bn.obstacleVeh && !bn.obstacleVeh.destroyed && bn.obstacleVeh.driver === null && !bn.obstacleVeh.towedByTruck) {
+                assignedWarden._boardingVeh = bn.obstacleVeh;
+                assignedWarden.homeCruiser = bn.obstacleVeh;
+            }
+            bn.wardenId = assignedWarden.id;
+            return assignedWarden;
+        }
+
+        // 2. Otherwise, spawn a physical VCPD Traffic Warden / Road Ranger strictly off-screen on a nearby sidewalk/road
+        if (g.peds.length >= 168 || typeof Pedestrian === "undefined") return null;
+        const tileSize = (typeof TILE_SIZE !== "undefined") ? TILE_SIZE : 64;
+        const p = g.player;
+        const camX = (g.renderer && g.renderer.camX !== undefined) ? g.renderer.camX : (p ? p.x : bn.x);
+        const camY = (g.renderer && g.renderer.camY !== undefined) ? g.renderer.camY : (p ? p.y : bn.y);
+        const halfW = ((g.renderer && g.renderer.canvas && g.renderer.canvas.width) ? g.renderer.canvas.width : 1280) * 0.5 + 36;
+        const halfH = ((g.renderer && g.renderer.canvas && g.renderer.canvas.height) ? g.renderer.canvas.height : 720) * 0.5 + 36;
+        const cz = bn.z || 2.0;
+
+        for (let ca = 0; ca < 16; ca++) {
+            const ang = ((ca * 4 + Math.floor(ca / 4)) % 16) * (Math.PI * 2 / 16);
+            const sDist = 415 + (ca % 3) * 55;
+            const sx = bn.x + Math.cos(ang) * sDist;
+            const sy = bn.y + Math.sin(ang) * sDist;
+            let onScreenNow = Math.abs(sx - camX) < halfW * 0.78 && Math.abs(sy - camY) < halfH * 0.78;
+            if (g.renderer && typeof g.renderer.worldToScreen === "function" && g.renderer.canvas) {
+                const sp = g.renderer.worldToScreen(sx, sy, cz);
+                const W = g.renderer.canvas.width || 1280;
+                const H = g.renderer.canvas.height || 720;
+                if (sp && typeof sp.x === "number" && typeof sp.y === "number" && (sp.x !== 0 || sp.y !== 0)) {
+                    onScreenNow = (sp.x >= -32 && sp.x <= W + 32 && sp.y >= -32 && sp.y <= H + 32);
+                }
+            }
+            if (onScreenNow) continue;
+            const sbx = Math.floor(sx / tileSize);
+            const sby = Math.floor(sy / tileSize);
+            const nav = g.map.getNavigationBlock ? g.map.getNavigationBlock(sbx, sby, cz) : null;
+            if (
+                nav &&
+                (nav.groundType === GROUND_TYPE.PAWEMENT || nav.groundType === GROUND_TYPE.ROAD) &&
+                (!g.map.isWaterAtPixel || !g.map.isWaterAtPixel(sx, sy)) &&
+                (!g.map.resolveCircleBuildingCollision || !g.map.resolveCircleBuildingCollision(sx, sy, 10, cz).hit)
+            ) {
+                const warden = new Pedestrian({
+                    id: `warden_${Date.now()}_${ca}`,
+                    x: sx,
+                    y: sy,
+                    z: cz,
+                    angle: Math.atan2(bn.y - sy, bn.x - sx),
+                    kind: "COP",
+                    g24Type: "police",
+                    copWeapon: "PISTOL",
+                    hp: 115,
+                    speed: 94
+                });
+                warden.isTrafficWarden = true;
+                warden.isReliefDriver = true;
+                warden.wardenRole = "VCPD TRAFFIC WARDEN";
+                warden.carryProp = "TRAFFIC_WAND";
+                warden.wardenBottleneck = bn;
+                if (bn.obstacleVeh && !bn.obstacleVeh.destroyed && bn.obstacleVeh.driver === null && !bn.obstacleVeh.towedByTruck) {
+                    warden._boardingVeh = bn.obstacleVeh;
+                    warden.homeCruiser = bn.obstacleVeh;
+                }
+                g.peds.push(warden);
+                bn.wardenId = warden.id;
+                this.laneTracker.totalWardensDispatched++;
+                this.blackboard.totalTrafficWardensDispatched = this.laneTracker.totalWardensDispatched;
+                this.emitEvent("TRAFFIC_WARDEN_DISPATCHED", {
+                    wardenId: warden.id,
+                    bottleneckId: bn.id,
+                    cause: bn.cause,
+                    bx: bn.bx,
+                    by: bn.by
+                });
+                return warden;
+            }
+        }
+        return null;
+    }
+
+    updateTrafficWardenBehavior(ped, dt) {
+        const g = this.game;
+        if (!g || !ped || ped.dead || !ped.isTrafficWarden) return;
+        ped.carryProp = "TRAFFIC_WAND";
+        if ((ped.wandWaveTimer || 0) > 0) {
+            ped.wandWaveTimer = Math.max(0, ped.wandWaveTimer - dt);
+        }
+
+        const bn = ped.wardenBottleneck;
+        const obsVeh = (bn && bn.obstacleVeh && !bn.obstacleVeh.towedByTruck)
+            ? bn.obstacleVeh
+            : ((ped._boardingVeh && !ped._boardingVeh.towedByTruck) ? ped._boardingVeh : null);
+        const targetX = obsVeh ? obsVeh.x : (bn ? bn.x : ped.x);
+        const targetY = obsVeh ? obsVeh.y : (bn ? bn.y : ped.y);
+        const distToTarget = Math.hypot(targetX - ped.x, targetY - ped.y);
+        const clearSide = (bn && bn.clearSide) ? bn.clearSide : 1;
+
+        // 1. When within 175px of the jam, wave the glowing orange traffic baton & issue physical steering/reverse directives to stalled AI drivers!
+        if (distToTarget < 175 && Array.isArray(g.vehicles)) {
+            ped.isDirectingTraffic = true;
+            ped.wandWaveTimer = 0.85;
+            for (let i = 0; i < g.vehicles.length; i++) {
+                const v = g.vehicles[i];
+                if (!v || v.destroyed || !v.driver || v.driver === "PLAYER" || v === obsVeh) continue;
+                const dv = Math.hypot(v.x - ped.x, v.y - ped.y);
+                if (dv > 165) continue;
+
+                // Direct stalled or slow approaching vehicles onto the open lateral corridor around the bottleneck
+                if (Math.abs(v.speed || 0) < 38) {
+                    const targetOff = clearSide * 27;
+                    if (Math.abs((v.aiPullOverOffset || 0) - targetOff) > 4 || (v.aiPullOverTimer || 0) < 1.2) {
+                        v.aiPullOverOffset = targetOff;
+                        v.aiPullOverTimer = Math.max(v.aiPullOverTimer || 0, 3.4);
+                        this.laneTracker.totalWardenDirectives++;
+                        this.blackboard.totalTrafficWardenDirectives = this.laneTracker.totalWardenDirectives;
+                    }
+                    // If the vehicle is wedged behind an obstacle with gridlockTimer > 0.8, command a physical reverse-and-steer maneuver
+                    if (Math.abs(v.speed || 0) < 8 && ((v.gridlockTimer || 0) > 0.8 || (v.yieldTimer || 0) > 1.4)) {
+                        v.gridlockReverseTimer = Math.max(v.gridlockReverseTimer || 0, 1.35);
+                        v.gridlockEscapeDir = clearSide;
+                        v.gridlockEscapeTimer = Math.max(v.gridlockEscapeTimer || 0, 2.8);
+                        v.yieldTimer = 0;
+                    }
+                }
+            }
+        } else {
+            ped.isDirectingTraffic = false;
+        }
+
+        // 2. If there is an intact unoccupied vehicle obstructing the traffic lane (whether police cruiser, criminal car, or abandoned civilian car),
+        // the Traffic Warden physically walks up to its driver-side door, opens the door, climbs in, and drives it out of the blocked lane!
+        if (obsVeh && !obsVeh.destroyed && obsVeh.driver === null && !obsVeh.towedByTruck && obsVeh !== (g.player && g.player.inVehicle)) {
+            ped._boardingVeh = obsVeh;
+            ped.homeCruiser = obsVeh;
+            const boardDist = Math.max(46, (obsVeh.w || 48) * 0.54 + 14);
+            if (distToTarget < boardDist) {
+                obsVeh.driver = (obsVeh.isPolice && (g.wantedLevel || 0) > 0) ? "AI_COP" : "AI_TRAFFIC";
+                obsVeh.noDeployCooldown = 5.2;
+                obsVeh.wasCriminalCar = false;
+                obsVeh.lastPlayerDriven = false;
+                obsVeh.abandonedTimer = 0;
+                obsVeh.doorOpenTimer = 0.44;
+                obsVeh.aiPullOverOffset = clearSide * 24;
+                obsVeh.aiPullOverTimer = 2.6;
+                ped._boardedVehicle = true;
+                ped.dead = true;
+                this.laneTracker.totalWardenBoardings++;
+                this.blackboard.totalTrafficWardenBoardings = this.laneTracker.totalWardenBoardings;
+                this.emitEvent("TRAFFIC_WARDEN_CLEARED_VEHICLE", {
+                    wardenId: ped.id,
+                    vehId: obsVeh.id,
+                    specKey: obsVeh.specKey
+                });
+                return;
+            }
+        }
     }
 
     /* ========================================================================
@@ -1458,6 +1875,7 @@ class ViceWorldDirector {
         this.updateFocusMode(dt);
         this.updateSpikeStrips(dt);
         this.updateStreetTakeoverHype(dt);
+        this.updateNavigableLaneTracker(dt);
         this.autoHealWorldAnomalies();
         if (!Array.isArray(g.vehicles)) return;
         const now = this.nowMs();
@@ -1662,6 +2080,16 @@ class ViceWorldDirector {
         const inv = this.auditWorldInvariants();
         addCheck("WORLD_SANITIZER_ORACLE", inv.ok, `ok=${inv.ok}, healed=${this.blackboard.totalAnomaliesHealed || 0}, ledger=${this.vehicleLedger.size}`);
 
+        // 13. Navigable Lane Flow Tracker & In-Game VCPD Traffic Warden AI Entity
+        const laneOk = Boolean(
+            this.laneTracker &&
+            typeof this.updateNavigableLaneTracker === "function" &&
+            typeof this.dispatchTrafficWardenForBottleneck === "function" &&
+            typeof this.updateTrafficWardenBehavior === "function" &&
+            g && g.map && typeof g.map.getLaneCongestionScore === "function"
+        );
+        addCheck("NAVIGABLE_LANE_TRACKER_AND_WARDEN_AI", laneOk, `congestedTiles=${this.laneTracker ? this.laneTracker.congestedTilesCount : 0}, wardens=${this.laneTracker ? this.laneTracker.totalWardensDispatched : 0}`);
+
         const passedCount = checks.filter((c) => c.ok).length;
         const buildVersion = (typeof window !== "undefined" && window.__VC26_BUILD) ? window.__VC26_BUILD : "101_219";
         const result = {
@@ -1695,6 +2123,17 @@ class ViceWorldDirector {
             effectiveSightRangePx: pursuitProbe ? pursuitProbe.effectiveSightRangePx : 480,
             blackboard: { ...this.blackboard },
             fleet,
+            laneTracker: this.laneTracker ? {
+                congestedTilesCount: this.laneTracker.congestedTilesCount || 0,
+                activeBottlenecksCount: Array.isArray(this.laneTracker.activeBottlenecks) ? this.laneTracker.activeBottlenecks.length : 0,
+                activeWardensCount: this.laneTracker.activeWardensCount || 0,
+                totalBottlenecksDetected: this.laneTracker.totalBottlenecksDetected || 0,
+                totalBottlenecksResolved: this.laneTracker.totalBottlenecksResolved || 0,
+                totalWardensDispatched: this.laneTracker.totalWardensDispatched || 0,
+                totalWardenDirectives: this.laneTracker.totalWardenDirectives || 0,
+                totalWardenBoardings: this.laneTracker.totalWardenBoardings || 0,
+                totalIntersectionDetours: (g && g.map && g.map.totalIntersectionDetours) || 0
+            } : null,
             invariantsOk: inv.ok,
             anomaliesHealed: this.blackboard.totalAnomaliesHealed || 0,
             vehicleLedgerSize: this.vehicleLedger.size,
