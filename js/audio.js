@@ -95,13 +95,13 @@ const VEHICLE_AUDIO_MANIFEST = {
     horn_car: "assets/sfx/vehicles/horn_car.wav",
     horn_sport: "assets/sfx/vehicles/horn_sport.wav",
     horn_truck: "assets/sfx/vehicles/horn_truck.wav",
-    horn_airhorn: "assets/sfx/vehicles/horn_airhorn.wav",
+    horn_airhorn: "assets/sfx/vehicles/horn_airhorn.wav?v=101_248",
     horn_dixie: "assets/sfx/vehicles/horn_dixie.wav",
 
     // Emergency Sirens
-    siren_police: "assets/sfx/vehicles/siren_police.wav",
-    siren_medic: "assets/sfx/vehicles/siren_medic.wav",
-    siren_firetruck: "assets/sfx/vehicles/siren_firetruck.wav",
+    siren_police: "assets/sfx/vehicles/siren_police.wav?v=101_248",
+    siren_medic: "assets/sfx/vehicles/siren_medic.wav?v=101_248",
+    siren_firetruck: "assets/sfx/vehicles/siren_firetruck.wav?v=101_248",
 
     // Crash Impacts
     crash_heavy: "assets/sfx/vehicles/crash_heavy.wav",
@@ -1052,7 +1052,15 @@ class RetroAudioEngine {
             const src = this.ctx.createBufferSource();
             src.buffer = this.buffers[sirenKey];
             src.loop = true;
-            src.connect(this.sirenGain);
+            // Distance-aware low-pass: far sirens are muffled by buildings/air absorption, close ones are bright and piercing
+            if (!this._sirenLP) {
+                this._sirenLP = this.ctx.createBiquadFilter();
+                this._sirenLP.type = "lowpass";
+                this._sirenLP.Q.value = 0.7;
+                this._sirenLP.frequency.value = 2400;
+                this._sirenLP.connect(this.sirenGain);
+            }
+            src.connect(this._sirenLP);
             src.start(this.ctx.currentTime);
             this._sirenNode = src;
             this._activeSirenKey = sirenKey;
@@ -1373,7 +1381,8 @@ class RetroAudioEngine {
                 : (sirenType === "FIRE" ? "siren_firetruck" : "siren_police");
             const prox = playerSiren ? 0.95 : Math.max(0, 1 - sirenDist / 950);
             if (this._ensureSirenLoop(sirenKey) && this._sirenNode) {
-                this._setParamSmooth(this.sirenGain.gain, prox * 0.115, 0.25);
+                this._setParamSmooth(this.sirenGain.gain, prox * 0.15, 0.25);
+                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 900 + Math.pow(prox, 1.4) * 9800, 0.3);
                 const doppler = playerSiren ? 1.0 : Math.max(0.88, Math.min(1.14, state.trafficDoppler || 1.0));
                 this._setParamSmooth(this._sirenNode.playbackRate, doppler, 0.25);
             }
