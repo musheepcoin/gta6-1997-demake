@@ -1490,7 +1490,7 @@ function runSimulations() {
     {
         const { g, sandbox } = createGameInstance(cmpBuf);
         const ce = g.creationEngine;
-        assert(Boolean(ce && ce.version === "101_230"), "ViceCreationEngine (v101_230) initialized and attached to LeonidaGame");
+        assert(Boolean(ce && ce.version === "101_231"), "ViceCreationEngine (v101_231) initialized and attached to LeonidaGame");
 
         // 1. Pillar 1: Live 3D Voxel & Building Sculpting + Undo / Redo Snapshot Restoration
         const testC = 212, testR = 148;
