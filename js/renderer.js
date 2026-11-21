@@ -7499,6 +7499,59 @@ class RetroRenderer {
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, 0, u0, 0.0, u1, 1.0, modeFlag, wPx, hPx, 1.0, drawOrder);
     }
 
+    // JS mirror of the city shader's districtWear(): 0 = pristine/maintained, 1 = heavily worn (tile coordinates)
+    getDistrictWear(px, py) {
+        const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+        const mix = (a, b, t) => a + (b - a) * t;
+        const x = px / TILE_SIZE;
+        const y = py / TILE_SIZE;
+        let w = 0.50;
+        w = mix(w, 1.00, 1.0 - sm(150, 185, x));
+        w = mix(w, 0.90, sm(165, 185, x) * (1.0 - sm(225, 245, x)));
+        const dtn = sm(225, 245, x) * (1.0 - sm(315, 335, x));
+        w = mix(w, mix(0.50, 0.85, sm(180, 210, y)), dtn);
+        const port = sm(318, 330, x) * (1.0 - sm(368, 380, x)) * sm(290, 300, y) * (1.0 - sm(342, 355, y));
+        w = mix(w, 1.00, port);
+        const isl = sm(318, 335, x) * (1.0 - sm(405, 420, x)) * sm(105, 120, y) * (1.0 - sm(225, 240, y));
+        w = mix(w, 0.06, isl);
+        w = mix(w, 0.30, sm(400, 420, x));
+        w = mix(w, 0.12, sm(425, 440, x));
+        w = mix(w, 0.60, sm(430, 442, y) * sm(180, 195, x) * (1.0 - sm(415, 425, x)));
+        return Math.max(0, Math.min(1, w));
+    }
+
+    // Prop-anchored ground wear: the places people actually use leave faint, coherent marks (never random speckle).
+    // Bus-stop waiting pads are polished/darkened by footfall, trash cans & recycle bins leave a faint ring, food carts a greasy pad.
+    // Strength follows the district wear level so well-kept Ocean Drive / Star Island stay nearly clean.
+    _drawPropGroundWear(minX, minY, maxX, maxY) {
+        const oe = this.map && this.map.objectEngine;
+        if (!oe || !Array.isArray(oe.streetProps) || oe.streetProps.length === 0) return;
+        const vis = typeof this._queryStaticChunkGrid === "function"
+            ? this._queryStaticChunkGrid(oe.streetProps, "homeX", "homeY", minX - 60, minY - 60, maxX + 60, maxY + 60)
+            : oe.streetProps;
+        for (let i = 0; i < vis.length; i++) {
+            const sp = vis[i];
+            if (!sp || sp.broken) continue;
+            const k = sp.kind;
+            if (k !== "BUS_STOP_SHELTER" && k !== "TRASH_CAN" && k !== "RECYCLE_BIN" && k !== "FOOD_CART") continue;
+            if (sp.x < minX - 40 || sp.x > maxX + 40 || sp.y < minY - 40 || sp.y > maxY + 40) continue;
+            const wear = sp._wearLvl !== undefined ? sp._wearLvl : (sp._wearLvl = this.getDistrictWear(sp.x, sp.y));
+            const z = (sp.z || 2.0) + 0.006;
+            const ang = sp.ang || 0;
+            const s = 0.35 + 0.90 * wear;
+            if (k === "BUS_STOP_SHELTER") {
+                this.pushSolidQuad3D(sp.x, sp.y, z, 46.0, 56.0, ang, 0.30, 0.29, 0.28, 0.030 * s, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(sp.x, sp.y, z + 0.001, 30.0, 40.0, ang, 0.26, 0.25, 0.24, 0.040 * s, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            } else if (k === "FOOD_CART") {
+                this.pushSolidQuad3D(sp.x, sp.y, z, 38.0, 42.0, ang, 0.24, 0.20, 0.16, 0.035 * s, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(sp.x, sp.y, z + 0.001, 24.0, 28.0, ang, 0.20, 0.17, 0.13, 0.045 * s, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            } else {
+                this.pushSolidQuad3D(sp.x, sp.y, z, 26.0, 26.0, ang, 0.24, 0.23, 0.22, 0.032 * s, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(sp.x, sp.y, z + 0.001, 15.0, 15.0, ang, 0.20, 0.19, 0.18, 0.044 * s, SPRITE_DRAW_ORDER.TIRE_MARKS);
+            }
+        }
+    }
+
     pushWornPaintQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, r, g, b, a, drawOrder = 1) {
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -3.0, -3.0, -3.0, -3.0, r, g, b, a, drawOrder);
     }
@@ -12331,6 +12384,9 @@ class RetroRenderer {
                 }
             }
         }
+
+        // 7C-bis. Prop-anchored, district-coherent ground wear (bus-stop pads, bins, food carts)
+        this._drawPropGroundWear(minX, minY, maxX, maxY);
 
         // 7C-ter. Off-Street Asphalt Surface Parking Lots & Recessed Boulevard Curbside Parking Bays (World-Space Procedural Asphalt + Worn Paint)
         if (this.map && Array.isArray(this.map.surfaceParkingLots)) {
