@@ -6641,7 +6641,10 @@ class RetroRenderer {
         //    - G: 3D Building-Foot & Urban Canyon Ambient Occlusion
         //    - B: 3D Cast Shadow from South-East Sun (morning/forenoon)
         //    - A: 3D Cast Shadow from West-Southwest Sun (midday/afternoon — casts Hotel Dixon & Ocean Drive shadows onto the promenade!)
-        const LRES = 512;
+        // Soft-shadow upgrade: sample the solar lightmap at 2 samples per tile (1024x1024) on desktop so shadow edges follow the
+        // building silhouettes smoothly instead of 64px-wide blocky steps (mobile keeps the 512x512 map).
+        const S = this.isMobileInit ? 1 : 2;
+        const LRES = 512 * S;
         const rawElev = new Float32Array(LRES * LRES);
         const rawAO = new Float32Array(LRES * LRES);
         const rawShadE = new Float32Array(LRES * LRES);
@@ -6652,11 +6655,11 @@ class RetroRenderer {
         ];
 
         for (let ty = 0; ty < LRES; ty++) {
-            const wy = ty + 0.5;
-            const cy = Math.min(M - 1, Math.max(0, ty));
+            const wy = (ty + 0.5) / S;
+            const cy = Math.min(M - 1, Math.max(0, Math.floor(ty / S)));
             for (let tx = 0; tx < LRES; tx++) {
-                const wx = tx + 0.5;
-                const cx = Math.min(M - 1, Math.max(0, tx));
+                const wx = (tx + 0.5) / S;
+                const cx = Math.min(M - 1, Math.max(0, Math.floor(tx / S)));
                 const idx = ty * LRES + tx;
                 const baseElev = colTopElev[cy * M + cx];
                 rawElev[idx] = baseElev;
@@ -6702,20 +6705,22 @@ class RetroRenderer {
             }
         }
 
-        // 3) Elevation-aware 3x3 penumbra smoothing (only averages samples sharing the same elevation plane)
+        // 3) Elevation-aware penumbra smoothing (only averages samples sharing the same elevation plane).
+        //    Radius = 1 tile of softness (3x3 at 512, 5x5 at 1024) with a centre-weighted kernel for a soft, natural shadow edge.
+        const KR = S;
         const lightBytes = new Uint8Array(LRES * LRES * 4);
         for (let ty = 0; ty < LRES; ty++) {
             for (let tx = 0; tx < LRES; tx++) {
                 const idx = ty * LRES + tx;
                 const bElev = rawElev[idx];
                 let sumAO = 0.0, sumE = 0.0, sumW = 0.0, wTotal = 0.0;
-                for (let dy = -1; dy <= 1; dy++) {
+                for (let dy = -KR; dy <= KR; dy++) {
                     const ny = Math.min(LRES - 1, Math.max(0, ty + dy));
-                    for (let dx = -1; dx <= 1; dx++) {
+                    for (let dx = -KR; dx <= KR; dx++) {
                         const nx = Math.min(LRES - 1, Math.max(0, tx + dx));
                         const nIdx = ny * LRES + nx;
                         if (Math.abs(rawElev[nIdx] - bElev) < 0.25) {
-                            const w = (dx === 0 && dy === 0) ? 2.0 : 1.0;
+                            const w = (dx === 0 && dy === 0) ? 2.0 : (1.0 / (1.0 + 0.6 * (Math.abs(dx) + Math.abs(dy))) * (S > 1 ? 1.6 : 1.0));
                             sumAO += rawAO[nIdx] * w;
                             sumE += rawShadE[nIdx] * w;
                             sumW += rawShadW[nIdx] * w;
@@ -6732,7 +6737,27 @@ class RetroRenderer {
             }
         }
 
-        this.dayShadowMap = lightBytes;
+        // JS-side queries (getDayShadeAtPixel) index a 512x512 map: derive it by averaging the hi-res samples
+        if (S === 1) {
+            this.dayShadowMap = lightBytes;
+        } else {
+            const low = new Uint8Array(512 * 512 * 4);
+            for (let ty = 0; ty < 512; ty++) {
+                for (let tx = 0; tx < 512; tx++) {
+                    const o = (ty * 512 + tx) * 4;
+                    for (let ch = 0; ch < 4; ch++) {
+                        let sum = 0;
+                        for (let sy = 0; sy < S; sy++) {
+                            for (let sx = 0; sx < S; sx++) {
+                                sum += lightBytes[((ty * S + sy) * LRES + (tx * S + sx)) * 4 + ch];
+                            }
+                        }
+                        low[o + ch] = Math.round(sum / (S * S));
+                    }
+                }
+            }
+            this.dayShadowMap = low;
+        }
         if (!this.dayLightTex) {
             this.dayLightTex = gl.createTexture();
         }
