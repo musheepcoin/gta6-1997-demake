@@ -16644,15 +16644,9 @@ class RetroRenderer {
 
         drawPixelBox(ctx, smsX, smsY, smsW, smsH, "#0d1527", "#0284c7", "#38bdf8", "#020617", 2);
 
-        // Jason Pixel Avatar + Pixel Green 5G Online Dot
+        // Dynamic GTA VI Caller Avatar + Pixel Green 5G Online Dot
         const avX = smsX + 6;
         const avY = smsY + 5;
-        this.drawPixelPortraitRect(ctx, avX, avY, 20, 20, "JASON");
-        ctx.fillStyle = "#090d16";
-        ctx.fillRect(avX + 15, avY + 15, 6, 6);
-        ctx.fillStyle = "#4ade80";
-        ctx.fillRect(avX + 16, avY + 16, 4, 4);
-
         const senderEl = this._phoneDomEls.senderEl;
         let contactName = "Jason Duval";
         if (senderEl && senderEl.textContent) {
@@ -16670,6 +16664,14 @@ class RetroRenderer {
                 this._lastContactName = contactName;
             }
         }
+        const dmSpeakerId = (game && typeof game.resolveSpeakerPortraitInfo === "function")
+            ? game.resolveSpeakerPortraitInfo((game && game._lastPagerSpeaker) || contactName).charId
+            : "JASON";
+        this.drawPixelPortraitRect(ctx, avX, avY, 20, 20, dmSpeakerId);
+        ctx.fillStyle = "#090d16";
+        ctx.fillRect(avX + 15, avY + 15, 6, 6);
+        ctx.fillStyle = "#4ade80";
+        ctx.fillRect(avX + 16, avY + 16, 4, 4);
 
         ctx.fillStyle = "#f8fafc";
         ctx.font = "bold 9px Consolas, 'Courier New', monospace";

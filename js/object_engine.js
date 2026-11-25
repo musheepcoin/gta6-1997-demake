@@ -666,9 +666,9 @@ class WorldObjectEngine {
         ];
         // Canonical Rockstar GTA VI Key-Art Setpieces on Ocean Drive & Vice Beach
         this.gta6KeyArtSpots = [
-            { id: "ocean_view_real_dimez", name: "OCEAN VIEW HOTEL — REAL DIMEZ VIP TERRACE", kind: "REAL_DIMEZ", x: 443.26 * TILE_SIZE, y: 279.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { id: "drequan_only_raw",      name: "ONLY RAW RECORDS — DRE'QUAN PRIEST VIP",    kind: "DREQUAN",    x: 443.26 * TILE_SIZE, y: 290.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { id: "raul_heist_table",      name: "RAUL BAUTISTA — LEONIDA HEIST BLUEPRINT",   kind: "RAUL",       x: 443.26 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "ocean_view_real_dimez", name: "OCEAN VIEW HOTEL — REAL DIMEZ VIP TERRACE", kind: "REAL_DIMEZ", x: 442.38 * TILE_SIZE, y: 278.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "drequan_only_raw",      name: "ONLY RAW RECORDS — DRE'QUAN PRIEST VIP",    kind: "DREQUAN",    x: 442.38 * TILE_SIZE, y: 290.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "raul_heist_table",      name: "RAUL BAUTISTA — LEONIDA HEIST BLUEPRINT",   kind: "RAUL",       x: 442.38 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { id: "the_atoll_pool_club",   name: "THE ATOLL — CALISTA BEACHFRONT POOL CLUB",  kind: "THE_ATOLL",  x: 468.20 * TILE_SIZE, y: 287.0 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         // 26. Official GTA 6 Vice Beach Baywatch Rescue Med-Stations & Open-Air Neon Roller-Disco Rinks (Loop 19)
@@ -10308,9 +10308,15 @@ class WorldObjectEngine {
             let oceanBldgGroup = 0;
             let prevHadBldg = false;
             for (let r = 44; r <= 358; r++) {
-                // Check if c=442 has a tall Art Deco hotel building block (z=2..3+)
-                const b2 = this.map.getBlockInfo(442, r, 2);
-                const b3 = this.map.getBlockInfo(442, r, 3);
+                // Check if c=442 or c=441 has the tall Art Deco Ocean Drive hotel building block (z=2..3+)
+                let hCol = 442;
+                let b2 = this.map.getBlockInfo(442, r, 2);
+                let b3 = this.map.getBlockInfo(442, r, 3);
+                if (!b2 || !b2.lid || !b3 || !b3.lid) {
+                    hCol = 441;
+                    b2 = this.map.getBlockInfo(441, r, 2);
+                    b3 = this.map.getBlockInfo(441, r, 3);
+                }
                 if (!b2 || !b2.lid || !b3 || !b3.lid) {
                     prevHadBldg = false;
                     continue;
@@ -10321,10 +10327,10 @@ class WorldObjectEngine {
                 }
                 let topZ = 4.0;
                 for (let zTest = 4; zTest <= 5; zTest++) {
-                    const bt = this.map.getBlockInfo(442, r, zTest);
+                    const bt = this.map.getBlockInfo(hCol, r, zTest);
                     if (bt && bt.lid > 0) topZ = zTest + 1.0;
                 }
-                const facadeX = 443.0 * TILE_SIZE;
+                const facadeX = (hCol + 1.0) * TILE_SIZE;
                 const rowY = (r + 0.5) * TILE_SIZE;
                 const trimCol = stoneTrimPal[oceanBldgGroup % stoneTrimPal.length];
                 const capCol  = copingMetalPal[oceanBldgGroup % copingMetalPal.length];
@@ -10337,13 +10343,13 @@ class WorldObjectEngine {
                 }
 
                 // 2) Stepped Art Deco Limestone Rooftop Crown & Vertical Stone Fin (every 5 building rows)
-                if (r === 279 || r === 280) {
+                if (r === 277 || r === 278) {
                     // Canonical GTA VI Artwork 3: OCEAN VIEW HOTEL Stepped White Art Deco Pylon + Triple Vertical Hot-Pink Neon Tubes (|||) + Pink Neon Marquee!
                     const ovWhite = [0.96, 0.95, 0.98];
                     const ovPink  = [1.00, 0.24, 0.76];
                     const ovCyan  = [0.22, 0.94, 0.98];
                     emitSolidBox3D(facadeX - 3.5, rowY, 1, 0, 0, 0, 11.0, 62.0, topZ, topZ + 0.24, ovWhite, 1);
-                    if (r === 279) {
+                    if (r === 277) {
                         emitSolidBox3D(facadeX - 1.5, rowY + 32.0, 1, 0, 0, 0, 13.0, 38.0, topZ + 0.24, topZ + 0.56, ovWhite, 1);
                         // Triple vertical pink neon tubes (|||) rising up the central Ocean View Hotel tower!
                         for (const nyOff of [-9.0, 0.0, 9.0]) {
@@ -10360,7 +10366,7 @@ class WorldObjectEngine {
                         }
                     }
                     continue;
-                } else if (r === 277 || r === 278) {
+                } else if (r === 275 || r === 276) {
                     // Canonical GTA VI Artwork 3 Left Hotel: Glowing Emerald-Aquamarine Uplight Facade & Arched Colonnade!
                     const emAqua = [0.18, 0.96, 0.74];
                     const emMint = [0.76, 0.98, 0.90];
