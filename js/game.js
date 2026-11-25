@@ -209,17 +209,18 @@ class LeonidaGame {
 
         // 1 in-game minute = 1 real second -> 1 full 24-hour cycle (1440 min) = 24 real minutes!
 
-        // Starts at 12:00 (Sunny midday on Ocean Drive)
+        // Starts at 17:50 (Iconic GTA VI Golden-Hour Lavender-Gold Sunset on Ocean Drive; [N] cycles Day/Golden/Dusk/Night!)
 
-        this.worldMinutes = 12 * 60;
-        this._lastServerWorldMinutes = 12 * 60;
+        this.worldMinutes = 17 * 60 + 50;
+        this._lastServerWorldMinutes = 17 * 60 + 50;
         this.localTimeOffsetMins = 0;
+        this._needsGoldenHourInit = true;
 
         this.timeScale = 1.0;
 
-        this.lastSmsTimeStr = "12:00";
+        this.lastSmsTimeStr = "17:50";
 
-        this._lastAnnouncedPhase = "DAY";
+        this._lastAnnouncedPhase = "GOLDEN";
 
 
 
@@ -502,6 +503,43 @@ class LeonidaGame {
     }
 
 
+
+    toggleRollerSkates() {
+        if (!this.player || this.player.dead) return;
+        if (this.player.inVehicle) {
+            this.addFloatingText(this.player.x, this.player.y - 28, "🛼 EXIT CAR TO SKATE [8]", "#38bdf8");
+            return;
+        }
+        this.player.rollerSkates = !this.player.rollerSkates;
+        const on = Boolean(this.player.rollerSkates);
+        this.addFloatingText(
+            this.player.x,
+            this.player.y - 28,
+            on ? "🛼 NEON ROLLER-SKATES: ON!" : "👟 ON-FOOT STRIDE",
+            on ? "#ff2a85" : "#e2e8f0"
+        );
+        if (this.audio && typeof this.audio.playBeep === "function") {
+            this.audio.playBeep(on ? 784 : 523, 0.06, "triangle", 0.06);
+        }
+    }
+
+    triggerPlayerGrooveEmote() {
+        if (!this.player || this.player.dead || this.player.inVehicle) return;
+        const emotes = [
+            { label: "💃 MIAMI BOUNCE GROOVE!", color: "#ff2a85" },
+            { label: "📸 OCEAN DRIVE SELFIE!", color: "#38bdf8" },
+            { label: "🎧 ONLY RAW VIBE!", color: "#fbbf24" },
+            { label: "🛼 SOUTH BEACH 360 SPIN!", color: "#2dd4bf" }
+        ];
+        const nextIdx = ((this.player.emoteStyle === undefined ? -1 : this.player.emoteStyle) + 1) % emotes.length;
+        this.player.emoteStyle = nextIdx;
+        this.player.emoteTimer = 4.4;
+        const spec = emotes[nextIdx];
+        this.addFloatingText(this.player.x, this.player.y - 30, spec.label, spec.color);
+        if (this.audio && typeof this.audio.playBeep === "function") {
+            this.audio.playBeep(660 + nextIdx * 80, 0.06, "sine", 0.05);
+        }
+    }
 
     advanceTimeOfDayPhase() {
 
@@ -1633,6 +1671,8 @@ class LeonidaGame {
             v.isStaticParked = true;
             v.isCurbParked = true;
             v.curbBayIndex = i;
+            if (typeof bay.remapIdx === "number") v.remapIdx = bay.remapIdx;
+            if (bay.heroVariant) v.heroVariant = bay.heroVariant;
             v.speed = 0;
             v.vx = 0;
             v.vy = 0;
@@ -2688,6 +2728,16 @@ class LeonidaGame {
 
             }
 
+            // [8] Toggle South Beach Neon Inline Roller-Skates Mode on Foot!
+            if (key === "8" && !e.repeat) {
+                this.toggleRollerSkates();
+            }
+
+            // [9] Trigger Physical Street Groove / Selfie / Dance Emote!
+            if (key === "9" && !e.repeat) {
+                this.triggerPlayerGrooveEmote();
+            }
+
 
 
             // Advance Time-of-Day Phase (Day -> Sunset -> Night -> Sunrise) (N)
@@ -2778,8 +2828,9 @@ class LeonidaGame {
                 }
             }
 
-            // 2.5D Overhead Arcade Social Emote Bubble [U]
+            // 2.5D Overhead Arcade Social Emote Bubble + Physical Street Groove Emote [U]
             if (code === "KeyU" && !e.repeat) {
+                this.triggerPlayerGrooveEmote();
                 if (this.net && typeof this.net.triggerSocialEmote === "function") {
                     this.net.triggerSocialEmote();
                 }
@@ -3478,6 +3529,7 @@ class LeonidaGame {
 
         bindTapBtn("tbtn-weapon", () => this.cycleWeapon(1));
 
+        bindTapBtn("tbtn-skates", () => this.toggleRollerSkates());
         bindTapBtn("tbtn-horn", () => this.triggerHornOrBurp());
 
         bindTapBtn("tbtn-map", () => this.toggleFullMap());
@@ -4765,6 +4817,35 @@ class LeonidaGame {
 
 
 
+    resolveSpeakerPortraitInfo(speakerRaw = "JASON") {
+        const up = String(speakerRaw || "JASON").toUpperCase();
+        if (up.includes("DRE") || up.includes("PRIEST") || up.includes("ONLY RAW")) {
+            return { charId: "DREQUAN", label: "DRE'QUAN" };
+        }
+        if (up.includes("DIMEZ") || up.includes("ROXY") || up.includes("BAE")) {
+            return { charId: "REALDIMEZ", label: "REAL DIMEZ" };
+        }
+        if (up.includes("RAUL") || up.includes("BAUTISTA") || up.includes("FIXER") || up.includes("CAL HAMPTON")) {
+            return { charId: "RAUL", label: "RAUL" };
+        }
+        if (up.includes("CALISTA") || up.includes("ATOLL")) {
+            return { charId: "CALISTA", label: "CALISTA" };
+        }
+        if (up.includes("BOOBIE")) {
+            return { charId: "BOOBIE", label: "BOOBIE IKE" };
+        }
+        if (up.includes("TOMMY") || up.includes("VERCETTI")) {
+            return { charId: "TOMMY", label: "TOMMY" };
+        }
+        if (up.includes("CROCKETT") || up.includes("VCPD")) {
+            return { charId: "CROCKETT", label: "VCPD" };
+        }
+        if (up.includes("LUCIA")) {
+            return { charId: "LUCIA", label: "LUCIA" };
+        }
+        return { charId: "JASON", label: "JASON" };
+    }
+
     renderPortraits(pagerSpeaker = "JASON") {
 
         if (!this.renderer || !this.renderer.drawCharacterPortrait) return;
@@ -4791,15 +4872,15 @@ class LeonidaGame {
 
         });
 
-        const isLuciaPager = String(pagerSpeaker).toUpperCase().includes("LUCIA");
+        const spInfo = this.resolveSpeakerPortraitInfo(pagerSpeaker);
 
         this.renderer.drawCharacterPortrait(
 
             document.getElementById("pager-portrait"),
 
-            isLuciaPager ? "LUCIA" : "JASON",
+            spInfo.charId,
 
-            { bandana: this.player.bandana && isLuciaPager, alert }
+            { bandana: this.player.bandana && spInfo.charId === "LUCIA", alert }
 
         );
 
@@ -12492,12 +12573,23 @@ class LeonidaGame {
                     : { inWater: Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(p.x, p.y)), distBlocks: 1.0, shoreDirX: -1, shoreDirY: 0 };
 
                 const isSwimmingPre = Boolean(preWaterInfo.inWater && preWaterInfo.distBlocks >= 0.36 && (p.jumpTimer || 0) <= 0.08);
+                const tileIdxFoot = Math.max(0, Math.min(MAP_ROWS - 1, Math.floor(p.y / TILE_SIZE))) * MAP_COLS + Math.max(0, Math.min(MAP_COLS - 1, Math.floor(p.x / TILE_SIZE)));
+                const onSoftSand = Boolean(this.map && this.map.coastalSandMask && this.map.coastalSandMask[tileIdxFoot]);
+                const isSkatingNow = Boolean(p.rollerSkates && !isSwimmingPre && !preWaterInfo.inWater && !onSoftSand);
+                p._isSkatingActive = isSkatingNow;
+                if ((p.emoteTimer || 0) > 0) {
+                    p.emoteTimer = Math.max(0, p.emoteTimer - dt);
+                    if (this.input.shoot || this.input.sprint || isSwimmingPre) p.emoteTimer = 0;
+                }
                 p.swimPhase = (p.swimPhase || 0) + dt * (this.input.sprint ? 5.8 : 4.0) * (p.isMoving ? 1.0 : 0.45);
                 const swimStrokeSurge = isSwimmingPre ? (0.92 + 0.16 * Math.sin(p.swimPhase)) : 1.0;
                 const exhaustedMult = (isSwimmingPre && p.swimStamina !== undefined && p.swimStamina <= 5) ? 0.68 : 1.0;
+                const baseFootSpd = isSkatingNow
+                    ? (this.input.sprint ? 250 : 188)
+                    : (this.input.sprint ? 198 : 142);
                 const walkSpeed = isSwimmingPre
                     ? ((this.input.sprint ? 128 : 92) * boostMult * swimStrokeSurge * exhaustedMult)
-                    : ((this.input.sprint ? 195 : 138) * boostMult * (preWaterInfo.inWater ? 0.82 : 1.0));
+                    : (baseFootSpd * boostMult * (preWaterInfo.inWater ? 0.82 : 1.0));
 
                 const manualInput = this.input.up || this.input.down || this.input.left || this.input.right;
 
@@ -12575,110 +12667,120 @@ class LeonidaGame {
 
                 } else if (this.input.joyActive && (Math.abs(this.input.joyX) > 0.1 || Math.abs(this.input.joyY) > 0.1)) {
 
-                    // Mobile 360° Virtual Analog Stick On-Foot Movement
-
-                    p.angle = Math.atan2(this.input.joyY, this.input.joyX);
+                    // Mobile 360° Virtual Analog Stick On-Foot Movement with smooth turn & velocity blend
+                    const targetAng = Math.atan2(this.input.joyY, this.input.joyX);
+                    let da = targetAng - (p.angle || 0);
+                    while (da > Math.PI) da -= Math.PI * 2;
+                    while (da < -Math.PI) da += Math.PI * 2;
+                    const turnStep = Math.min(1.0, dt * (isSkatingNow ? 11.5 : 16.5));
+                    p.angle = (p.angle || 0) + da * turnStep;
+                    p._turnBank = (p._turnBank || 0) * 0.82 + Math.max(-0.22, Math.min(0.22, da * 0.28)) * 0.18;
 
                     const mag = Math.min(1.0, this.input.joyMag || 1.0);
-
                     const spd = p.jumpTimer > 0 ? Math.max(walkSpeed, 175) : walkSpeed * mag;
+                    const tx = Math.cos(targetAng) * spd;
+                    const ty = Math.sin(targetAng) * spd;
+                    const acc = Math.min(1.0, dt * (isSkatingNow ? 10.5 : 19.0));
+                    p._velX = (p._velX || 0) + (tx - (p._velX || 0)) * acc;
+                    p._velY = (p._velY || 0) + (ty - (p._velY || 0)) * acc;
 
-                    p.x += Math.cos(p.angle) * spd * dt;
-
-                    p.y += Math.sin(p.angle) * spd * dt;
-
+                    p.x += p._velX * dt;
+                    p.y += p._velY * dt;
                     p.isMoving = true;
-
-                    p.walkPhase += dt * (this.input.sprint ? 1.55 : 1.0);
+                    p.walkPhase += dt * (this.input.sprint ? 1.58 : (isSkatingNow ? 1.28 : 1.06));
 
                 } else if (p.tankControls) {
 
-                    // Authentic 1997 1997 GTA 1 Rotational On-Foot Controls:
-
-                    // Left/Right rotates character; Up walks/runs forward; Down steps backward!
-
+                    // Authentic 1997 GTA 1 Rotational On-Foot Controls
                     const turnRate = 4.35;
-
-                    if (this.input.left) p.angle -= turnRate * dt;
-
-                    if (this.input.right) p.angle += turnRate * dt;
-
-
+                    let turnDir = 0;
+                    if (this.input.left) { p.angle -= turnRate * dt; turnDir -= 1; }
+                    if (this.input.right) { p.angle += turnRate * dt; turnDir += 1; }
+                    p._turnBank = (p._turnBank || 0) * 0.82 + (turnDir * 0.14) * 0.18;
 
                     let moveDir = 0;
-
                     if (this.input.up) moveDir += 1.0;
-
                     if (this.input.down) moveDir -= 0.6;
 
-
-
                     if (moveDir !== 0 || p.jumpTimer > 0) {
-
                         const spd = p.jumpTimer > 0 ? Math.max(walkSpeed, 175) * (moveDir !== 0 ? Math.sign(moveDir) : 1) : walkSpeed * moveDir;
-
-                        p.x += Math.cos(p.angle) * spd * dt;
-
-                        p.y += Math.sin(p.angle) * spd * dt;
-
+                        const tx = Math.cos(p.angle) * spd;
+                        const ty = Math.sin(p.angle) * spd;
+                        const acc = Math.min(1.0, dt * (isSkatingNow ? 10.5 : 19.0));
+                        p._velX = (p._velX || 0) + (tx - (p._velX || 0)) * acc;
+                        p._velY = (p._velY || 0) + (ty - (p._velY || 0)) * acc;
+                        p.x += p._velX * dt;
+                        p.y += p._velY * dt;
                         p.isMoving = true;
-
-                        p.walkPhase += dt * (this.input.sprint ? 1.55 : 1.0);
-
+                        p.walkPhase += dt * (this.input.sprint ? 1.58 : (isSkatingNow ? 1.28 : 1.06));
                     } else {
-
-                        p.isMoving = false;
-
+                        const dec = Math.min(1.0, dt * (isSkatingNow ? 7.5 : 18.0));
+                        p._velX = (p._velX || 0) * (1.0 - dec);
+                        p._velY = (p._velY || 0) * (1.0 - dec);
+                        if (Math.hypot(p._velX, p._velY) > 6.0) {
+                            p.x += p._velX * dt;
+                            p.y += p._velY * dt;
+                            p.isMoving = isSkatingNow;
+                        } else {
+                            p._velX = 0;
+                            p._velY = 0;
+                            p.isMoving = false;
+                        }
                     }
 
                     if (this.input.shoot && useMouseAim) {
-
                         p.angle = mouseAimAngle;
-
                     }
 
                 } else {
 
-                    // Modern Cardinal 8-Way WASD Controls
-
+                    // Modern Cardinal 8-Way WASD Controls with fluid angular turn & momentum glide
                     let mx = 0;
-
                     let my = 0;
-
                     if (this.input.up) my -= 1;
-
                     if (this.input.down) my += 1;
-
                     if (this.input.left) mx -= 1;
-
                     if (this.input.right) mx += 1;
 
-
-
                     if (mx !== 0 || my !== 0) {
-
                         const len = Math.hypot(mx, my);
+                        const targetAng = Math.atan2(my, mx);
+                        let da = targetAng - (p.angle || 0);
+                        while (da > Math.PI) da -= Math.PI * 2;
+                        while (da < -Math.PI) da += Math.PI * 2;
+                        const turnStep = Math.min(1.0, dt * (isSkatingNow ? 11.5 : 16.5));
+                        p.angle = (p.angle || 0) + da * turnStep;
+                        p._turnBank = (p._turnBank || 0) * 0.82 + Math.max(-0.22, Math.min(0.22, da * 0.28)) * 0.18;
 
-                        p.x += (mx / len) * walkSpeed * dt;
+                        const tx = (mx / len) * walkSpeed;
+                        const ty = (my / len) * walkSpeed;
+                        const acc = Math.min(1.0, dt * (isSkatingNow ? 10.5 : 19.0));
+                        p._velX = (p._velX || 0) + (tx - (p._velX || 0)) * acc;
+                        p._velY = (p._velY || 0) + (ty - (p._velY || 0)) * acc;
 
-                        p.y += (my / len) * walkSpeed * dt;
-
+                        p.x += p._velX * dt;
+                        p.y += p._velY * dt;
                         p.isMoving = true;
-
-                        p.walkPhase += dt * (this.input.sprint ? 1.55 : 1.0);
-
-                        p.angle = Math.atan2(my, mx);
-
+                        p.walkPhase += dt * (this.input.sprint ? 1.58 : (isSkatingNow ? 1.28 : 1.06));
                     } else {
-
-                        p.isMoving = false;
-
+                        p._turnBank = (p._turnBank || 0) * 0.82;
+                        const dec = Math.min(1.0, dt * (isSkatingNow ? 7.5 : 18.0));
+                        p._velX = (p._velX || 0) * (1.0 - dec);
+                        p._velY = (p._velY || 0) * (1.0 - dec);
+                        if (Math.hypot(p._velX, p._velY) > 6.0) {
+                            p.x += p._velX * dt;
+                            p.y += p._velY * dt;
+                            p.isMoving = isSkatingNow;
+                            if (isSkatingNow) p.walkPhase += dt * 0.72;
+                        } else {
+                            p._velX = 0;
+                            p._velY = 0;
+                            p.isMoving = false;
+                        }
                     }
 
                     if (this.input.shoot && useMouseAim) {
-
                         p.angle = mouseAimAngle;
-
                     }
 
                 }
@@ -19718,7 +19820,7 @@ class LeonidaGame {
 
         if (lblEl) {
 
-            lblEl.textContent = String(sender).toUpperCase().includes("LUCIA") ? "LUCIA" : "JASON";
+            lblEl.textContent = this.resolveSpeakerPortraitInfo(sender).label;
 
         }
 

@@ -2591,6 +2591,11 @@ class ViceNetworkManager {
 
         if (typeof pkt.wm === "number") {
             g._lastServerWorldMinutes = pkt.wm;
+            if (g._needsGoldenHourInit) {
+                g._needsGoldenHourInit = false;
+                const targetGoldenMins = 17 * 60 + 50; // 17:50 GTA VI Golden Sunset on fresh boot
+                g.localTimeOffsetMins = (((targetGoldenMins - pkt.wm) % 1440) + 1440) % 1440;
+            }
             g.worldMinutes = (((pkt.wm + (g.localTimeOffsetMins || 0)) % 1440) + 1440) % 1440;
             if (typeof g.syncDayNightCycle === "function") {
                 g.syncDayNightCycle();

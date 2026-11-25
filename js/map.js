@@ -4834,6 +4834,42 @@ class LeonidaMap {
             }
         }
 
+        // Canonical GTA VI Key-Art Ocean Drive Curbside Hero Vehicles (parked in real c=444 recessed bays right by spawn!)
+        let bestTulipBay = null, bestTulipDist = Infinity;
+        for (let bi = 0; bi < bays.length; bi++) {
+            const b = bays[bi];
+            if (b.c !== 444) continue;
+            const dy = Math.abs(b.y - 286.2 * TILE_SIZE);
+            if (dy < bestTulipDist && dy < 9.5 * TILE_SIZE) {
+                bestTulipDist = dy;
+                bestTulipBay = b;
+            }
+        }
+        if (bestTulipBay) {
+            bestTulipBay.specKey = "TULIP_MUSCLE";
+            bestTulipBay.remapIdx = 0; // Authentic Crimson-Cherry Muscle Paint
+            bestTulipBay.emptyStall = false;
+            bestTulipBay.heroVariant = "CRIMSON_DUFFEL";
+            this.heroTulipSpot = { x: bestTulipBay.x, y: bestTulipBay.y, angle: bestTulipBay.angle };
+        }
+        let bestSuvBay = null, bestSuvDist = Infinity;
+        for (let bi = 0; bi < bays.length; bi++) {
+            const b = bays[bi];
+            if (b.c !== 444 || b === bestTulipBay) continue;
+            const dy = Math.abs(b.y - 290.8 * TILE_SIZE);
+            if (dy < bestSuvDist && dy < 11.5 * TILE_SIZE) {
+                bestSuvDist = dy;
+                bestSuvBay = b;
+            }
+        }
+        if (bestSuvBay) {
+            bestSuvBay.specKey = "GATOR_4X4";
+            bestSuvBay.remapIdx = 5; // Deep Obsidian Luxury 4x4 Paint
+            bestSuvBay.emptyStall = false;
+            bestSuvBay.heroVariant = "ONLYRAW_SUV";
+            this.onlyRawSuvSpot = { x: bestSuvBay.x, y: bestSuvBay.y, angle: bestSuvBay.angle };
+        }
+
         // Build O(1) spatial indices for recessed curb parking bays & strips (used by dynamic Vehicle AI & Pedestrian AI)
         this.curbParkingBayByRoadTile = new Map();
         this.curbParkingStripByCol = new Map();

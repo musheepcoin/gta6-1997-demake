@@ -5330,13 +5330,20 @@ class TrafficManager {
                 spec.speed = Math.max(spec.speed || 0, 39 + (r2 % 6));
                 if (!spec.carryProp) spec.carryProp = "JOGGER_GEAR";
             }
-            if (!spec.isJogger && !spec.isChild && !isSand && (
+            if (!spec.isJogger && !spec.isRollerblader && !spec.isChild && !isSand && (
                 gt === "kid_skater" ||
                 ((gt === "beach_guy_lime" || gt === "beach_guy_yellow" || gt === "surfer_guy" || gt === "g2_civ_redtee" || gt === "g2_civ_blueshorts") && (r2 % 4) === 1)
             )) {
-                spec.isRollerblader = false;
                 spec.isSkateboarder = true;
                 spec.speed = 42 + (r2 % 5);
+            } else if (
+                !spec.isJogger && !spec.isRollerblader && !spec.isSkateboarder && !spec.isChild && !isSand &&
+                bx >= 424 && bx <= 449 &&
+                (gt === "bikini_cyan" || gt === "bikini_pink" || gt === "g2_civ_pink" || gt === "g2_civ_aqua" || gt === "vc_tourist") &&
+                (r2 % 5) === 2
+            ) {
+                spec.isRollerblader = true;
+                spec.speed = 46 + (r2 % 6);
             }
             if (!spec.carryProp && !spec.isRollerblader && !spec.isSkateboarder && !spec.isChild) {
                 if (gt === "surfer_guy" && (r2 % 2) === 0) {

@@ -64,6 +64,8 @@ class RetroRenderer {
         this.viceOverviewReady = false;
         this.charPortraitsImg = new Image();
         this.charPortraitsReady = false;
+        this.gta6CastPortraitsImg = new Image();
+        this.gta6CastPortraitsReady = false;
         this.minimapZoomMode = 0; // 0 = Cruise (68 blocks), 1 = Wide (136 blocks), 2 = Full Island (256 blocks)
 
         // Hardware-composited WebGL 3D Canvas mounted directly behind #game-canvas (eliminates full-screen GPU->2D copy on mobile daytime!)
@@ -305,13 +307,14 @@ class RetroRenderer {
                 // Wave-slope Fresnel sky/sunset reflection & directional wave shading
                 vec2 sunDir = normalize(uSunDir + vec2(0.0001));
                 float sunAlign = clamp(dot(normalize(waveGrad + vec2(0.0001)), sunDir) * 0.5 + 0.5, 0.0, 1.0);
-                vec3 skyReflCol = mix(vec3(0.44, 0.80, 0.96), vec3(0.96, 0.62, 0.76), uSunsetTint);
-                float fresnel = clamp(length(waveGrad) * 0.28, 0.0, 0.24);
-                rgb = mix(rgb, skyReflCol, fresnel * (0.28 + 0.72 * dayAmt));
+                vec3 sunsetWaterRefl = mix(vec3(0.78, 0.56, 0.92), vec3(1.0, 0.68, 0.58), sunAlign);
+                vec3 skyReflCol = mix(vec3(0.44, 0.80, 0.96), sunsetWaterRefl, uSunsetTint);
+                float fresnel = clamp(length(waveGrad) * 0.28, 0.0, 0.28);
+                rgb = mix(rgb, skyReflCol, fresnel * (0.30 + 0.70 * dayAmt));
 
                 // Delicate luminous cellular caustic web (subtle on surface so seabed parallax caustics shine through)
                 float caustVis = (0.24 + 0.42 * shallowFactor) * (1.0 - deepAtlantic * 0.55) * (0.30 + 0.70 * dayAmt);
-                vec3 caustTint = mix(vec3(0.36, 0.94, 0.92), vec3(0.96, 0.92, 0.74), caust);
+                vec3 caustTint = mix(vec3(0.36, 0.94, 0.92), mix(vec3(0.96, 0.92, 0.74), vec3(1.0, 0.82, 0.68), uSunsetTint * 0.75), caust);
                 rgb = mix(rgb, min(vec3(1.0), rgb + caustTint * 0.34), caust * caustVis);
 
                 // Organic curved shore-breaking surf rollers along the beach
@@ -320,13 +323,13 @@ class RetroRenderer {
                 float rollerCrest = pow(max(0.0, sin(rollerPhase)), 7.0) * shallowFactor;
                 float foamCell = clamp(caust * 1.3 + (aNoise(p * 4.5 + uTime * 0.5) - 0.38), 0.0, 1.0);
                 float whitecap = rollerCrest * (0.48 + 0.52 * foamCell) * 0.72;
-                vec3 crestFoam = mix(vec3(0.92, 0.98, 1.00), vec3(1.0, 0.90, 0.86), uSunsetTint * 0.35);
+                vec3 crestFoam = mix(vec3(0.92, 0.98, 1.00), vec3(1.0, 0.89, 0.88), uSunsetTint * 0.48);
                 rgb = mix(rgb, crestFoam, clamp(whitecap * (1.0 - uNightTint * 0.60), 0.0, 0.78));
 
                 // Silky Solar / Sunset Wave-Crest Glint along caustic focal nodes
                 float filamentGlint = pow(caust, 2.4) * (0.40 + 0.60 * sunAlign) * dayAmt;
-                vec3 specTint = mix(vec3(0.96, 0.94, 0.80), vec3(1.0, 0.70, 0.52), uSunsetTint);
-                rgb = min(vec3(1.0), rgb + specTint * filamentGlint * 0.32);
+                vec3 specTint = mix(vec3(0.96, 0.94, 0.80), vec3(1.0, 0.72, 0.52), uSunsetTint);
+                rgb = min(vec3(1.0), rgb + specTint * filamentGlint * (0.32 + 0.10 * uSunsetTint));
 
                 // Water is more translucent over shallow turquoise reefs so the 3D sandy seabed & caustics shine through!
                 float waterAlpha = mix(0.84, 0.66, shallowFactor * 0.70);
@@ -904,12 +907,17 @@ class RetroRenderer {
                             totalShade = clamp(bldShadow * 0.92 + bldAO * 0.32, 0.0, 1.0);
                         }
 
-                        vec3 sunlitTint = mix(vec3(1.13, 1.07, 0.95), vec3(1.01, 1.00, 0.98), sandMask);
-                        vec3 shadowTint = mix(vec3(0.54, 0.65, 0.86), vec3(0.82, 0.84, 0.90), sandMask);
+                        vec3 daySunlit = mix(vec3(1.13, 1.07, 0.95), vec3(1.01, 1.00, 0.98), sandMask);
+                        vec3 dayShadow = mix(vec3(0.54, 0.65, 0.86), vec3(0.82, 0.84, 0.90), sandMask);
                         if (isRoad) {
-                            sunlitTint = vec3(1.11, 1.07, 0.98);
-                            shadowTint = vec3(0.56, 0.66, 0.85);
+                            daySunlit = vec3(1.11, 1.07, 0.98);
+                            dayShadow = vec3(0.56, 0.66, 0.85);
                         }
+                        // Rockstar GTA VI Golden-Hour Dual-Tone Lighting: warm apricot-peach-gold sunlight vs dreamy pastel lavender-mauve shadows
+                        vec3 goldenSunlit = mix(vec3(1.22, 0.99, 0.86), vec3(1.07, 0.96, 0.90), sandMask);
+                        vec3 goldenShadow = mix(vec3(0.68, 0.56, 0.92), vec3(0.85, 0.78, 0.95), sandMask);
+                        vec3 sunlitTint = mix(daySunlit, goldenSunlit, uSunsetTint * 0.88);
+                        vec3 shadowTint = mix(dayShadow, goldenShadow, uSunsetTint * 0.88);
                         vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.24);
                         float isElevatedRoof = step(2.85, vWorldPos.y);
                         if (isElevatedRoof > 0.5 && waterCoverage < 0.05) {
@@ -1051,7 +1059,9 @@ class RetroRenderer {
 
                     float sunDot = dot(wallNormal, uSunDir);
                     float wallSunFactor = clamp(sunDot * 0.5 + 0.5, 0.0, 1.0);
-                    vec3 wallDayTint = mix(vec3(0.58, 0.70, 0.89), vec3(1.20, 1.11, 0.93), wallSunFactor);
+                    vec3 wallNoonTint = mix(vec3(0.58, 0.70, 0.89), vec3(1.20, 1.11, 0.93), wallSunFactor);
+                    vec3 wallGoldenTint = mix(vec3(0.70, 0.58, 0.93), vec3(1.25, 0.98, 0.84), wallSunFactor);
+                    vec3 wallDayTint = mix(wallNoonTint, wallGoldenTint, uSunsetTint * 0.88);
                     vec3 wallShade = mix(vec3(1.0 + sunDot * 0.08), wallDayTint, dayAmt);
 
                     vec3 bWallCol, bTrimCol, bRoofCol, bAccentCol;
@@ -1163,15 +1173,19 @@ class RetroRenderer {
                         c.rgb = mix(c.rgb + stuccoGrain, blindCol * (1.0 - winRecessShad), isGlass * inBlind * 0.38 * dayAmt);
                     }
 
-                    vec3 skyGlint = vec3(0.16, 0.26, 0.36) * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.35, 0.15, 1.0) * (0.35 + 0.65 * wallSunFactor);
-                    vec3 sunGlassSpec = vec3(0.28, 0.23, 0.14) * isGlass * dayAmt * pow(wallSunFactor, 2.6) * (1.0 - winRecessShad);
+                    vec3 skyGlintCol = mix(vec3(0.16, 0.26, 0.36), vec3(0.32, 0.20, 0.38), uSunsetTint * 0.85);
+                    vec3 sunSpecCol = mix(vec3(0.28, 0.23, 0.14), vec3(0.42, 0.25, 0.16), uSunsetTint * 0.90);
+                    vec3 skyGlint = skyGlintCol * isGlass * dayAmt * clamp((vWorldPos.y - 2.0) * 0.35, 0.15, 1.0) * (0.35 + 0.65 * wallSunFactor);
+                    vec3 sunGlassSpec = sunSpecCol * isGlass * dayAmt * pow(wallSunFactor, 2.4) * (1.0 - winRecessShad);
                     c.rgb = min(vec3(1.0), c.rgb * wallShade * baseAO * pilaster * corniceLight + skyGlint + sunGlassSpec);
                 }
 
                 if (uSunsetTint > 0.01) {
-                    // Warm Vice City Golden-Pink Sunset & Atlantic Sunrise glow
-                    vec3 sunsetCol = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
-                    c.rgb = mix(c.rgb, min(vec3(1.0), sunsetCol), uSunsetTint * 0.65);
+                    //GTA VI Golden-Pink-Lavender atmospheric haze & warm sunlit highlight bloom
+                    float lumS = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                    vec3 sunsetTone = mix(vec3(0.96, 0.84, 1.06), vec3(1.16, 0.94, 0.88), smoothstep(0.22, 0.68, lumS));
+                    vec3 sunsetCol = c.rgb * sunsetTone + vec3(0.035, 0.010, 0.028);
+                    c.rgb = mix(c.rgb, min(vec3(1.0), sunsetCol), uSunsetTint * 0.52);
                 }
                 if (abs(uNightTint) > 0.01) {
                     bool emissiveOnly = (uNightTint < -0.5);
@@ -1303,16 +1317,18 @@ class RetroRenderer {
                     float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
                     float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround;
                     float totalShade = clamp(bldShadow * 0.84 + bldAO * 0.26, 0.0, 1.0);
-                    vec3 sunlitTint = vec3(1.11, 1.07, 0.98);
-                    vec3 shadowTint = vec3(0.56, 0.66, 0.85);
+                    vec3 sunlitTint = mix(vec3(1.11, 1.07, 0.98), vec3(1.20, 0.99, 0.88), uSunsetTint * 0.85);
+                    vec3 shadowTint = mix(vec3(0.56, 0.66, 0.85), vec3(0.68, 0.56, 0.92), uSunsetTint * 0.85);
                     vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade) * (1.0 - bldAO * 0.22);
                     vec3 sunlitRgb = clamp((col - 0.5) * (1.0 + 0.14 * (1.0 - totalShade)) + 0.5, 0.0, 1.0);
                     sunlitRgb = min(vec3(1.0), sunlitRgb * dayGrading);
                     col = mix(col, clamp(sunlitRgb, 0.0, 1.0), dayAmt);
                 }
                 if (uSunsetTint > 0.01) {
-                    vec3 sunsetCol = col * vec3(1.16, 0.88, 0.96) + vec3(0.05, 0.01, 0.03);
-                    col = mix(col, min(vec3(1.0), sunsetCol), uSunsetTint * 0.65);
+                    float lumSp = dot(col, vec3(0.299, 0.587, 0.114));
+                    vec3 sunsetTone = mix(vec3(0.96, 0.84, 1.06), vec3(1.15, 0.94, 0.88), smoothstep(0.22, 0.68, lumSp));
+                    vec3 sunsetCol = col * sunsetTone + vec3(0.035, 0.010, 0.028);
+                    col = mix(col, min(vec3(1.0), sunsetCol), uSunsetTint * 0.50);
                 }
                 if (uNightTint > 0.01) {
                     float nfAmt = clamp(uNightTint * 1.25, 0.0, 0.85);
@@ -6239,6 +6255,13 @@ class RetroRenderer {
             }
         }, 5, true);
 
+        loadImageWithRetry(this.gta6CastPortraitsImg, "assets/gta1/gta6_cast_portraits.jpg?v=101_253", () => {
+            this.gta6CastPortraitsReady = true;
+            if (window.game && typeof window.game.renderPortraits === "function") {
+                window.game.renderPortraits();
+            }
+        }, 5, true);
+
         loadImageWithRetry(this.gta1TilesViceImg, "assets/gta1/gta1_tiles_vice.png?v=98_11", () => {
             viceTilesLoaded = true;
             checkReady();
@@ -10182,6 +10205,12 @@ class RetroRenderer {
             { key: "g2_civ_pink",     shirt: [255, 84, 176],  pants: JEANS,           sleeves: "short", legs: "shorts", hair: H.blond,  skin: SK.light, pattern: "stripes",  shirt2: [250, 250, 252] },
             { key: "g2_civ_darkgreen",shirt: [44, 218, 146],  pants: [242, 238, 226], sleeves: "short", legs: "pants",  hair: H.black,  skin: SK.dark,  pattern: "hawaiian", shirt2: [254, 218, 68],  shirt3: [255, 94, 154] },
             { key: "g2_civ_granny",   shirt: [250, 148, 212], pants: [244, 244, 248], sleeves: "short", legs: "pants",  hair: H.blond,  skin: SK.light, pattern: "jacket",   shirt2: [250, 250, 252] },
+            // --- Official Rockstar GTA VI Key-Art Cast (Dre'Quan Priest, Real Dimez, Raul Bautista, Calista / The Atoll) ---
+            { key: "vc_drequan",      shirt: [224, 34, 52],   shirt2: [250, 204, 24],  pants: [152, 184, 224], sleeves: "short", legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "stripes" },
+            { key: "vc_roxy",         shirt: [132, 214, 54],  shirt2: [250, 204, 28],  pants: JEANS,           sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.dark,  pattern: "jacket" },
+            { key: "vc_baeluxe",      shirt: [138, 152, 174], shirt2: [214, 36, 48],   pants: [118, 148, 194], sleeves: "long",  legs: "pants",  hair: H.black, skin: SK.brown, pattern: "jacket" },
+            { key: "vc_raul",         shirt: [142, 34, 54],   shirt2: [242, 194, 58],  shirt3: [198, 142, 48],  pants: KHAKI,           sleeves: "short", legs: "pants",  hair: H.grey,  skin: SK.tan,   pattern: "hawaiian" },
+            { key: "vc_calista",      shirt: [64, 218, 192],  shirt2: [248, 250, 252], pants: [244, 246, 250], sleeves: "short", legs: "shorts", hair: H.black, skin: SK.tan,   pattern: "stripes" },
             // --- Vice City '86 & Miami Beach Icons ---
             { key: "vc_hawaiian_red", shirt: [242, 48, 68],   shirt2: [255, 228, 72],  shirt3: [36, 214, 168], pants: [244, 240, 228], sleeves: "short", legs: "pants",  hair: H.brown, skin: SK.tan,   pattern: "hawaiian" },
             { key: "vc_tourist",      shirt: [42, 186, 248],  shirt2: [255, 234, 84],  shirt3: [255, 96, 176], pants: KHAKI,           sleeves: "short", legs: "shorts", hair: H.blond, skin: SK.light, pattern: "hawaiian" },
@@ -11510,13 +11539,78 @@ class RetroRenderer {
                 }
 
                 const pCharScale = p.pedType === "bigsmoke" ? 1.22 : 1.15;
+                const isPlayerSkating = Boolean(p._isSkatingActive && !isJumpingOrSliding);
+                const hasGrooveEmote = Boolean((p.emoteTimer || 0) > 0 && !isJumpingOrSliding);
+                const pPerpX = Math.cos((p.angle || 0) + Math.PI * 0.5);
+                const pPerpY = Math.sin((p.angle || 0) + Math.PI * 0.5);
+
+                // Stylish On-Foot Swagger Stride Sway, Carving Inline-Skates S-Glide & Physical Groove Emotes!
+                let drawPx = p.x;
+                let drawPy = p.y;
+                let drawAng = (p.angle || 0) + (p._turnBank || 0) * 0.45;
+                if (isPlayerSkating) {
+                    const carveAmp = p.isMoving ? 3.2 : 0.7;
+                    const carveWave = Math.sin(this.time * 5.6) * carveAmp;
+                    drawPx += pPerpX * carveWave;
+                    drawPy += pPerpY * carveWave;
+                    drawAng += Math.cos(this.time * 5.6) * (p.isMoving ? 0.12 : 0.03);
+                    const skCos = Math.cos(drawAng);
+                    const skSin = Math.sin(drawAng);
+                    // Glowing Neon Hot-Pink & Electric-Cyan Inline Roller-Skates under left & right feet + urethane heel trail!
+                    this.pushSolidQuad3D(drawPx - skSin * 3.4, drawPy + skCos * 3.4, baseZ - 0.012, 5.8, 2.4, drawAng, 1.0, 0.20, 0.72, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    this.pushSolidQuad3D(drawPx + skSin * 3.4, drawPy - skCos * 3.4, baseZ - 0.012, 5.8, 2.4, drawAng, 0.14, 0.94, 0.98, 0.96, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    if (p.isMoving) {
+                        this.pushSolidQuad3D(drawPx - skCos * 6.5 - skSin * 3.4, drawPy - skSin * 6.5 + skCos * 3.4, baseZ - 0.016, 7.5, 1.5, drawAng, 1.0, 0.28, 0.78, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                        this.pushSolidQuad3D(drawPx - skCos * 6.5 + skSin * 3.4, drawPy - skSin * 6.5 - skCos * 3.4, baseZ - 0.016, 7.5, 1.5, drawAng, 0.18, 0.94, 0.98, 0.42, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                } else if (p.isMoving && !isJumpingOrSliding) {
+                    const strideSway = Math.sin((p.walkPhase || 0) * Math.PI * 2.0) * (game.input.sprint ? 1.35 : 0.95);
+                    drawPx += pPerpX * strideSway;
+                    drawPy += pPerpY * strideSway;
+                    drawAng += Math.cos((p.walkPhase || 0) * Math.PI * 2.0) * 0.055;
+                }
+
+                if (hasGrooveEmote) {
+                    const emStyle = p.emoteStyle || 0;
+                    const beat = this.time * 6.8;
+                    if (emStyle === 0 || emStyle === 2) {
+                        // Miami Bounce Groove / Only Raw Head-Nod: figure-8 hip sway + pulsing neon floor beat ring!
+                        drawPx += pPerpX * Math.sin(beat) * 2.6;
+                        drawPy += pPerpY * Math.sin(beat) * 2.6;
+                        drawAng += Math.sin(beat * 0.5) * 0.28;
+                        if (!p.isMoving) {
+                            frameIdx = this.getPedFrameIndex("FIST", true, false, this.time * 1.35);
+                        }
+                        const pulse = (this.time * 2.4) % 1.0;
+                        const ringR = 10.0 + pulse * 18.0;
+                        const isGold = emStyle === 2;
+                        this.pushSolidQuad3D(drawPx, drawPy, baseZ - 0.018, ringR, ringR, this.time * 2.2, isGold ? 1.0 : 1.0, isGold ? 0.78 : 0.22, isGold ? 0.18 : 0.72, (1.0 - pulse) * 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    } else if (emStyle === 1) {
+                        // Ocean Drive Viral Selfie: pose sway + 3D Smartphone held out + camera strobe flash!
+                        drawAng += Math.sin(beat * 0.45) * 0.24;
+                        const eCos = Math.cos(drawAng), eSin = Math.sin(drawAng);
+                        const phX = drawPx + eCos * 7.2 - eSin * 2.2;
+                        const phY = drawPy + eSin * 7.2 + eCos * 2.2;
+                        this.pushSolidQuad3D(phX, phY, baseZ + 0.018, 3.0, 3.8, drawAng, 0.14, 0.16, 0.22, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        this.pushSolidQuad3D(phX, phY, baseZ + 0.020, 2.2, 3.0, drawAng, 0.22, 0.90, 0.98, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                        if (Math.sin(this.time * 7.5) > 0.88) {
+                            this.pushSolidQuad3D(phX + eCos * 2.5, phY + eSin * 2.5, baseZ + 0.025, 11.0, 11.0, this.time * 4.0, 1.0, 0.99, 0.90, 0.88, SPRITE_DRAW_ORDER.HUD_ARROW);
+                        }
+                    } else {
+                        // South Beach 360 Spin-Groove!
+                        drawAng += this.time * 6.2;
+                        const pulse = (this.time * 2.8) % 1.0;
+                        this.pushSolidQuad3D(drawPx, drawPy, baseZ - 0.018, 9.0 + pulse * 17.0, 9.0 + pulse * 17.0, -this.time * 3.0, 0.16, 0.94, 0.88, (1.0 - pulse) * 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                }
+
                 this.batchPedSprite3D(
                     p.pedType || "lucia",
                     frameIdx,
-                    p.x,
-                    p.y,
+                    drawPx,
+                    drawPy,
                     baseZ + jumpZ,
-                    p.angle,
+                    drawAng,
                     pedScale * pCharScale,
                     (p.muzzleTimer || 0) > 0,
                     isJumpingOrSliding ? SPRITE_DRAW_ORDER.JUMPING_PEDESTRIAN : SPRITE_DRAW_ORDER.PEDESTRIAN
@@ -11795,15 +11889,45 @@ class RetroRenderer {
             const vehShade = isWaterCraft ? 0 : ((1.0 - nfGlobal) * rawDayShade);
             const sunAlign = Math.cos(v.angle - sunShadowAngle);
             const carSunSpec = v.destroyed ? 1.0 : (isWaterCraft ? 1.12 : (1.0 + 0.12 * sunAlign * (1.0 - nfGlobal * 0.72) * (1.0 - vehShade * 0.75)));
-            const vTintR = carSunSpec * (1.04 - vehShade * 0.22);
-            const vTintG = carSunSpec * (1.01 - vehShade * 0.15);
-            const vTintB = carSunSpec * (0.97 - vehShade * 0.04);
+            let vTintR = carSunSpec * (1.04 - vehShade * 0.22);
+            let vTintG = carSunSpec * (1.01 - vehShade * 0.15);
+            let vTintB = carSunSpec * (0.97 - vehShade * 0.04);
+            if (!v.destroyed && v.heroVariant === "CRIMSON_DUFFEL") {
+                vTintR *= 1.18;
+                vTintG *= 0.88;
+                vTintB *= 0.92;
+            } else if (!v.destroyed && v.heroVariant === "ONLYRAW_SUV") {
+                vTintR *= 0.44;
+                vTintG *= 0.45;
+                vTintB *= 0.50;
+            }
             this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             if (dmgRect) {
                 this.pushAtlasSprite3D(dmgRect, v.x, v.y, vz + airZ + 0.0015, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             }
             if (doorRect) {
                 this.pushAtlasSprite3D(doorRect, v.x, v.y, vz + airZ + 0.0025, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
+            }
+            // GTA VI Key-Art Hero Details: 3D Black Leather Heist Duffel Bag on Crimson Tulip Trunk & Chrome Trim on Dre'Quan's Black SUV!
+            if (!v.destroyed && v.heroVariant === "CRIMSON_DUFFEL") {
+                const bagX = v.x - cosA * 17.5 - sinA * 1.4;
+                const bagY = v.y - sinA * 17.5 + cosA * 1.4;
+                const bagZ = vz + airZ - totalPitchZ * 0.65 + 0.014;
+                const bagAng = renderAngle + 0.24;
+                // Contact shadow + matte black leather duffel body + twin nylon straps + silver metallic zipper
+                this.pushSolidQuad3D(bagX + sunCos * 1.6, bagY + sunSin * 1.6, bagZ - 0.002, 11.6, 7.6, bagAng, 0.02, 0.02, 0.04, 0.58, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(bagX, bagY, bagZ, 10.8, 6.8, bagAng, 0.11, 0.12, 0.16, 0.99, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(bagX - Math.cos(bagAng) * 2.4, bagY - Math.sin(bagAng) * 2.4, bagZ + 0.002, 1.5, 7.2, bagAng, 0.22, 0.24, 0.30, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(bagX + Math.cos(bagAng) * 2.4, bagY + Math.sin(bagAng) * 2.4, bagZ + 0.002, 1.5, 7.2, bagAng, 0.22, 0.24, 0.30, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(bagX, bagY, bagZ + 0.003, 7.8, 1.1, bagAng, 0.88, 0.92, 0.97, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+            } else if (!v.destroyed && v.heroVariant === "ONLYRAW_SUV") {
+                // Gleaming Chrome Luxury Bullbar / Grille & Brushed Silver Roof Rails on Dre'Quan's Black 4x4 SUV
+                const noseX = v.x + cosA * 27.5;
+                const noseY = v.y + sinA * 27.5;
+                const roofZ = vz + airZ + 0.014;
+                this.pushSolidQuad3D(noseX, noseY, roofZ - 0.002, 2.6, 17.5, renderAngle, 0.86, 0.90, 0.96, 0.95, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(v.x - cosA * 3.0 - sinA * 8.2, v.y - sinA * 3.0 + cosA * 8.2, roofZ, 26.0, 1.4, renderAngle, 0.78, 0.82, 0.88, 0.90, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(v.x - cosA * 3.0 + sinA * 8.2, v.y - sinA * 3.0 - cosA * 8.2, roofZ, 26.0, 1.4, renderAngle, 0.78, 0.82, 0.88, 0.90, SPRITE_DRAW_ORDER.CAR_ROOF);
             }
             // Solar clearcoat / windshield sun-glint on sunlit cars by day
             if (!v.destroyed && !mapInfo.isMotorcycle && !isMicroTwoWheeler && nfGlobal < 0.45 && vehShade < 0.35) {
@@ -18423,13 +18547,25 @@ class RetroRenderer {
     drawPixelPortraitRect(ctx, rx, ry, rw, rh, character = "LUCIA", opts = {}) {
         ctx.save();
 
-        // 1. Authentic 1997 GTA 1 UK PlayStation Cover-Art Gouache Portrait Atlas (3x3 Grid)
+        // 1A. Official GTA VI Cast 2x2 Key-Art Illustrated Portrait Atlas (Dre'Quan Priest, Real Dimez, Raul Bautista, Calista)
+        const gta6CastIndex = {
+            DREQUAN: 0,
+            ONLYRAW: 0,
+            REALDIMEZ: 1,
+            ROXY: 1,
+            BAELUXE: 1,
+            RAUL: 2,
+            CALISTA: 3,
+            ATOLL: 3
+        };
+        // 1B. Classic 3x3 Portrait Atlas (Lucia, Jason, Tommy, Trevor, CJ, Niko, Claude, Big Smoke, Crockett)
         const charGridIndex = {
             LUCIA: 0,
             JASON: 1,
             TOMMY: 2,
             TREVOR: 3,
             CJ: 4,
+            BOOBIE: 4,
             NIKO: 5,
             CLAUDE: 6,
             BIGSMOKE: 7,
@@ -18437,6 +18573,38 @@ class RetroRenderer {
             DETECTIVE: 8
         };
         const upperChar = String(character || "LUCIA").toUpperCase();
+        if (this.gta6CastPortraitsReady && this.gta6CastPortraitsImg && this.gta6CastPortraitsImg.width > 0 && gta6CastIndex[upperChar] !== undefined) {
+            const idx = gta6CastIndex[upperChar];
+            const col = idx % 2;
+            const row = Math.floor(idx / 2);
+            const cellW = this.gta6CastPortraitsImg.width / 2;
+            const cellH = this.gta6CastPortraitsImg.height / 2;
+            const padX = cellW * 0.016;
+            const padY = cellH * 0.016;
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(
+                this.gta6CastPortraitsImg,
+                col * cellW + padX,
+                row * cellH + padY,
+                cellW - padX * 2,
+                cellH - padY * 2,
+                rx,
+                ry,
+                rw,
+                rh
+            );
+
+            ctx.strokeStyle = opts.alert ? "#ff1e38" : "#ff2a85";
+            ctx.lineWidth = Math.max(2, rw * 0.035);
+            ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.65)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(rx + 3, ry + 3, rw - 6, rh - 6);
+            ctx.restore();
+            return;
+        }
         if (this.charPortraitsReady && this.charPortraitsImg && this.charPortraitsImg.width > 0 && charGridIndex[upperChar] !== undefined) {
             const idx = charGridIndex[upperChar];
             const col = idx % 3;

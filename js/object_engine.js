@@ -664,6 +664,13 @@ class WorldObjectEngine {
             { name: "NORTH BEACH TROPICAL VIP CABANA",        x: 466.5 * TILE_SIZE, y: 146.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "STAR ISLAND YACHT CLUB CABANA",          x: 354.5 * TILE_SIZE, y: 174.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
+        // Canonical Rockstar GTA VI Key-Art Setpieces on Ocean Drive & Vice Beach
+        this.gta6KeyArtSpots = [
+            { id: "ocean_view_real_dimez", name: "OCEAN VIEW HOTEL — REAL DIMEZ VIP TERRACE", kind: "REAL_DIMEZ", x: 443.26 * TILE_SIZE, y: 279.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "drequan_only_raw",      name: "ONLY RAW RECORDS — DRE'QUAN PRIEST VIP",    kind: "DREQUAN",    x: 443.26 * TILE_SIZE, y: 290.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "raul_heist_table",      name: "RAUL BAUTISTA — LEONIDA HEIST BLUEPRINT",   kind: "RAUL",       x: 443.26 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "the_atoll_pool_club",   name: "THE ATOLL — CALISTA BEACHFRONT POOL CLUB",  kind: "THE_ATOLL",  x: 468.20 * TILE_SIZE, y: 287.0 * TILE_SIZE, z: 2.0, cooldown: 0 }
+        ];
         // 26. Official GTA 6 Vice Beach Baywatch Rescue Med-Stations & Open-Air Neon Roller-Disco Rinks (Loop 19)
         this.beachRescueStations = [
             { name: "NORTH BEACH BAYWATCH RESCUE POST",       x: 474.5 * TILE_SIZE, y: 108.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
@@ -1539,6 +1546,16 @@ class WorldObjectEngine {
                     clearZones.push({ x: bc.x, y: bc.y, r: 42 });
                 }
             }
+            if (Array.isArray(this.gta6KeyArtSpots)) {
+                for (const gs of this.gta6KeyArtSpots) {
+                    if (gs.kind === "THE_ATOLL") {
+                        snapOffRoad(gs);
+                        clearZones.push({ x: gs.x, y: gs.y, r: 58 });
+                    } else {
+                        clearZones.push({ x: gs.x, y: gs.y, r: 28 });
+                    }
+                }
+            }
             if (Array.isArray(this.beachRescueStations)) {
                 for (const br of this.beachRescueStations) {
                     snapOffRoad(br);
@@ -2053,6 +2070,13 @@ class WorldObjectEngine {
             addArrayOBBs(this.beachBoxingRings, 18, 18);
             addArrayOBBs(this.kalagaLookoutTowers, 13, 13);
             addArrayOBBs(this.beachCabanaLounges, 15, 11);
+            if (Array.isArray(this.gta6KeyArtSpots)) {
+                for (const gs of this.gta6KeyArtSpots) {
+                    if (gs.kind === "THE_ATOLL") {
+                        pushWorldOBB(gs.x - 20, gs.y, 10, 18, 0);
+                    }
+                }
+            }
             addArrayOBBs(this.beachRescueStations, 15, 11);
             addArrayOBBs(this.gulfSunsetTikiClubs, 18, 12);
             addArrayOBBs(this.citrusOrchardStands, 14, 9);
@@ -3665,6 +3689,96 @@ class WorldObjectEngine {
                             text: `🥂 VIP CABANA CHAMPAGNE! 150 HP/ARMOR`,
                             color: "#2dd4bf",
                             life: 2.3
+                        });
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 0P-31B. Canonical GTA VI Key-Art Setpieces: Ocean View Real Dimez, Only Raw Dre'Quan, Raul's Heist Blueprint & The Atoll Pool Club ([E]!)
+        if (Array.isArray(this.gta6KeyArtSpots)) {
+            for (const gs of this.gta6KeyArtSpots) {
+                if ((gs.cooldown || 0) <= 0 && Math.hypot(px - gs.x, py - gs.y) < 84) {
+                    gs.cooldown = 45.0;
+                    game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
+                    game.player.hp = 150;
+                    game.player.armor = 150;
+                    if (game.audio) game.audio.playPickup("HEALTH");
+
+                    let title = "🌴 LEONIDA VIP SPOT!";
+                    let sub = gs.name;
+                    let col = "#ff2a85";
+                    let floatTxt = "✨ VIP HYPE! 150 HP/ARMOR";
+                    let sender = "Jason Duval";
+                    let sms = "Ocean Drive is glowing tonight!";
+
+                    if (gs.kind === "REAL_DIMEZ") {
+                        game.player.speedBoostTimer = 25.0;
+                        game.player.rollerSkates = true;
+                        title = "🎤 REAL DIMEZ — OCEAN VIEW DROP!";
+                        sub = "BAE-LUXE & ROXY LIVE • ROLLER-SKATES + SPEED HYPE + 150 HP/ARMOR!";
+                        col = "#a3e635";
+                        floatTxt = "🎤 REAL DIMEZ VIP! 🛼 SKATES ON + 150 HP";
+                        sender = "Real Dimez (Roxy & Bae-Luxe)";
+                        sms = "Ocean View Hotel rooftop & terrace going viral tonight! Lace up those skates and own South Beach!";
+                    } else if (gs.kind === "DREQUAN") {
+                        if (game.player.weaponsOwned && !game.player.weaponsOwned.includes("UZI")) {
+                            game.player.weaponsOwned.push("UZI");
+                        }
+                        if (game.player.ammo) {
+                            game.player.ammo.UZI = Math.max(game.player.ammo.UZI || 0, 120);
+                            game.player.ammo.PISTOL = Math.max(game.player.ammo.PISTOL || 0, 60);
+                        }
+                        title = "🎧 ONLY RAW RECORDS — DRE'QUAN PRIEST!";
+                        sub = "VIP SECURITY LOADOUT: +120 UZI AMMO & 150 HP/ARMOR!";
+                        col = "#ef4444";
+                        floatTxt = "🎧 ONLY RAW VIP! +120 UZI & 150 ARMOR";
+                        sender = "Dre'Quan Priest";
+                        sms = "Only Raw Records runs Ocean Drive! Take the black 4x4 SUV out front or roll with security.";
+                    } else if (gs.kind === "RAUL") {
+                        if (game.player.weaponsOwned && !game.player.weaponsOwned.includes("SHOTGUN")) {
+                            game.player.weaponsOwned.push("SHOTGUN");
+                        }
+                        if (game.player.ammo) {
+                            game.player.ammo.SHOTGUN = Math.max(game.player.ammo.SHOTGUN || 0, 32);
+                            game.player.ammo.PISTOL = Math.max(game.player.ammo.PISTOL || 0, 60);
+                        }
+                        game.wantedLevel = 0;
+                        game.player.ankleScrambled = true;
+                        title = "🗺️ RAUL BAUTISTA — LEONIDA HEIST INTEL!";
+                        sub = "WANTED HEAT CLEARED • +32 SHOTGUN SHELLS & 150 ARMOR!";
+                        col = "#fbbf24";
+                        floatTxt = "🗺️ HEIST INTEL! HEAT CLEARED + SHOTGUN";
+                        sender = "Raul Bautista";
+                        sms = "Every exit route mapped to the second. Stay sharp — the crimson Declasse Tulip has the duffel packed on the trunk.";
+                    } else if (gs.kind === "THE_ATOLL") {
+                        game.player.speedBoostTimer = 30.0;
+                        title = "🏖️ THE ATOLL — CALISTA POOL CLUB VIP!";
+                        sub = "CHILLED ATOLL REFRESH • 30S GOLDEN SPEED BOOST & 150 HP/ARMOR!";
+                        col = "#2dd4bf";
+                        floatTxt = "🏖️ THE ATOLL #69 VIP! 150 HP + SPEED";
+                        sender = "Calista (The Atoll)";
+                        sms = "Golden hour at The Atoll Pool Club! Grab an ice-cold drink by the loungers — best view on Vice Beach.";
+                    }
+
+                    if (typeof game.showBigBanner === "function") {
+                        game.showBigBanner(title, sub, col, 2.7);
+                    }
+                    if (typeof game.sendPager === "function") {
+                        game.sendPager(sender, sms, false);
+                    }
+                    if (typeof game.updateHud === "function") {
+                        game.updateHud();
+                    }
+                    if (Array.isArray(game.floatingTexts)) {
+                        game.floatingTexts.push({
+                            x: gs.x,
+                            y: gs.y,
+                            z: 2.68,
+                            text: floatTxt,
+                            color: col,
+                            life: 2.5
                         });
                     }
                     return true;
@@ -5843,7 +5957,7 @@ class WorldObjectEngine {
                 this.sandcastles, this.kayakOutposts, this.baseJumpPads, this.kitesurfStands,
                 this.luxuryValetStands, this.gatorTourDocks, this.graffitiScaffolds, this.pierCarnivalGames,
                 this.latinStreetBands, this.monsterCrushPads, this.sharkCageCharters, this.heliTourPads,
-                this.cigarRumStands, this.kalagaLookoutTowers, this.beachCabanaLounges, this.beachRescueStations,
+                this.cigarRumStands, this.kalagaLookoutTowers, this.beachCabanaLounges, this.gta6KeyArtSpots, this.beachRescueStations,
                 this.rollerDiscoRinks, this.conchShacks, this.moonshineStills, this.spaceViewingStands,
                 this.catamaranDocks, this.botanicaShrines, this.droneLaunchPads, this.tarotNeonBooths,
                 this.beachBoxingRings, this.derbyPitGarages, this.lobsterTrapBuoys, this.blockPartyStages,
@@ -7648,15 +7762,17 @@ class WorldObjectEngine {
                             float westSunWeight = clamp(0.76 - uSunDir.x * 0.35, 0.25, 0.92);
                             float bldShadow = max(lm.a * westSunWeight, lm.b * (1.0 - westSunWeight * 0.45)) * onGround * 0.68;
                             float totalShade = clamp(max(bldShadow, bldAO), 0.0, 1.0);
-                            vec3 sunlitTint = vec3(1.13, 1.07, 0.93);
-                            vec3 shadowTint = vec3(0.58, 0.68, 0.87);
+                            vec3 sunlitTint = mix(vec3(1.13, 1.07, 0.93), vec3(1.22, 0.99, 0.86), uSunsetTint * 0.88);
+                            vec3 shadowTint = mix(vec3(0.58, 0.68, 0.87), vec3(0.70, 0.58, 0.93), uSunsetTint * 0.88);
                             vec3 dayGrading = mix(sunlitTint, shadowTint, totalShade);
                             float baseAO = mix(0.85, 1.03, smoothstep(2.0, 2.55, vWorldPos.y));
                             c.rgb = min(vec3(1.0), c.rgb * mix(vec3(1.0), dayGrading * baseAO, dayAmt));
                         }
                         if (uSunsetTint > 0.01) {
-                            vec3 sunsetRgb = c.rgb * vec3(1.16, 0.88, 0.96) + vec3(0.04, 0.01, 0.02);
-                            c.rgb = mix(c.rgb, min(vec3(1.0), sunsetRgb), uSunsetTint * 0.60);
+                            float lumObj = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                            vec3 sunsetTone = mix(vec3(0.96, 0.85, 1.06), vec3(1.15, 0.94, 0.88), smoothstep(0.22, 0.68, lumObj));
+                            vec3 sunsetRgb = c.rgb * sunsetTone + vec3(0.03, 0.01, 0.025);
+                            c.rgb = mix(c.rgb, min(vec3(1.0), sunsetRgb), uSunsetTint * 0.48);
                         }
                         if (abs(uNightTint) > 0.01) {
                             bool emissiveOnly = (uNightTint < -0.5);
@@ -10221,7 +10337,39 @@ class WorldObjectEngine {
                 }
 
                 // 2) Stepped Art Deco Limestone Rooftop Crown & Vertical Stone Fin (every 5 building rows)
-                if (r % 5 === 2) {
+                if (r === 279 || r === 280) {
+                    // Canonical GTA VI Artwork 3: OCEAN VIEW HOTEL Stepped White Art Deco Pylon + Triple Vertical Hot-Pink Neon Tubes (|||) + Pink Neon Marquee!
+                    const ovWhite = [0.96, 0.95, 0.98];
+                    const ovPink  = [1.00, 0.24, 0.76];
+                    const ovCyan  = [0.22, 0.94, 0.98];
+                    emitSolidBox3D(facadeX - 3.5, rowY, 1, 0, 0, 0, 11.0, 62.0, topZ, topZ + 0.24, ovWhite, 1);
+                    if (r === 279) {
+                        emitSolidBox3D(facadeX - 1.5, rowY + 32.0, 1, 0, 0, 0, 13.0, 38.0, topZ + 0.24, topZ + 0.56, ovWhite, 1);
+                        // Triple vertical pink neon tubes (|||) rising up the central Ocean View Hotel tower!
+                        for (const nyOff of [-9.0, 0.0, 9.0]) {
+                            emitSolidBox3D(facadeX + 5.2, rowY + 32.0 + nyOff, 1, 0, 0, 0, 2.8, 2.4, 2.46, topZ + 0.52, ovPink, 10);
+                        }
+                        // Horizontal glowing pink & cyan Art Deco marquee band ("OCEAN VIEW HOTEL")
+                        emitSolidBox3D(facadeX + 8.5, rowY + 32.0, 1, 0, 0, 0, 16.0, 118.0, 2.42, 2.50, ovWhite, 1);
+                        emitSolidBox3D(facadeX + 16.8, rowY + 32.0, 1, 0, 0, 0, 2.8, 120.0, 2.44, 2.52, ovPink, 10);
+                        emitSolidBox3D(facadeX + 16.8, rowY + 32.0, 1, 0, 0, 0, 2.2, 86.0, 2.52, 2.57, ovCyan, 10);
+                        // Charcoal-slate outdoor bistro parasols matching Artwork 3
+                        for (const pyOff of [-22.0, 22.0, 66.0]) {
+                            emitCylinder3D(facadeX + 12.0, rowY + pyOff, 0, 0, 1.2, 1.2, 2.00, 2.30, 6, [0.82, 0.86, 0.92], 5, false);
+                            emitCone3D(facadeX + 12.0, rowY + pyOff, 0, 0, 10.5, 2.27, 2.36, 8, [0.18, 0.21, 0.27], 1);
+                        }
+                    }
+                    continue;
+                } else if (r === 277 || r === 278) {
+                    // Canonical GTA VI Artwork 3 Left Hotel: Glowing Emerald-Aquamarine Uplight Facade & Arched Colonnade!
+                    const emAqua = [0.18, 0.96, 0.74];
+                    const emMint = [0.76, 0.98, 0.90];
+                    emitSolidBox3D(facadeX - 3.0, rowY, 1, 0, 0, 0, 9.5, 60.0, topZ, topZ + 0.20, emMint, 1);
+                    emitSolidBox3D(facadeX + 2.2, rowY - 18.0, 1, 0, 0, 0, 3.0, 4.2, 2.08, topZ - 0.08, emAqua, 10);
+                    emitSolidBox3D(facadeX + 2.2, rowY + 18.0, 1, 0, 0, 0, 3.0, 4.2, 2.08, topZ - 0.08, emAqua, 10);
+                    emitSolidBox3D(facadeX + 3.2, rowY, 1, 0, 0, 0, 4.5, 54.0, 2.36, 2.44, emAqua, 10);
+                    continue;
+                } else if (r % 5 === 2) {
                     emitSolidBox3D(facadeX - 4.0, rowY, 1, 0, 0, 0, 10.0, 52.0, topZ, topZ + 0.16, trimCol, 1);
                     emitSolidBox3D(facadeX - 2.5, rowY, 1, 0, 0, 0, 8.0, 34.0, topZ + 0.16, topZ + 0.28, capCol, 2);
                     emitSolidBox3D(facadeX + 1.0, rowY, 1, 0, 0, 0, 11.0, 5.5, topZ + 0.08, topZ + 0.44, trimCol, 1);
@@ -10813,6 +10961,48 @@ class WorldObjectEngine {
                 emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz, bz + 0.06, [0.66, 0.48, 0.28], 11);
                 emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 16, 12, bz + 0.06, bz + 0.12, [0.18, 0.86, 0.88], 1);
                 emitSolidBox3D(bc.x, bc.y, 1, 0, 0, 0, 22, 18, bz + 0.26, bz + 0.31, [0.98, 0.98, 1.00], 1);
+            }
+        }
+        if (Array.isArray(this.gta6KeyArtSpots)) {
+            for (const gs of this.gta6KeyArtSpots) {
+                const bz = gs.z || 2.0;
+                if (gs.kind === "THE_ATOLL") {
+                    // Canonical GTA VI Artwork 4: THE ATOLL Beachfront Art Deco Pool Club Pavilion, Turquoise Pool, 4 White Sun Loungers & White Parasols!
+                    emitAOShadow3D(gs.x, gs.y, 1, 0, 0, 0, 74, 58, bz, 0.34);
+                    // Warm travertine sun-deck terrace plinth
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 0, 0, 68, 52, bz, bz + 0.032, [0.95, 0.91, 0.85], 1);
+                    // Stepped Cream-White Art Deco "THE ATOLL" Bar Pavilion on West edge (x - 20)
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, -20, 0, 18, 34, bz + 0.032, bz + 0.36, [0.97, 0.95, 0.94], 1);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, -20, 0, 21, 37, bz + 0.36, bz + 0.42, [0.99, 0.97, 0.96], 1);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, -10.5, 0, 4.5, 32, bz + 0.24, bz + 0.29, [0.98, 0.78, 0.84], 10); // Sign frieze glow
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, -11.0, 0, 4.0, 24, bz + 0.032, bz + 0.14, [0.88, 0.84, 0.88], 1); // Bar counter
+                    // Illuminated Turquoise-Aqua Plunge Pool on East side (x + 11) with cobalt trim & chrome ladder rails
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 11, 0, 32, 24, bz + 0.032, bz + 0.052, [0.98, 0.97, 0.95], 1);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 11, 0, 28, 20, bz + 0.034, bz + 0.058, [0.14, 0.88, 0.92], 10);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, -2.5, -5.5, 3.2, 0.9, bz + 0.05, bz + 0.14, [0.88, 0.92, 0.96], 5);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, -2.5, -2.5, 3.2, 0.9, bz + 0.05, bz + 0.14, [0.88, 0.92, 0.96], 5);
+                    // Row of 4 Crisp White Slatted Sun Loungers + 2 Tall White Octagonal Resort Parasols
+                    for (const lyOff of [-18, -13, 13, 18]) {
+                        emitSolidBox3D(gs.x, gs.y, 1, 0, 8, lyOff, 11.5, 3.8, bz + 0.034, bz + 0.068, [0.98, 0.98, 1.00], 1);
+                        emitSolidBox3D(gs.x, gs.y, 1, 0, 3.2, lyOff, 3.4, 3.8, bz + 0.068, bz + 0.105, [0.99, 0.99, 1.00], 1);
+                    }
+                    for (const pyOff of [-15.5, 15.5]) {
+                        emitCylinder3D(gs.x, gs.y, 6, pyOff, 1.0, 1.0, bz + 0.034, bz + 0.33, 6, [0.86, 0.89, 0.94], 5, false);
+                        emitCone3D(gs.x, gs.y, 6, pyOff, 11.2, bz + 0.30, bz + 0.39, 8, [0.99, 0.98, 1.00], 1);
+                    }
+                } else if (gs.kind === "RAUL") {
+                    // Canonical GTA VI Artwork 2 Right Panel: Raul Bautista's Heist Planning Table (Teak Table + Coastal Map + Red Target Marks + Gold/Cash)
+                    emitAOShadow3D(gs.x, gs.y, 1, 0, 0, 0, 18, 24, bz, 0.30);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 2.0, 0, 11.0, 18.0, bz, bz + 0.12, [0.46, 0.28, 0.16], 11);
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 2.0, 0, 9.2, 15.4, bz + 0.12, bz + 0.132, [0.74, 0.92, 0.90], 1); // Leonida coastal blueprint sheet
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 1.5, -2.5, 4.4, 5.2, bz + 0.132, bz + 0.138, [0.92, 0.88, 0.74], 1); // Mainland landmass
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 2.2, 3.2, 2.6, 2.6, bz + 0.138, bz + 0.144, [0.96, 0.18, 0.24], 10); // Red sharpie heist target
+                    emitSolidBox3D(gs.x, gs.y, 1, 0, 3.5, -5.5, 3.4, 2.4, bz + 0.132, bz + 0.162, [0.16, 0.18, 0.22], 5); // Tactical comm radio
+                } else if (gs.kind === "REAL_DIMEZ") {
+                    // Real Dimez VIP Velvet Rope & Pink/Lime Neon Ring-Light Rig outside Ocean View Hotel
+                    emitCylinder3D(gs.x, gs.y, 5.5, 0, 0.9, 0.9, bz, bz + 0.20, 6, [0.88, 0.90, 0.95], 5, false);
+                    emitCylinder3D(gs.x, gs.y, 5.5, 0, 3.4, 3.4, bz + 0.20, bz + 0.24, 8, [1.00, 0.30, 0.78], 10, true);
+                }
             }
         }
         // 22L. OFFICIAL GTA 6 BAYWATCH RESCUE STATIONS, NEON ROLLER-DISCO RINKS, CONCH SHACKS, MOONSHINE STILLS, SPACE VIEWING BLEACHERS, CATAMARANS, BOTANICAS & DRONE PADS (LOOPS 19..22)
@@ -14758,6 +14948,53 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (this._isStaticArrInView(this.gta6KeyArtSpots, minX, minY, maxX, maxY, 150)) {
+            const t = renderer.time || 0;
+            for (let i = 0; i < this.gta6KeyArtSpots.length; i++) {
+                const gs = this.gta6KeyArtSpots[i];
+                if (gs.x < minX - 140 || gs.x > maxX + 140 || gs.y < minY - 140 || gs.y > maxY + 140) continue;
+                const bz = gs.z || 2.0;
+                const groove = Math.sin(t * 4.2 + i * 1.7);
+                if (gs.kind === "REAL_DIMEZ") {
+                    // Roxy (lime fur jacket) & Bae-Luxe (grey denim & zebra top) grooving together outside Ocean View Hotel!
+                    if ((gs.cooldown || 0) <= 0) {
+                        const rSz = 24 + groove * 2.8;
+                        renderer.pushSolidQuad3D(gs.x + 2, gs.y, 2.026, rSz, rSz, t * 1.4, 0.64, 0.92, 0.22, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    renderer.batchPedSprite3D("vc_roxy", 98, gs.x - 1.5, gs.y - 7.5, bz + 0.048, 0.22 + groove * 0.16, 1.38, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    renderer.batchPedSprite3D("vc_baeluxe", 98, gs.x - 1.5, gs.y + 7.5, bz + 0.048, -0.22 - groove * 0.16, 1.38, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else if (gs.kind === "DREQUAN") {
+                    // Dre'Quan Priest in crimson tee & gold chain checking his smartphone on Ocean Drive!
+                    if ((gs.cooldown || 0) <= 0) {
+                        const rSz = 22 + groove * 2.5;
+                        renderer.pushSolidQuad3D(gs.x + 2, gs.y, 2.026, rSz, rSz, -t * 1.3, 0.96, 0.22, 0.30, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    const dAng = 0.08 + Math.sin(t * 2.4) * 0.10;
+                    renderer.batchPedSprite3D("vc_drequan", 98, gs.x - 1.0, gs.y, bz + 0.048, dAng, 1.40, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Sleek glowing smartphone in Dre'Quan's right hand
+                    renderer.pushSolidQuad3D(gs.x + 5.2, gs.y + 3.4, bz + 0.062, 3.0, 1.9, dAng, 0.16, 0.84, 0.98, 0.96, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else if (gs.kind === "RAUL") {
+                    // Raul Bautista leaning over the coastal heist blueprint table!
+                    if ((gs.cooldown || 0) <= 0) {
+                        const rSz = 22 + groove * 2.5;
+                        renderer.pushSolidQuad3D(gs.x + 2, gs.y, 2.026, rSz, rSz, t * 1.2, 0.98, 0.76, 0.18, 0.46, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    renderer.batchPedSprite3D("vc_raul", 98, gs.x - 5.5, gs.y, bz + 0.048, Math.sin(t * 1.8) * 0.10, 1.40, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                } else if (gs.kind === "THE_ATOLL") {
+                    // Calista (#69 mint-teal jersey) poolside at The Atoll holding her chilled blue beverage can with white straw!
+                    if ((gs.cooldown || 0) <= 0) {
+                        const rSz = 28 + groove * 3.2;
+                        renderer.pushSolidQuad3D(gs.x - 2, gs.y, 2.062, rSz, rSz, t * 1.3, 0.18, 0.90, 0.82, 0.48, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                    }
+                    const cAng = 0.15 + Math.sin(t * 2.6) * 0.14;
+                    const cx = gs.x - 2.0, cy = gs.y + 2.0;
+                    renderer.batchPedSprite3D("vc_calista", 98, cx, cy, bz + 0.082, cAng, 1.38, false, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    // Chilled blue aluminum drink can + white straw in left hand
+                    renderer.pushSolidQuad3D(cx + 4.8, cy - 4.4, bz + 0.096, 2.8, 2.2, cAng, 0.22, 0.62, 0.98, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                    renderer.pushSolidQuad3D(cx + 5.6, cy - 4.4, bz + 0.102, 2.2, 0.8, cAng - 0.3, 0.98, 0.99, 1.00, 0.98, SPRITE_DRAW_ORDER.PEDESTRIAN);
+                }
+            }
+        }
         if (this._isStaticArrInView(this.beachRescueStations, minX, minY, maxX, maxY, 130)) {
             for (let i = 0; i < this.beachRescueStations.length; i++) {
                 const br = this.beachRescueStations[i];
@@ -16166,6 +16403,29 @@ class WorldObjectEngine {
                 }
             }
         }
+        if (Array.isArray(this.gta6KeyArtSpots)) {
+            for (const gs of this.gta6KeyArtSpots) {
+                if ((gs.cooldown || 0) <= 0 && Math.hypot(px - gs.x, py - gs.y) < 108) {
+                    const scr = renderer.worldToScreen(gs.x, gs.y - 16, 2.52);
+                    ctx.font = "900 11px monospace";
+                    ctx.fillStyle = "rgba(8,12,22,0.92)";
+                    ctx.fillRect(scr.x - 224, scr.y - 22, 448, 22);
+                    const bCol = gs.kind === "REAL_DIMEZ" ? "#a3e635" : (gs.kind === "DREQUAN" ? "#ef4444" : (gs.kind === "RAUL" ? "#fbbf24" : "#2dd4bf"));
+                    const pTxt = gs.kind === "REAL_DIMEZ"
+                        ? "🎤 [E] REAL DIMEZ @ OCEAN VIEW (SKATES + SPEED + 150 HP)"
+                        : (gs.kind === "DREQUAN"
+                            ? "🎧 [E] DRE'QUAN ONLY RAW VIP (+120 UZI AMMO & 150 ARMOR)"
+                            : (gs.kind === "RAUL"
+                                ? "🗺️ [E] RAUL'S HEIST BLUEPRINT (CLEAR HEAT + SHOTGUN & ARMOR)"
+                                : "🏖️ [E] CALISTA @ THE ATOLL POOL CLUB (SPEED BOOST & 150 HP)"));
+                    ctx.strokeStyle = bCol;
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(scr.x - 224, scr.y - 22, 448, 22);
+                    ctx.fillStyle = bCol;
+                    ctx.fillText(pTxt, scr.x, scr.y - 7);
+                }
+            }
+        }
         if (Array.isArray(this.beachCabanaLounges)) {
             for (const bc of this.beachCabanaLounges) {
                 if ((bc.cooldown || 0) <= 0 && Math.hypot(px - bc.x, py - bc.y) < 110) {
@@ -17320,6 +17580,14 @@ class WorldObjectEngine {
             ctx.fillStyle = "#2dd4bf";
             for (const bc of this.beachCabanaLounges) {
                 ctx.fillRect((bc.x - 14) * sx, (bc.y - 12) * sy, 28 * sx, 24 * sy);
+            }
+        }
+        if (Array.isArray(this.gta6KeyArtSpots)) {
+            for (const gs of this.gta6KeyArtSpots) {
+                ctx.fillStyle = gs.kind === "THE_ATOLL" ? "#2dd4bf" : "#ff2a85";
+                const rw = gs.kind === "THE_ATOLL" ? 36 : 16;
+                const rh = gs.kind === "THE_ATOLL" ? 28 : 16;
+                ctx.fillRect((gs.x - rw * 0.5) * sx, (gs.y - rh * 0.5) * sy, rw * sx, rh * sy);
             }
         }
         if (Array.isArray(this.beachRescueStations)) {

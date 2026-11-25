@@ -1015,8 +1015,8 @@ html, body {
 
 .char-select-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
     margin-bottom: 12px;
 }
 
@@ -2041,7 +2041,7 @@ body.touch-enabled #mobile-touch-controls {
         gap: 6px;
     }
 
-    .char-select-card:last-child {
+    .char-select-card:nth-child(2n+1):last-child {
         grid-column: 1 / -1;
     }
 

@@ -11,11 +11,12 @@
     <link rel="preconnect" href="https://srv2162111.hstgr.cloud:8443" crossorigin>
     <link rel="dns-prefetch" href="https://srv2162111.hstgr.cloud:8443">
     <link rel="preload" as="image" href="assets/gta1/gta1_char_portraits.png?v=98_51" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/gta1/gta6_cast_portraits.jpg?v=101_253" fetchpriority="high">
     <link rel="preload" as="image" href="assets/gta1/gta1_sprites.png?v=101_146" fetchpriority="high">
     <link rel="preload" as="fetch" href="assets/gta1/gta1_meta.json?v=101_146" crossorigin="anonymous" fetchpriority="high">
-    <link rel="stylesheet" href="css/style.css?v=101_252">
+    <link rel="stylesheet" href="css/style.css?v=101_253">
     <script>
-        window.__VC26_BUILD = "101_252";
+        window.__VC26_BUILD = "101_253";
         window.__VC26_WS_URL = "wss://srv2162111.hstgr.cloud:8443";
         (function() {
             function checkBuildVersion() {
@@ -150,7 +151,8 @@
             <div><span class="key-pill">X</span> / <span class="key-pill">Q</span> Focus Mode • <span class="key-pill">G</span> Horn / Siren / Burp</div>
             <div><span class="key-pill">K</span> Arm 5s Car Bomb • <span class="key-pill">P</span> Spray Graffiti Tag</div>
             <div><span class="key-pill">CLICK</span> / <span class="key-pill">J</span> Shoot • <span class="key-pill">TAB</span> / <span class="key-pill">1-7</span> Weapon</div>
-            <div><span class="key-pill">M</span> Map • <span class="key-pill">R</span> Radio • <span class="key-pill">H</span> Dossier • <span class="key-pill">F10</span> Studio</div>
+            <div><span class="key-pill">8</span> Roller-Skates 🛼 • <span class="key-pill">U</span> / <span class="key-pill">9</span> Groove Emote 💃</div>
+            <div><span class="key-pill">M</span> Map • <span class="key-pill">N</span> Golden/Night • <span class="key-pill">H</span> Cast • <span class="key-pill">R</span> Radio</div>
         </div>
 
         <!-- Bottom-Right: Audio-Only 1997 Vice City Car Stereo Tuner (No Video Display) -->
@@ -230,6 +232,7 @@
                 <div class="touch-utility-row">
                     <button type="button" class="touch-util-btn" id="tbtn-phone" title="Toggle Smartphone" aria-label="Phone">📱</button>
                     <button type="button" class="touch-util-btn" id="tbtn-map" title="Open Full Map" aria-label="Map">🗺️</button>
+                    <button type="button" class="touch-util-btn" id="tbtn-skates" title="Toggle Neon Roller-Skates [8]" aria-label="Roller-Skates">🛼</button>
                     <button type="button" class="touch-util-btn" id="tbtn-weapon" title="Cycle Weapon" aria-label="Weapon">🔄</button>
                     <button type="button" class="touch-util-btn" id="tbtn-horn" title="Horn / Siren / Burp" aria-label="Horn">📢</button>
                 </div>
@@ -349,8 +352,8 @@
                     </div>
                 </div>
 
-                <!-- STEP 2: 9 ICONIC PLAYABLE LEGENDS -->
-                <div class="char-select-section-title">🎭 CHOOSE YOUR LEGEND (9 PLAYABLE CHARACTERS)</div>
+                <!-- STEP 2: 12 ICONIC PLAYABLE LEGENDS (GTA VI CAST + GTA UNIVERSE ICONS) -->
+                <div class="char-select-section-title">🎭 CHOOSE YOUR LEGEND (12 PLAYABLE CHARACTERS — GTA VI CAST &amp; ICONS)</div>
                 <div class="char-select-grid" id="char-select-grid">
                     <div class="mugshot-card char-select-card active-mug" data-char-id="LUCIA" data-ped-type="lucia" data-color="#ff2a85" data-weapon="PISTOL">
                         <canvas id="lucia-dossier-portrait" class="char-select-canvas" data-char="LUCIA" width="128" height="128"></canvas>
@@ -365,6 +368,38 @@
                         <div class="mugshot-meta">
                             <span class="mug-name">JASON DUVAL</span>
                             <span class="mug-tag">LEONIDA • KEYS</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="DREQUAN" data-ped-type="vc_drequan" data-color="#ef4444" data-weapon="PISTOL">
+                        <canvas class="char-select-canvas" data-char="DREQUAN" width="128" height="128"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">DRE'QUAN PRIEST</span>
+                            <span class="mug-tag">ONLY RAW • MUSIC MOGUL</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="REALDIMEZ" data-ped-type="vc_roxy" data-color="#a3e635" data-weapon="PISTOL">
+                        <canvas class="char-select-canvas" data-char="REALDIMEZ" width="128" height="128"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">REAL DIMEZ</span>
+                            <span class="mug-tag">OCEAN VIEW • RAP DUO</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="RAUL" data-ped-type="vc_raul" data-color="#fbbf24" data-weapon="PISTOL">
+                        <canvas class="char-select-canvas" data-char="RAUL" width="128" height="128"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">RAUL BAUTISTA</span>
+                            <span class="mug-tag">LEONIDA • MASTER HEIST</span>
+                        </div>
+                    </div>
+
+                    <div class="mugshot-card char-select-card" data-char-id="CALISTA" data-ped-type="vc_calista" data-color="#2dd4bf" data-weapon="PISTOL">
+                        <canvas class="char-select-canvas" data-char="CALISTA" width="128" height="128"></canvas>
+                        <div class="mugshot-meta">
+                            <span class="mug-name">CALISTA</span>
+                            <span class="mug-tag">THE ATOLL • POOL CLUB</span>
                         </div>
                     </div>
 
@@ -400,19 +435,11 @@
                         </div>
                     </div>
 
-                    <div class="mugshot-card char-select-card" data-char-id="CLAUDE" data-ped-type="claude" data-color="#10b981" data-weapon="PISTOL">
-                        <canvas class="char-select-canvas" data-char="CLAUDE" width="128" height="128"></canvas>
-                        <div class="mugshot-meta">
-                            <span class="mug-name">CLAUDE SPEED</span>
-                            <span class="mug-tag">LIBERTY CITY • SILENT PRO</span>
-                        </div>
-                    </div>
-
                     <div class="mugshot-card char-select-card" data-char-id="BIGSMOKE" data-ped-type="bigsmoke" data-color="#84cc16" data-weapon="PISTOL">
                         <canvas class="char-select-canvas" data-char="BIGSMOKE" width="128" height="128"></canvas>
                         <div class="mugshot-meta">
                             <span class="mug-name">BIG SMOKE</span>
-                            <span class="mug-tag">SAN ANDREAS • NUMBER 9 LARGE</span>
+                            <span class="mug-tag">SAN ANDREAS • NUMBER 9</span>
                         </div>
                     </div>
 
@@ -431,17 +458,17 @@
     </div>
 
     <!-- Modular Zero-Dependency 2.5D Engine Scripts -->
-    <script src="js/audio.js?v=101_252"></script>
-    <script src="js/interiors.js?v=101_252"></script>
-    <script src="js/object_engine.js?v=101_252"></script>
-    <script src="js/map.js?v=101_252"></script>
-    <script src="js/entities.js?v=101_252"></script>
-    <script src="js/pednav.js?v=101_252"></script>
-    <script src="js/missions.js?v=101_252"></script>
-    <script src="js/renderer.js?v=101_252"></script>
-    <script src="js/net.js?v=101_252"></script>
-    <script src="js/world_director.js?v=101_252"></script>
-    <script src="js/creation_engine.js?v=101_252"></script>
-    <script src="js/game.js?v=101_252"></script>
+    <script src="js/audio.js?v=101_253"></script>
+    <script src="js/interiors.js?v=101_253"></script>
+    <script src="js/object_engine.js?v=101_253"></script>
+    <script src="js/map.js?v=101_253"></script>
+    <script src="js/entities.js?v=101_253"></script>
+    <script src="js/pednav.js?v=101_253"></script>
+    <script src="js/missions.js?v=101_253"></script>
+    <script src="js/renderer.js?v=101_253"></script>
+    <script src="js/net.js?v=101_253"></script>
+    <script src="js/world_director.js?v=101_253"></script>
+    <script src="js/creation_engine.js?v=101_253"></script>
+    <script src="js/game.js?v=101_253"></script>
 </body>
 </html>
