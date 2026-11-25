@@ -664,11 +664,11 @@ class WorldObjectEngine {
             { name: "NORTH BEACH TROPICAL VIP CABANA",        x: 466.5 * TILE_SIZE, y: 146.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { name: "STAR ISLAND YACHT CLUB CABANA",          x: 354.5 * TILE_SIZE, y: 174.5 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
-        // Canonical Rockstar GTA VI Key-Art Setpieces on Ocean Drive & Vice Beach
+        // Canonical Rockstar GTA VI Key-Art Setpieces on Ocean Drive & Vice Beach (443.34 sits cleanly outside the c=442 3D hotel roof overhang!)
         this.gta6KeyArtSpots = [
-            { id: "ocean_view_real_dimez", name: "OCEAN VIEW HOTEL — REAL DIMEZ VIP TERRACE", kind: "REAL_DIMEZ", x: 442.38 * TILE_SIZE, y: 278.0 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { id: "drequan_only_raw",      name: "ONLY RAW RECORDS — DRE'QUAN PRIEST VIP",    kind: "DREQUAN",    x: 442.38 * TILE_SIZE, y: 290.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
-            { id: "raul_heist_table",      name: "RAUL BAUTISTA — LEONIDA HEIST BLUEPRINT",   kind: "RAUL",       x: 442.38 * TILE_SIZE, y: 294.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "ocean_view_real_dimez", name: "OCEAN VIEW HOTEL — REAL DIMEZ VIP TERRACE", kind: "REAL_DIMEZ", x: 443.34 * TILE_SIZE, y: 278.2 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "drequan_only_raw",      name: "ONLY RAW RECORDS — DRE'QUAN PRIEST VIP",    kind: "DREQUAN",    x: 443.34 * TILE_SIZE, y: 289.5 * TILE_SIZE, z: 2.0, cooldown: 0 },
+            { id: "raul_heist_table",      name: "RAUL BAUTISTA — LEONIDA HEIST BLUEPRINT",   kind: "RAUL",       x: 443.34 * TILE_SIZE, y: 294.2 * TILE_SIZE, z: 2.0, cooldown: 0 },
             { id: "the_atoll_pool_club",   name: "THE ATOLL — CALISTA BEACHFRONT POOL CLUB",  kind: "THE_ATOLL",  x: 468.20 * TILE_SIZE, y: 287.0 * TILE_SIZE, z: 2.0, cooldown: 0 }
         ];
         // 26. Official GTA 6 Vice Beach Baywatch Rescue Med-Stations & Open-Air Neon Roller-Disco Rinks (Loop 19)
