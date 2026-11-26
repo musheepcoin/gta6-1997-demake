@@ -1244,13 +1244,13 @@ class ViceWorldDirector {
                     : false;
                 const isFastRescue = (serviceType === "FIRE" || serviceType === "MEDIC");
                 const minGateDist = isFastRescue ? 780 : this.config.stationGateMinDist;
-                const maxGateDist = isFastRescue ? 1800 : this.config.stationGateMaxDist;
+                const maxGateDist = this.config.stationGateMaxDist;
                 const useStationGate = distStToTarget >= minGateDist &&
                     distStToTarget <= maxGateDist &&
                     !inViewSt;
                 const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - roadTargetX);
                 const corridorDist = isFastRescue
-                    ? Math.max(880, Math.min(distStToTarget, 1180))
+                    ? Math.max(920, Math.min(distStToTarget, 1220))
                     : Math.max(1520, Math.min(distStToTarget, 1920));
                 const anchorX = useStationGate ? st.x : (roadTargetX + Math.cos(dirFromTargetToSt) * corridorDist);
                 const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
@@ -1459,13 +1459,9 @@ class ViceWorldDirector {
             if (!nav || nav.groundType !== roadType || nav.isRailway) continue;
 
             // Real-World 3M Opticom Infrared Signal Preemption:
-            // If an active emergency responder (Police, Ambulance, Fire Engine, or Tow Truck with sirenActive)
-            // is within 1..3 tiles of a signalized intersection stop-line, preempt the traffic light to GREEN on its axis
-            // so queued civilian cars at the red light ahead roll forward and clear the intersection!
-            const isPrioritySiren = !v.destroyed && Boolean(
-                v.sirenActive ||
-                (v.driver === "AI_TOW" && (v.towTarget || v.towingVehicle))
-            );
+            // Only life-safety emergency responders (Police, Ambulance, Fire Engine — NOT Tow Trucks) with sirenActive
+            // preempt the traffic light to GREEN on their approach axis!
+            const isPrioritySiren = !v.destroyed && v.driver !== "AI_TOW" && v.specKey !== "TOW_TRUCK" && Boolean(v.sirenActive);
             if (isPrioritySiren && !opticomAxis && typeof g.map.getBlockInfo === "function") {
                 const fDx = Math.round(Math.cos(v.angle || 0));
                 const fDy = Math.round(Math.sin(v.angle || 0));
@@ -1494,7 +1490,7 @@ class ViceWorldDirector {
             }
             const isWreck = Boolean(v.destroyed && !v.towedByTruck);
             const isAbandoned = !isWreck && !v.towedByTruck && v.driver === null && (v.abandonedTimer || 0) >= 2.5;
-            const isTowManeuver = !isWreck && v.driver === "AI_TOW" && !v.towingVehicle && spd < 24;
+            const isTowManeuver = !isWreck && v.driver === "AI_TOW" && v.aiState !== "STOPPED_LIGHT" && Boolean(v.towTarget) && !v.towingVehicle && spd < 24;
             const isStalledTraffic = !isWreck && !v.towedByTruck && v.driver !== null && v.driver !== "PLAYER" &&
                 spd < 12 &&
                 v.aiState !== "STOPPED_LIGHT" &&
@@ -2215,7 +2211,7 @@ class ViceWorldDirector {
         addCheck("BEACH_OFFROAD_PURSUIT", beachPursuitOk, `SouthBeach=${sbProbe.pursuitMode}:cut=${sbProbe.cruiserCanCutOffRoad}:los=${sbProbe.clearFromNearestRoad}, NorthBeach=${nbProbe.pursuitMode}:cut=${nbProbe.cruiserCanCutOffRoad}:los=${nbProbe.clearFromNearestRoad}:road=(${Math.floor(nbProbe.nearestRoadX / 64)},${Math.floor(nbProbe.nearestRoadY / 64)})`);
 
         // 5. 911 Witness Pipeline Config
-        const w911Ok = this.config.call911DurationSec >= 3.5 && this.config.crimeSceneRadiusPx === 240;
+        const w911Ok = this.config.call911DurationSec >= 3.5 && this.config.crimeSceneRadiusPx >= 180 && this.config.crimeSceneRadiusPx <= 320;
         addCheck("WITNESS_911_PIPELINE", w911Ok, `callDuration=${this.config.call911DurationSec}s, sceneRadius=${this.config.crimeSceneRadiusPx}px`);
 
         // 6. GTA 6 Trunk & Outfit Disguise API

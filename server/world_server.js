@@ -459,6 +459,20 @@ function normalizeRoomCode(roomCode) {
     return raw === "VICE97" ? "VICE26" : raw;
 }
 
+function wrapServerAngle(a) {
+    if (!Number.isFinite(a)) return 0;
+    return Math.round(Math.atan2(Math.sin(a), Math.cos(a)) * 1000) / 1000;
+}
+
+function clearCorpseSmashedPropsNear(room, x, y, radius = 42) {
+    if (!room || !room.smashedProps || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    for (const [pk, pv] of Object.entries(room.smashedProps)) {
+        if (pv && typeof pv.pType === "string" && pv.pType.startsWith("CORPSE:") && Math.hypot((pv.x || 0) - x, (pv.y || 0) - y) <= radius) {
+            delete room.smashedProps[pk];
+        }
+    }
+}
+
 function isDynamicVehicleId(vid) {
     if (typeof vid !== "string") return false;
     return (
@@ -639,9 +653,22 @@ function loadPersistentState() {
                                     migratedAny = true;
                                     continue;
                                 }
+                                vrow[5] = wrapServerAngle(vrow[5]);
                                 vrow[8] = 0; // Ensure parked on startup
                                 vrow[6] = 0;
                                 vrow[7] = 0;
+                                if (vrow[10] & 1) {
+                                    vrow[9] = 0;
+                                    vrow[10] &= ~2;
+                                    const bx = Math.floor(vrow[2] / 64), by = Math.floor(vrow[3] / 64);
+                                    const inRestr = serverMap && serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(bx, by);
+                                    const inWater = serverMap && serverMap.isWaterAtPixel && serverMap.isWaterAtPixel(vrow[2], vrow[3]);
+                                    if ((inRestr || inWater) && (nowMs - (cleanModTs[vid] || 0)) > 120000) {
+                                        delete cleanModTs[vid];
+                                        migratedAny = true;
+                                        continue;
+                                    }
+                                }
                                 cleanModVehs[vid] = vrow;
                                 if (!cleanModTs[vid]) cleanModTs[vid] = nowMs;
                             }
@@ -657,7 +684,9 @@ function loadPersistentState() {
                                         migratedAny = true;
                                         continue;
                                     }
+                                    vrow[5] = wrapServerAngle(vrow[5]);
                                     if (vrow[8] === 4) vrow[8] = 0;
+                                    if (vrow[10] & 1) vrow[9] = 0;
                                     loadedVehs[vid] = vrow;
                                 }
                             }
@@ -665,11 +694,13 @@ function loadPersistentState() {
                             if (rv.peds && typeof rv.peds === "object") {
                                 for (const [pid, prow] of Object.entries(rv.peds)) {
                                     if (Array.isArray(prow) && prow.length >= 10 && !(prow[9] & 1)) {
-                                        // Only keep autonomous server sidewalk peds (ped_init_*) across server restarts; purge stale client peds!
-                                        if (!String(pid).startsWith("ped_init_")) {
+                                        // Only keep autonomous server sidewalk peds (ped_init_0..63) across server restarts; purge stale client/excess peds!
+                                        const pedMatch = /^ped_init_(\d+)$/.exec(String(pid));
+                                        if (!pedMatch || Number(pedMatch[1]) >= 64) {
                                             migratedAny = true;
                                             continue;
                                         }
+                                        prow[6] = Math.round(wrapServerAngle(prow[6]) * 100) / 100;
                                         loadedPeds[pid] = prow;
                                     }
                                 }
@@ -1232,10 +1263,12 @@ function handleClientPacket(socket, pkt) {
         meta.lastDrivenVehId = curDrivenId;
 
         // If player is driving a vehicle (seat === 0), persist its pose in room.modifiedVehs!
-        if (curDrivenId && typeof pkt.x === "number" && typeof pkt.y === "number") {
+        if (curDrivenId && typeof pkt.x === "number" && typeof pkt.y === "number" && Number.isFinite(pkt.x) && Number.isFinite(pkt.y)) {
             const v = pkt.veh;
+            const safeHp = Math.max(0, Math.round(v.hp !== undefined ? v.hp : 100));
             const flags =
-                (v.siren ? 2 : 0) |
+                (safeHp <= 0 ? 1 : 0) |
+                (v.siren && safeHp > 0 ? 2 : 0) |
                 (v.fDent ? 4 : 0) |
                 (v.rDent ? 8 : 0) |
                 (v.hDent ? 16 : 0);
@@ -1245,11 +1278,11 @@ function handleClientPacket(socket, pkt) {
                 Math.round(pkt.x),
                 Math.round(pkt.y),
                 Math.round((pkt.z || 2.0) * 100) / 100,
-                Math.round((pkt.a || 0) * 1000) / 1000,
-                Math.round(pkt.vx || 0),
-                Math.round(pkt.vy || 0),
-                4, // Driven
-                Math.round(v.hp || 100),
+                wrapServerAngle(pkt.a || 0),
+                safeHp > 0 ? Math.round(pkt.vx || 0) : 0,
+                safeHp > 0 ? Math.round(pkt.vy || 0) : 0,
+                safeHp > 0 ? 4 : 0, // Driven (or wrecked)
+                safeHp,
                 flags,
                 v.remapIdx || 0,
                 0,
@@ -1309,6 +1342,16 @@ function handleClientPacket(socket, pkt) {
                 }
                 continue;
             }
+            row[5] = wrapServerAngle(row[5]);
+            if (row[10] & 1) {
+                row[9] = 0;
+                row[8] = 0;
+                row[6] = 0;
+                row[7] = 0;
+                row[10] &= ~2;
+            } else if ((row[9] || 0) <= 0) {
+                row[9] = 1;
+            }
             row[13] = 1;
             if (!room.modifiedVehs[vid] || row[8] !== 0) {
                 room.modifiedVehTs[vid] = nowMs;
@@ -1316,12 +1359,24 @@ function handleClientPacket(socket, pkt) {
             room.modifiedVehs[vid] = row;
             room.vehs[vid] = row;
         }
-        // Keep all modifiedVehs (capped at 120 most recent) so parked/wrecked cars across the city never vanish!
+        // Keep all modifiedVehs (capped at 400 most recent, never evicting actively driven cars)
         const modKeys = Object.keys(room.modifiedVehs);
         if (modKeys.length > 400) {
-            const oldVid = modKeys[0];
-            delete room.modifiedVehs[oldVid];
-            delete room.modifiedVehTs[oldVid];
+            let oldestVid = null;
+            let oldestTs = Infinity;
+            for (const mk of modKeys) {
+                const mr = room.modifiedVehs[mk];
+                if (Array.isArray(mr) && mr[8] === 4) continue;
+                const ts = (room.modifiedVehTs && room.modifiedVehTs[mk]) || 0;
+                if (ts < oldestTs) {
+                    oldestTs = ts;
+                    oldestVid = mk;
+                }
+            }
+            if (oldestVid) {
+                delete room.modifiedVehs[oldestVid];
+                delete room.modifiedVehTs[oldestVid];
+            }
         }
         if (Array.isArray(pkt.peds)) {
             if (!room.corpses) room.corpses = {};
@@ -1375,15 +1430,16 @@ function handleClientPacket(socket, pkt) {
                 0,
                 1
             ];
-            if (typeof pkt.x === "number") row[2] = Math.round(pkt.x);
-            if (typeof pkt.y === "number") row[3] = Math.round(pkt.y);
-            if (typeof pkt.z === "number") row[4] = Math.round(pkt.z * 100) / 100;
-            if (typeof pkt.a === "number") row[5] = Math.round(pkt.a * 1000) / 1000;
+            if (typeof pkt.x === "number" && Number.isFinite(pkt.x)) row[2] = Math.round(pkt.x);
+            if (typeof pkt.y === "number" && Number.isFinite(pkt.y)) row[3] = Math.round(pkt.y);
+            if (typeof pkt.z === "number" && Number.isFinite(pkt.z)) row[4] = Math.round(pkt.z * 100) / 100;
+            if (typeof pkt.a === "number" && Number.isFinite(pkt.a)) row[5] = wrapServerAngle(pkt.a);
             row[6] = 0;
             row[7] = 0;
             row[8] = 0; // Parked (no driver)
-            if (typeof pkt.hp === "number") row[9] = Math.round(pkt.hp);
-            if (typeof pkt.flags === "number") row[10] = pkt.flags;
+            if (typeof pkt.hp === "number" && Number.isFinite(pkt.hp)) row[9] = Math.max(0, Math.round(pkt.hp));
+            if (typeof pkt.flags === "number" && Number.isFinite(pkt.flags)) row[10] = pkt.flags & ~2;
+            if (row[10] & 1) row[9] = 0;
             row[13] = 1; // Permanent modified flag
             room.modifiedVehs[pkt.vehId] = row;
             room.modifiedVehTs[pkt.vehId] = Date.now();
@@ -1547,6 +1603,9 @@ function handleClientPacket(socket, pkt) {
         } else if (pkt.kind === "CREATION_OP" && pkt.op && typeof pkt.op === "object") {
             if (!room.creationOps) room.creationOps = {};
             const op = pkt.op;
+            if ((op.x !== undefined && !Number.isFinite(Number(op.x))) || (op.y !== undefined && !Number.isFinite(Number(op.y)))) {
+                return;
+            }
             if (op.action === "CLEAR_ALL") {
                 for (const oldOp of Object.values(room.creationOps)) {
                     if (oldOp && oldOp.action === "SPAWN_VEHICLE" && oldOp.id) {
@@ -1947,7 +2006,12 @@ server.on("upgrade", (req, socket) => {
                     r.vehs[relVid][6] = 0;
                     r.vehs[relVid][7] = 0;
                     r.vehs[relVid][10] = (r.vehs[relVid][10] || 0) & ~2;
+                    isDirty = true;
                 }
+            }
+            const { room: mRoom } = ensureRoom(m.room);
+            if (mRoom.activeBounty && mRoom.activeBounty.targetId === m.playerId) {
+                mRoom.activeBounty = null;
             }
             clients.delete(socket);
             broadcastToRoom(m.room, { t: "LEAVE", id: m.playerId, name: m.name }, socket);
@@ -2306,9 +2370,10 @@ function ensureFleetParked(room) {
                 used.push(room.fleetHome[id]);
                 isDirty = true;
             }
-            if (!room.vehs[id]) {
+            if (!room.vehs[id] || (Array.isArray(room.vehs[id]) && (room.vehs[id][10] & 1))) {
                 const h = room.fleetHome[id];
                 room.vehs[id] = [id, def.spec, h.x, h.y, h.z, h.angle, 0, 0, 0, def.hp, 0, k % 4, 0, 0];
+                if (room.vehNav) delete room.vehNav[id];
                 isDirty = true;
             }
         }
@@ -2319,9 +2384,14 @@ function parkFleetUnit(room, id) {
     const row = room.vehs[id];
     const h = room.fleetHome && room.fleetHome[id];
     if (!Array.isArray(row) || !h) return;
-    row[2] = h.x; row[3] = h.y; row[4] = h.z; row[5] = h.angle;
+    let maxHp = 180;
+    if (String(id).startsWith("fleet_ems_")) maxHp = FLEET_DEFS.EMS.hp;
+    else if (String(id).startsWith("fleet_fire_")) maxHp = FLEET_DEFS.FIRE.hp;
+    else if (String(id).startsWith("fleet_tow_")) maxHp = FLEET_DEFS.TOW.hp;
+    row[2] = h.x; row[3] = h.y; row[4] = h.z; row[5] = wrapServerAngle(h.angle);
     row[6] = 0; row[7] = 0; row[8] = 0;
-    row[10] = (row[10] || 0) & ~2;
+    row[9] = maxHp;
+    row[10] = 0; // Repair dents & turn siren off at depot
     if (room.vehNav) delete room.vehNav[id];
     isDirty = true;
 }
@@ -2435,9 +2505,15 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         if (!room.activeFlashDrop && room._flashDropCooldown <= 0 && hotspotRoadTiles.length > 0) {
             room._flashDropCooldown = 180;
             const fd = room.activeFlashDistrict || FLASH_DISTRICTS[0];
-            const nearTiles = hotspotRoadTiles.filter((t) => Math.hypot((t.bx + 0.5) * TS - fd.x, (t.by + 0.5) * TS - fd.y) < 1500);
-            const pool = nearTiles.length > 0 ? nearTiles : hotspotRoadTiles;
-            const tile = pool[Math.floor(Math.random() * pool.length)];
+            const isClearDropTile = (t) => {
+                const tx = (t.bx + 0.5) * TS;
+                const ty = (t.by + 0.5) * TS;
+                if (serverMap.resolveCircleBuildingCollision && serverMap.resolveCircleBuildingCollision(tx, ty, 18, t.z || 2.0).hit) return false;
+                return true;
+            };
+            const nearTiles = hotspotRoadTiles.filter((t) => Math.hypot((t.bx + 0.5) * TS - fd.x, (t.by + 0.5) * TS - fd.y) < 1500 && isClearDropTile(t));
+            const pool = nearTiles.length > 0 ? nearTiles : hotspotRoadTiles.filter(isClearDropTile);
+            const tile = (pool.length > 0 ? pool : hotspotRoadTiles)[Math.floor(Math.random() * (pool.length > 0 ? pool.length : hotspotRoadTiles.length))];
             const wx = Math.round((tile.bx + 0.5) * TS);
             const wy = Math.round((tile.by + 0.5) * TS);
             const wz = Math.round((tile.z || 2.0) * 100) / 100;
@@ -2514,27 +2590,57 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         }
 
         // 3A. EMS Ambulance Dispatch from Leonida General Hospital (ems_hq) for street corpses
-        const corpseEntries = Object.entries(room.corpses || {});
-        if (corpseEntries.length > 0) {
-            const activeAmbs = Object.entries(room.vehNav).filter(([, nv]) => nv && nv.role === "EMS");
-            const claimedCorpses = new Set(activeAmbs.map(([, nv]) => nv.targetId));
-            let launchedEms = 0;
-            for (const [targetCid, targetCrow] of corpseEntries) {
-                if (claimedCorpses.has(targetCid)) continue;
-                if (!Array.isArray(targetCrow) || !Number.isFinite(targetCrow[3]) || !Number.isFinite(targetCrow[4])) continue;
-                if (!launchFleetUnit(room, "EMS", targetCid, targetCrow[3], targetCrow[4])) break; // whole fleet busy
-                if (++launchedEms >= 3) break; // stagger departures
-            }
-        }
-
-        // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
-        // Prioritize wrecks closest to active online players and skip unreachable gated/off-road wrecks so fleet units NEVER deadlock!
         const roomPlayerPts = [];
         for (const meta of clients.values()) {
             if (meta.room === roomCode && !meta.isOutdated && meta.lastState && Number.isFinite(meta.lastState.x)) {
                 roomPlayerPts.push(meta.lastState);
             }
         }
+        const corpseEntries = Object.entries(room.corpses || {});
+        if (corpseEntries.length > 0) {
+            corpseEntries.sort((a, b) => {
+                const da = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot((a[1][3] || 0) - p.x, (a[1][4] || 0) - p.y)), 999999);
+                const db = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot((b[1][3] || 0) - p.x, (b[1][4] || 0) - p.y)), 999999);
+                return da - db;
+            });
+            const activeAmbs = Object.entries(room.vehNav).filter(([, nv]) => nv && nv.role === "EMS");
+            const claimedCorpses = new Set(activeAmbs.map(([, nv]) => nv.targetId));
+            let launchedEms = 0;
+            for (const [targetCid, targetCrow] of corpseEntries) {
+                if (claimedCorpses.has(targetCid)) continue;
+                if (!Array.isArray(targetCrow) || !Number.isFinite(targetCrow[3]) || !Number.isFinite(targetCrow[4])) continue;
+                const cx = targetCrow[3], cy = targetCrow[4];
+                const cbx = Math.floor(cx / TS), cby = Math.floor(cy / TS);
+                const inNoTraffic = serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(cbx, cby);
+                const inWater = serverMap.isWaterAtPixel && serverMap.isWaterAtPixel(cx, cy);
+                const snappedCorpseGoal = snapStationToNearestRoad(cx, cy);
+                const corpseReachable = !inNoTraffic && !inWater && Math.hypot(snappedCorpseGoal.x - cx, snappedCorpseGoal.y - cy) <= 185;
+                const corpseAgeMs = nowMs - ((room.corpseTs && room.corpseTs[targetCid]) || nowMs);
+                if (!corpseReachable) {
+                    if (corpseAgeMs > 45000) {
+                        delete room.corpses[targetCid];
+                        if (room.corpseTs) delete room.corpseTs[targetCid];
+                        clearCorpseSmashedPropsNear(room, cx, cy);
+                        isDirty = true;
+                        broadcastToRoom(roomCode, {
+                            t: "WORLD_EVENT",
+                            kind: "PROP_SMASH",
+                            pedId: targetCid,
+                            pType: `CORPSE:${targetCrow[2] || "civ0"}:CIVILIAN`,
+                            x: Math.round(cx),
+                            y: Math.round(cy),
+                            a: -999
+                        });
+                    }
+                    continue;
+                }
+                if (!launchFleetUnit(room, "EMS", targetCid, snappedCorpseGoal.x, snappedCorpseGoal.y)) break; // whole fleet busy
+                if (++launchedEms >= 3) break; // stagger departures
+            }
+        }
+
+        // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
+        // Prioritize wrecks closest to active online players and skip unreachable gated/off-road wrecks so fleet units NEVER deadlock!
         const wreckList = Object.entries(room.modifiedVehs || {}).filter(([, vrow]) => Array.isArray(vrow) && (vrow[10] & 1));
         wreckList.sort((a, b) => {
             const da = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot(a[1][2] - p.x, a[1][3] - p.y)), 999999);
@@ -2542,13 +2648,19 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             return da - db;
         });
         for (const [vid, vrow] of wreckList) {
+            if ((vrow[9] || 0) > 0) {
+                vrow[9] = 0;
+                if (room.vehs && room.vehs[vid]) room.vehs[vid][9] = 0;
+                isDirty = true;
+            }
             const wx = vrow[2];
             const wy = vrow[3];
             if (!Number.isFinite(wx) || !Number.isFinite(wy) || wx < 128 || wy < 128) continue;
             const wbx = Math.floor(wx / TS), wby = Math.floor(wy / TS);
             const inNoTraffic = serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(wbx, wby);
+            const inWater = serverMap.isWaterAtPixel && serverMap.isWaterAtPixel(wx, wy);
             const snappedGoal = snapStationToNearestRoad(wx, wy);
-            const roadReachable = !inNoTraffic && Math.hypot(snappedGoal.x - wx, snappedGoal.y - wy) <= 185;
+            const roadReachable = !inNoTraffic && !inWater && Math.hypot(snappedGoal.x - wx, snappedGoal.y - wy) <= 185;
             const wreckAgeMs = nowMs - ((room.modifiedVehTs && room.modifiedVehTs[vid]) || nowMs);
             if (!(vrow[10] & 128)) {
                 if (!roadReachable) {
@@ -2564,6 +2676,23 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             } else if (roadReachable) {
                 const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
                 if (!hasTowUnit && wreckAgeMs > 120000) launchFleetUnit(room, "TOW", vid, snappedGoal.x, snappedGoal.y);
+            } else if (wreckAgeMs > 120000) {
+                // Municipal clearance of off-road / compound / water extinguished wrecks after 2 minutes so world_state.json never clogs!
+                delete room.modifiedVehs[vid];
+                if (room.modifiedVehTs) delete room.modifiedVehTs[vid];
+                delete room.vehs[vid];
+                isDirty = true;
+                broadcastToRoom(roomCode, {
+                    t: "WORLD_EVENT",
+                    kind: "VEH_EXIT",
+                    vehId: vid,
+                    x: -9999,
+                    y: -9999,
+                    z: -99,
+                    a: 0,
+                    hp: 0,
+                    flags: 0
+                });
             }
         }
     }
@@ -2623,27 +2752,35 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                     nav.elapsedSec = 0;
                     if (nav.role === "EMS" && nav.targetId && room.corpses && room.corpses[nav.targetId]) {
                         const crow = room.corpses[nav.targetId];
+                        const revX = Array.isArray(crow) ? crow[3] : Math.round(x);
+                        const revY = Array.isArray(crow) ? crow[4] : Math.round(y);
                         delete room.corpses[nav.targetId];
                         if (room.corpseTs) delete room.corpseTs[nav.targetId];
+                        clearCorpseSmashedPropsNear(room, revX, revY);
+                        isDirty = true;
                         broadcastToRoom(roomCode, {
                             t: "WORLD_EVENT",
                             kind: "PED_REVIVE",
                             pedId: nav.targetId,
-                            x: Array.isArray(crow) ? crow[3] : Math.round(x),
-                            y: Array.isArray(crow) ? crow[4] : Math.round(y),
+                            x: revX,
+                            y: revY,
                             evacuated: false
                         });
                     } else if (nav.role === "FIRE" && nav.targetId) {
                         if (room.modifiedVehs && room.modifiedVehs[nav.targetId]) {
                             room.modifiedVehs[nav.targetId][10] |= 128;
+                            room.modifiedVehs[nav.targetId][9] = 0;
                         }
                         if (room.vehs && room.vehs[nav.targetId]) {
                             room.vehs[nav.targetId][10] |= 128;
+                            room.vehs[nav.targetId][9] = 0;
                         }
+                        isDirty = true;
                     } else if (nav.role === "TOW" && nav.targetId) {
                         delete room.modifiedVehs[nav.targetId];
                         if (room.modifiedVehTs) delete room.modifiedVehTs[nav.targetId];
                         delete room.vehs[nav.targetId];
+                        isDirty = true;
                         broadcastToRoom(roomCode, {
                             t: "WORLD_EVENT",
                             kind: "VEH_EXIT",
@@ -2793,7 +2930,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         row[2] = Math.round(x * 10) / 10;
         row[3] = Math.round(y * 10) / 10;
         row[4] = Math.round(z * 100) / 100;
-        row[5] = Math.round(a * 1000) / 1000;
+        row[5] = wrapServerAngle(a);
         row[6] = Math.round(vx);
         row[7] = Math.round(vy);
     }
@@ -2833,9 +2970,17 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 pnav.targetBy = step.by;
                 pa = step.angle;
             } else {
-                pa = ((pa + Math.PI) % (Math.PI * 2));
-                pnav.targetBx = bx + Math.round(Math.cos(pa));
-                pnav.targetBy = by + Math.round(Math.sin(pa));
+                pa = wrapServerAngle(pa + Math.PI);
+                const fbx = bx + Math.round(Math.cos(pa));
+                const fby = by + Math.round(Math.sin(pa));
+                const fNav = serverMap.getNavigationBlock ? serverMap.getNavigationBlock(fbx, fby, pz) : null;
+                if (fNav && fNav.groundType !== global.GROUND_TYPE.WATER && fNav.groundType !== global.GROUND_TYPE.BUILDING) {
+                    pnav.targetBx = fbx;
+                    pnav.targetBy = fby;
+                } else {
+                    pnav.targetBx = bx;
+                    pnav.targetBy = by;
+                }
             }
         } else {
             const tx = (pnav.targetBx + 0.5) * TS;
@@ -2843,14 +2988,30 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             pa = Math.atan2(ty - py, tx - px);
         }
 
-        px += Math.cos(pa) * pspd * dt;
-        py += Math.sin(pa) * pspd * dt;
-        pz = serverMap.getHeightAtPixel(px, py, pz);
+        const nextPx = px + Math.cos(pa) * pspd * dt;
+        const nextPy = py + Math.sin(pa) * pspd * dt;
+        if (
+            (serverMap.isWaterAtPixel && serverMap.isWaterAtPixel(nextPx, nextPy)) ||
+            (serverMap.resolveCircleBuildingCollision && serverMap.resolveCircleBuildingCollision(nextPx, nextPy, 8, pz).hit)
+        ) {
+            if (sidewalkSpawnTiles.length > 0) {
+                const safeTile = sidewalkSpawnTiles[(pSeq * 29 + 11) % sidewalkSpawnTiles.length];
+                px = (safeTile.bx + 0.5) * TS;
+                py = (safeTile.by + 0.5) * TS;
+                pz = safeTile.z || 2.0;
+                pnav.targetBx = null;
+                pnav.targetBy = null;
+            }
+        } else {
+            px = nextPx;
+            py = nextPy;
+            pz = serverMap.getHeightAtPixel(px, py, pz);
+        }
 
         prow[3] = Math.round(px * 10) / 10;
         prow[4] = Math.round(py * 10) / 10;
         prow[5] = Math.round(pz * 100) / 100;
-        prow[6] = Math.round(pa * 100) / 100;
+        prow[6] = Math.round(wrapServerAngle(pa) * 100) / 100;
     }
 
     // 6. Broadcast authoritative Dedicated Server simulation ticks (2 Hz = every 5th tick = 500ms) to all players in the room!
@@ -2921,11 +3082,11 @@ setInterval(() => {
             rv.activeBounty = null;
         }
 
-        // Municipal auto-repair for ancient smashed props (> 5 minutes old) & corpse cleanup (> 3 minutes old)
+        // Municipal auto-repair for ancient smashed props (> 30 minutes old) & corpse cleanup (> 3 minutes old)
         if (rv.smashedProps) {
             for (const [pk, pv] of Object.entries(rv.smashedProps)) {
                 const isCorpse = pv && typeof pv.pType === "string" && pv.pType.startsWith("CORPSE:");
-                const maxAge = isCorpse ? 600000 : 1800000;
+                const maxAge = isCorpse ? 180000 : 1800000;
                 if (pv && pv.ts && (nowMs - pv.ts) > maxAge) {
                     delete rv.smashedProps[pk];
                     isDirty = true;
@@ -2933,11 +3094,13 @@ setInterval(() => {
             }
         }
 
-        // Expire old corpses in rv.corpses after 3 minutes (180s)
+        // Expire old corpses in rv.corpses after 3 minutes (180s) and clear matching smashedProps corpse markers
         if (rv.corpses && rv.corpseTs) {
             for (const cid of Object.keys(rv.corpses)) {
                 const cts = rv.corpseTs[cid] || 0;
-                if (cts && (nowMs - cts) > 600000) {
+                if (cts && (nowMs - cts) > 180000) {
+                    const crow = rv.corpses[cid];
+                    if (Array.isArray(crow)) clearCorpseSmashedPropsNear(rv, crow[3], crow[4]);
                     delete rv.corpses[cid];
                     delete rv.corpseTs[cid];
                     isDirty = true;

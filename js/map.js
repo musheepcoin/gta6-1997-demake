@@ -3868,6 +3868,20 @@ class LeonidaMap {
 
         // 16 Official GTA 6 (State of Leonida & Vice City) Bespoke Landmarks
         this.landmarks = this.buildGta6Landmarks();
+        if (Array.isArray(this.interiors) && Array.isArray(this.residentialHouses)) {
+            this.interiors = this.interiors.filter(intr => {
+                if (!intr || intr.isEstatePortico || !intr.isShop) return true;
+                return !this.residentialHouses.some(rh => {
+                    const ex = (rh.hw || 96) + 48;
+                    const ey = (rh.hh || 72) + 48;
+                    return Math.abs(intr.doorX - rh.x) <= ex && Math.abs(intr.doorY - rh.y) <= ey;
+                });
+            });
+        }
+        if (this.objectEngine && typeof this.objectEngine.registerEstateInteriors === "function") {
+            this.objectEngine.interiorsRegistered = false;
+            this.objectEngine.registerEstateInteriors();
+        }
 
         // 17. Filter this.vicePalms so flora never spawns inside volleyball courts, sunbathers, ramps, gym equipment or road/water tiles
         if (this.vicePalms && this.vicePalms.length > 0) {
@@ -5984,6 +5998,32 @@ class LeonidaMap {
         const dirs = this.getAllowedRoadDirections(bx, by, zBlocks);
         if (dirs.length === 0) {
             const snapAngle = Math.round(currentAngle / (Math.PI * 0.5)) * (Math.PI * 0.5);
+            const cands = [
+                snapAngle,
+                snapAngle + Math.PI * 0.5,
+                snapAngle - Math.PI * 0.5,
+                snapAngle + Math.PI
+            ];
+            for (const ca of cands) {
+                const cdx = Math.round(Math.cos(ca));
+                const cdy = Math.round(Math.sin(ca));
+                const nbx = bx + cdx, nby = by + cdy;
+                if (nbx < 1 || nbx >= MAP_COLS - 1 || nby < 1 || nby >= MAP_ROWS - 1) continue;
+                const nb = this.getNavigationBlock(nbx, nby, zBlocks);
+                if (nb && nb.groundType === GROUND_TYPE.ROAD) {
+                    return { dx: cdx, dy: cdy, bx: nbx, by: nby, angle: ca, isTurn: Math.abs(this.normalizeAngleDiff(ca, currentAngle)) > 0.45 };
+                }
+            }
+            for (const ca of cands) {
+                const cdx = Math.round(Math.cos(ca));
+                const cdy = Math.round(Math.sin(ca));
+                const nbx = bx + cdx, nby = by + cdy;
+                if (nbx < 1 || nbx >= MAP_COLS - 1 || nby < 1 || nby >= MAP_ROWS - 1) continue;
+                const nb = this.getNavigationBlock(nbx, nby, zBlocks);
+                if (nb && nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER && nb.groundType !== GROUND_TYPE.AIR) {
+                    return { dx: cdx, dy: cdy, bx: nbx, by: nby, angle: ca, isTurn: Math.abs(this.normalizeAngleDiff(ca, currentAngle)) > 0.45 };
+                }
+            }
             const dx = Math.round(Math.cos(snapAngle));
             const dy = Math.round(Math.sin(snapAngle));
             return {

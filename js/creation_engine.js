@@ -722,6 +722,9 @@
         }
 
         rebuildWorldMeshes(fast = true) {
+            if (typeof PedNav !== "undefined" && typeof PedNav.invalidateCache === "function") {
+                PedNav.invalidateCache(this.game);
+            }
             const r = this.game && this.game.renderer;
             if (!r) return;
             if (typeof r.buildCityMesh === "function" && r.gl) {
@@ -948,6 +951,7 @@
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({ action: "PLACE_PREFAB_3D", opKey: id, id, prefabId, x: Math.round(sx * 10) / 10, y: Math.round(sy * 10) / 10, angle: Math.round(sa * 1000) / 1000 }, opts);
                 this.setStatus(`PLACED 3D TIKI BAR AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return tb;
             }
@@ -960,6 +964,7 @@
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({ action: "PLACE_PREFAB_3D", opKey: id, id, prefabId, x: Math.round(sx * 10) / 10, y: Math.round(sy * 10) / 10, angle: Math.round(sa * 1000) / 1000 }, opts);
                 this.setStatus(`PLACED 3D BEACH VOLLEYBALL COURT AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return vc;
             }
@@ -972,6 +977,7 @@
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({ action: "PLACE_PREFAB_3D", opKey: id, id, prefabId, x: Math.round(sx * 10) / 10, y: Math.round(sy * 10) / 10, angle: Math.round(sa * 1000) / 1000 }, opts);
                 this.setStatus(`PLACED 3D STREET TAKEOVER RING AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return st;
             }
@@ -1001,6 +1007,7 @@
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({ action: "PLACE_PREFAB_3D", opKey: id, id, prefabId, x: Math.round(sx * 10) / 10, y: Math.round(sy * 10) / 10, angle: Math.round(sa * 1000) / 1000 }, opts);
                 this.setStatus(`PLACED 3D SMUGGLER CONTRABAND CRATE AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return drop;
             }
@@ -1036,6 +1043,7 @@
                 this.createdEntities.push(rec);
                 if (!opts.skipHistory) this._pushHistory(rec);
                 if (!opts.skipSave) this.saveToLocalStorage();
+                this._broadcastCreationOp({ action: "PLACE_PREFAB_3D", opKey: id, id, prefabId, x: Math.round(sx * 10) / 10, y: Math.round(sy * 10) / 10, angle: Math.round(sa * 1000) / 1000 }, opts);
                 this.setStatus(`PLACED 3D ${brand} MACHINE AT (${Math.round(sx)}, ${Math.round(sy)})`);
                 return sm;
             }
@@ -1482,19 +1490,40 @@
                 mm.completeMission(g, m);
             };
 
+            const snapDry = (wx, wy) => {
+                let rx = wx, ry = wy;
+                const map = this.game.map;
+                if (map) {
+                    if (typeof map.resolveCircleBuildingCollision === "function") {
+                        const col = map.resolveCircleBuildingCollision(rx, ry, 10, 2.0, false);
+                        rx = col.x;
+                        ry = col.y;
+                    }
+                    if (map.isWaterAtPixel && map.isWaterAtPixel(rx, ry)) {
+                        const safe = this.findSafePlacement("PROPS_FLORA", "PAYPHONE", rx, ry, 0);
+                        if (safe && safe.ok) {
+                            rx = safe.snappedX;
+                            ry = safe.snappedY;
+                        }
+                    }
+                }
+                return { x: rx, y: ry };
+            };
+
             if (spec.type === "CONTRABAND_DROP") {
                 m.crates = [
-                    { x: tx, y: ty },
-                    { x: tx + 140, y: ty - 90 },
-                    { x: tx - 120, y: ty + 110 }
+                    snapDry(tx, ty),
+                    snapDry(tx + 140, ty - 90),
+                    snapDry(tx - 120, ty + 110)
                 ];
                 m.objectiveLabel = `${spec.title} (3 CRATES LEFT)`;
                 m.update = (g) => {
+                    if (g.activeInterior) return;
                     const p = g.player.inVehicle || g.player;
                     m.crates = m.crates.filter((c) => {
-                        if (Math.hypot(p.x - c.x, p.y - c.y) < 46) {
+                        if (Math.hypot(p.x - c.x, p.y - c.y) < 48) {
                             g.audio.playPickup();
-                            g.addFloatingText("📦 CONTRABAND SECURED!", c.x, c.y, "#39ff14");
+                            g.addFloatingText(c.x, c.y - 20, "📦 CONTRABAND SECURED!", "#39ff14");
                             return false;
                         }
                         return true;
@@ -1508,25 +1537,27 @@
                     }
                 };
             } else if (spec.type === "ARMORED_AMBUSH") {
-                const van = this.spawnVehicle("ARMORED_VAN", tx, ty, 0, { id: `${spec.id}_van`, skipHistory: true, skipSave: true, skipBroadcast: true });
+                const van = this.spawnVehicle("BRINKS_TRUCK", tx, ty, 0, { id: `${spec.id}_van`, skipHistory: true, skipSave: true, skipBroadcast: true });
                 van.driver = "AI_TRAFFIC";
                 van.hp = 180;
                 m.armoredVan = van;
                 m.briefcase = null;
                 m.update = (g) => {
+                    if (g.activeInterior) return;
                     if (!m.briefcase) {
                         m.targetX = van.x;
                         m.targetY = van.y;
                         m.objectiveLabel = "DESTROY ARMORED VAN";
                         if (van.destroyed) {
-                            m.briefcase = { x: van.x, y: van.y };
-                            m.targetX = van.x;
-                            m.targetY = van.y;
+                            const bf = snapDry(van.x, van.y);
+                            m.briefcase = { x: bf.x, y: bf.y };
+                            m.targetX = bf.x;
+                            m.targetY = bf.y;
                             m.objectiveLabel = "COLLECT ARMORED PAYOUT";
                         }
                     } else {
                         const p = g.player.inVehicle || g.player;
-                        if (Math.hypot(p.x - m.briefcase.x, p.y - m.briefcase.y) < 48) {
+                        if (Math.hypot(p.x - m.briefcase.x, p.y - m.briefcase.y) < 52) {
                             finishMmoMission(g);
                         }
                     }
@@ -1534,17 +1565,25 @@
             } else if (spec.type === "VIP_ELIMINATION") {
                 const targets = [];
                 for (let i = 0; i < 3; i++) {
+                    const spot = snapDry(tx + (i - 1) * 28, ty);
                     const ped = new Pedestrian({
                         id: `${spec.id}_vip_${i}`,
-                        x: tx + (i - 1) * 28,
-                        y: ty,
+                        x: spot.x,
+                        y: spot.y,
                         z: 2.0,
                         kind: "HOSTILE",
+                        g24Type: "gang",
                         archetype: "CARTEL",
-                        weapon: "UZI"
+                        weapon: "UZI",
+                        copWeapon: "UZI",
+                        hp: 65,
+                        maxHp: 65
                     });
                     this.game.peds.push(ped);
                     targets.push(ped);
+                }
+                if (typeof this.game.rebuildPedSpatialGrid === "function") {
+                    this.game.rebuildPedSpatialGrid();
                 }
                 m.targets = targets;
                 m.update = (g) => {
@@ -1560,11 +1599,20 @@
             } else {
                 // Default: HIJACK_VEHICLE & deliver to dropoff
                 const car = this.spawnVehicle(spec.vehicleSpec || "VICE_CHEETAH", tx, ty, 0, { id: `${spec.id}_veh`, skipHistory: true, skipSave: true, skipBroadcast: true });
+                const dropCheck = this.validatePlacement("VEHICLES", spec.vehicleSpec || "VICE_CHEETAH", spec.dropoffX, spec.dropoffY, 0);
                 m.targetCar = car;
-                m.dropoff = { x: spec.dropoffX, y: spec.dropoffY };
+                m.dropoff = {
+                    x: dropCheck.snappedX !== undefined ? dropCheck.snappedX : spec.dropoffX,
+                    y: dropCheck.snappedY !== undefined ? dropCheck.snappedY : spec.dropoffY
+                };
                 m.update = (g) => {
                     if (car.destroyed) {
                         mm.failMission(g, "TARGET VEHICLE DESTROYED!");
+                        return;
+                    }
+                    const pObj = g.player.inVehicle || g.player;
+                    if (Math.hypot(car.x - m.dropoff.x, car.y - m.dropoff.y) < 88 && (g.player.inVehicle === car || Math.hypot(pObj.x - car.x, pObj.y - car.y) < 68)) {
+                        finishMmoMission(g);
                         return;
                     }
                     if (g.player.inVehicle !== car) {
@@ -1575,9 +1623,6 @@
                         m.targetX = m.dropoff.x;
                         m.targetY = m.dropoff.y;
                         m.objectiveLabel = "DELIVER TO DROP-OFF ZONE";
-                        if (Math.hypot(car.x - m.dropoff.x, car.y - m.dropoff.y) < 76) {
-                            finishMmoMission(g);
-                        }
                     }
                 };
             }
@@ -2803,8 +2848,26 @@
                     map.barrierBoxGrid = null;
                     if (typeof map.ensureBarrierSpatialGrids === "function") map.ensureBarrierSpatialGrids();
                 }
+                if (rec.desc && rec.desc.subtype === "FLORA" && map && map.floraGrid instanceof Map) {
+                    const fc = Math.floor(rec.entityRef.x / TILE_SIZE);
+                    const fr = Math.floor(rec.entityRef.y / TILE_SIZE);
+                    const key = (fr << 16) | (fc & 0xffff);
+                    const cell = map.floraGrid.get(key);
+                    if (Array.isArray(cell)) {
+                        map.floraGrid.set(key, cell.filter((p) => p !== rec.entityRef));
+                    }
+                }
                 this._invalidateArrayAndPromptMasks(rec.sourceArray);
                 if (oe) oe._propColGrid = null;
+                if (this.game.renderer && this.game.renderer._staticChunkGridMap) {
+                    this.game.renderer._staticChunkGridMap.delete(rec.sourceArray);
+                }
+                if (typeof this.game.rebuildVehicleSpatialGrid === "function" && rec.desc && rec.desc.type === "VEHICLE") {
+                    this.game.rebuildVehicleSpatialGrid();
+                }
+                if (oe && this.game.renderer && this.game.renderer.gl && rec.desc && (rec.desc.subtype === "ESTATE" || rec.desc.subtype === "TIKI_BAR_3D" || rec.desc.subtype === "SODA_ECOLA_3D" || rec.desc.subtype === "SODA_SPRUNK_3D")) {
+                    oe.buildStatic3DMesh(this.game.renderer.gl, this.game.renderer);
+                }
                 return true;
             }
             if (rec.type === "VEHICLE") {
@@ -3369,11 +3432,19 @@
 
         toggleStudio(force) {
             this.studioActive = typeof force === "boolean" ? force : !this.studioActive;
+            if (this.game && typeof this.game.clearHeldInputs === "function") {
+                this.game.clearHeldInputs();
+            }
             if (this.studioActive && this.game) {
+                if (this.game.activeInterior && typeof this.game.exitInterior === "function") {
+                    this.game.exitInterior();
+                }
                 const target = this.game.player.inVehicle || this.game.player;
                 this.camX = (this.game.renderer && this.game.renderer.camX) || target.x;
                 this.camY = (this.game.renderer && this.game.renderer.camY) || target.y;
                 this.setStatus("VC26 CREATION STUDIO ACTIVE — [1..6] TABS • [R] ROTATE • [G] GRID SNAP • [CTRL+Z] UNDO");
+            } else {
+                this.grabbedEntity = null;
             }
             return this.studioActive;
         }
@@ -3396,6 +3467,10 @@
         }
 
         handleKeyDown(e) {
+            const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+            if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+                return false;
+            }
             const code = e.code;
             if (code === "F10") {
                 e.preventDefault();
@@ -3403,6 +3478,17 @@
                 return true;
             }
             if (!this.studioActive) return false;
+
+            if (code === "Escape") {
+                e.preventDefault();
+                if (this.grabbedEntity) {
+                    this.grabbedEntity = null;
+                    this.setStatus("CANCELLED ENTITY MOVE");
+                } else {
+                    this.toggleStudio(false);
+                }
+                return true;
+            }
 
             if ((e.ctrlKey || e.metaKey) && code === "KeyZ") {
                 e.preventDefault();
@@ -3739,9 +3825,9 @@
                 ? `✋ MOVING: ${this.grabbedEntity.label} • (${cur.c}, ${cur.r}) • CLICK TO DROP`
                 : `${item ? item.icon + " " + item.label : ""} • (${cur.c}, ${cur.r}) • ${safety.reason}`;
             ctx.font = "bold 10px Consolas, 'Courier New', monospace";
-            const bw = Math.max(180, ctx.measureText(badgeTxt).width + 18);
-            const bx = Math.round(sc.x - bw * 0.5);
-            const by = Math.round(sc.y - 38);
+            const bw = Math.min(W - 16, Math.max(180, Math.round(ctx.measureText(badgeTxt).width + 18)));
+            const bx = Math.max(8, Math.min(W - bw - 8, Math.round(sc.x - bw * 0.5)));
+            const by = Math.max(8, Math.min(H - 28, Math.round(sc.y - 38)));
             ctx.fillStyle = "rgba(8, 12, 24, 0.92)";
             ctx.fillRect(bx, by, bw, 20);
             ctx.strokeStyle = col;

@@ -2109,7 +2109,7 @@ class WorldObjectEngine {
             const cosA = Math.cos(inst.ang);
             const sinA = Math.sin(inst.ang);
             const frontDist = (inst.spec.d1 * 0.5 + (inst.spec.porticoD || 26) + 18) * inst.scale;
-            const facing = Math.abs(inst.ang) > 2.0 ? "N" : (inst.ang < -0.8 ? "E" : "S");
+            const facing = Math.abs(inst.ang) > 2.0 ? "N" : (inst.ang < -0.8 ? "E" : (inst.ang > 0.8 ? "W" : "S"));
             return {
                 doorX: inst.x - sinA * frontDist,
                 doorY: inst.y + cosA * frontDist,
@@ -2193,16 +2193,20 @@ class WorldObjectEngine {
             if (!inst || map.interiors.some(it => it.id === ed.id)) continue;
             const pt = computePorticoDoor(inst);
             const tpl = (window.ShopInteriors && window.ShopInteriors.SHOP_TEMPLATES && window.ShopInteriors.SHOP_TEMPLATES[ed.theme]) || null;
-            const rawNpcs = tpl && Array.isArray(tpl.npcs)
-                ? tpl.npcs.map(n => ({ ...n }))
-                : (baseMansion && Array.isArray(baseMansion._rawNpcs || baseMansion.npcs)
-                    ? (baseMansion._rawNpcs || baseMansion.npcs).map(n => ({ ...n }))
-                    : []);
-            const rawStations = tpl && Array.isArray(tpl.stations)
-                ? tpl.stations.map(s => ({ ...s, id: `${ed.id}_${s.id}` }))
-                : (baseMansion && Array.isArray(baseMansion._rawStations || baseMansion.stations)
-                    ? (baseMansion._rawStations || baseMansion.stations).map(s => ({ ...s, id: `${ed.id}_${s.id}` }))
-                    : []);
+            const rawNpcs = tpl && typeof tpl.buildNpcs === "function"
+                ? tpl.buildNpcs().map(n => ({ ...n }))
+                : (tpl && Array.isArray(tpl.npcs)
+                    ? tpl.npcs.map(n => ({ ...n }))
+                    : (baseMansion && Array.isArray(baseMansion._rawNpcs || baseMansion.npcs)
+                        ? (baseMansion._rawNpcs || baseMansion.npcs).map(n => ({ ...n }))
+                        : []));
+            const rawStations = tpl && typeof tpl.buildStations === "function"
+                ? tpl.buildStations(ed.id).map(s => ({ ...s }))
+                : (tpl && Array.isArray(tpl.stations)
+                    ? tpl.stations.map(s => ({ ...s, id: `${ed.id}_${s.id}` }))
+                    : (baseMansion && Array.isArray(baseMansion._rawStations || baseMansion.stations)
+                        ? (baseMansion._rawStations || baseMansion.stations).map(s => ({ ...s, id: `${ed.id}_${s.id}` }))
+                        : []));
             const newEstateIntr = {
                 id: ed.id,
                 name: ed.name,
@@ -2415,7 +2419,55 @@ class WorldObjectEngine {
         return true;
     }
 
+    repairNearbyPlayerVehicle(game, px, py, boost = false) {
+        if (!game || !Array.isArray(game.vehicles)) return null;
+        let bestV = game.player && game.player.inVehicle ? game.player.inVehicle : null;
+        if (!bestV) {
+            let bestDist = 155;
+            for (const v of game.vehicles) {
+                if (!v || v.destroyed || v.waterOnly) continue;
+                if (v !== game.lastPlayerVehicle && !v._worldModified && v.driver !== null) continue;
+                const d = Math.hypot(v.x - px, v.y - py);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestV = v;
+                }
+            }
+        }
+        if (bestV) {
+            if (typeof bestV.resetDamage === "function") bestV.resetDamage();
+            else bestV.hp = bestV.maxHp || 100;
+            bestV.burnTimer = 0;
+            bestV.smokeTimer = 0;
+            bestV.frontDented = false;
+            bestV.rearDented = false;
+            bestV.heavyDented = false;
+            bestV._worldModified = true;
+            if (boost) {
+                bestV.vx = (bestV.vx || 0) * 1.25;
+                bestV.vy = (bestV.vy || 0) * 1.25;
+            }
+            if (game.net && typeof game.net.broadcastStateNow === "function") {
+                game.net.broadcastStateNow();
+            }
+        }
+        return bestV;
+    }
+
     tryTriggerHeistAction(game) {
+        const triggered = this._tryTriggerHeistActionImpl(game);
+        if (triggered && game) {
+            if (game.player && typeof game.player.armor === "number") {
+                game.player.armor = Math.min(100, Math.max(0, game.player.armor));
+            }
+            if (typeof game.updateHud === "function") {
+                game.updateHud();
+            }
+        }
+        return triggered;
+    }
+
+    _tryTriggerHeistActionImpl(game) {
         if (!game || !game.player || game.player.inVehicle || game.activeInterior) return false;
         const px = game.player.x;
         const py = game.player.y;
@@ -2486,9 +2538,25 @@ class WorldObjectEngine {
         // 0D. Drink Ice-Cold eCola or Sprunk from 3D Illuminated Sidewalk Soda Vending Machines ([E] on foot!)
         if (Array.isArray(this.sodaMachines)) {
             for (const sm of this.sodaMachines) {
-                if (Math.hypot(px - sm.x, py - sm.y) < 58) {
+                if ((sm.cooldown || 0) <= 0 && Math.hypot(px - sm.x, py - sm.y) < 58) {
                     const maxHp = game.player.maxHp || 100;
+                    if ((game.player.hp || 100) >= maxHp && (game.player.speedBoostTimer || 0) >= 4.0) {
+                        sm.cooldown = 1.5;
+                        if (Array.isArray(game.floatingTexts)) {
+                            game.floatingTexts.push({
+                                x: sm.x,
+                                y: sm.y,
+                                z: 2.55,
+                                text: "🥤 ALREADY REFRESHED & FULL HP!",
+                                color: "#94a3b8",
+                                life: 1.6
+                            });
+                        }
+                        return true;
+                    }
+                    sm.cooldown = 12.0;
                     game.player.hp = Math.min(maxHp, (game.player.hp || 100) + 35);
+                    game.player.speedBoostTimer = Math.max(game.player.speedBoostTimer || 0, 6.0);
                     if (game.audio) game.audio.playPickup("SCORE");
                     if (Array.isArray(game.floatingTexts)) {
                         game.floatingTexts.push({
@@ -2496,8 +2564,8 @@ class WorldObjectEngine {
                             y: sm.y,
                             z: 2.55,
                             text: sm.brand === "SPRUNK"
-                                ? "🥤 ICE-COLD SPRUNK! +35 HP RESTORED!"
-                                : "🥤 ICE-COLD eCOLA! +35 HP RESTORED!",
+                                ? "🥤 ICE-COLD SPRUNK! +35 HP & SUGAR BOOST!"
+                                : "🥤 ICE-COLD eCOLA! +35 HP & SUGAR BOOST!",
                             color: sm.brand === "SPRUNK" ? "#4ade80" : "#f87171",
                             life: 2.4
                         });
@@ -2712,10 +2780,15 @@ class WorldObjectEngine {
                 bb.cooldown = 120.0;
                 game.player.hp = game.player.maxHp || 100;
                 game.player.armor = 100;
+                if (Array.isArray(game.player.weaponsOwned)) {
+                    for (const wk of ["UZI", "SHOTGUN", "ROCKET"]) {
+                        if (!game.player.weaponsOwned.includes(wk)) game.player.weaponsOwned.push(wk);
+                    }
+                }
                 if (game.player.ammo) {
-                    game.player.ammo.UZI = (game.player.ammo.UZI || 0) + 90;
-                    game.player.ammo.SHOTGUN = (game.player.ammo.SHOTGUN || 0) + 24;
-                    game.player.ammo.ROCKET = (game.player.ammo.ROCKET || 0) + 4;
+                    game.player.ammo.UZI = Math.min(999, (game.player.ammo.UZI || 0) + 90);
+                    game.player.ammo.SHOTGUN = Math.min(999, (game.player.ammo.SHOTGUN || 0) + 24);
+                    game.player.ammo.ROCKET = Math.min(999, (game.player.ammo.ROCKET || 0) + 4);
                 }
                 if (typeof game.setWantedLevel === "function" && (game.wantedLevel || 0) > 0) {
                     game.setWantedLevel(Math.max(0, (game.wantedLevel || 0) - 1));
@@ -2796,9 +2869,10 @@ class WorldObjectEngine {
                 if (Math.hypot(px - dp.x, py - dp.y) < 76) {
                     this.dominoCooldown = 25.0;
                     game.player.hp = game.player.maxHp || 100;
+                    if (typeof game.addCash === "function") game.addCash(100, `🀄 ${dp.name}!`);
                     if (game.audio) game.audio.playPickup("SCORE");
                     if (typeof game.showBigBanner === "function") {
-                        game.showBigBanner("🀄 LITTLE CUBA DOMINOES CHAMPION!", `${dp.name} • DOUBLE-SIX CAPICÚ SLAM!`, "#facc15", 2.5);
+                        game.showBigBanner("🀄 LITTLE CUBA DOMINOES CHAMPION!", `${dp.name} • DOUBLE-SIX CAPICÚ SLAM (+$100)!`, "#facc15", 2.5);
                     }
                     return true;
                 }
@@ -2888,11 +2962,13 @@ class WorldObjectEngine {
             for (const pt of this.poolTables) {
                 if ((pt.cooldown || 0) <= 0 && Math.hypot(px - pt.x, py - pt.y) < 74) {
                     pt.cooldown = 60.0;
+                    if (typeof game.addCash === "function") game.addCash(150, `🎱 ${pt.name} HUSTLE!`);
+                    if (typeof game.addTurfInfluence === "function") game.addTurfInfluence(60);
                     if (game.audio) game.audio.playPickup("SCORE");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
                             `🎱 8-BALL BANK SHOT CHAMPION!`,
-                            `${pt.name} • TABLE RUN-OUT!`,
+                            `${pt.name} • TABLE RUN-OUT (+$150)!`,
                             "#4ade80",
                             2.4
                         );
@@ -2902,7 +2978,7 @@ class WorldObjectEngine {
                             x: pt.x,
                             y: pt.y,
                             z: 2.65,
-                            text: `🎱 8-BALL TABLE RUN-OUT!`,
+                            text: `🎱 8-BALL TABLE RUN-OUT! +$150`,
                             color: "#4ade80",
                             life: 2.2
                         });
@@ -2950,11 +3026,14 @@ class WorldObjectEngine {
             for (const bc of this.streetBasketballCourts) {
                 if ((bc.cooldown || 0) <= 0 && Math.hypot(px - bc.x, py - bc.y) < 82) {
                     bc.cooldown = 45.0;
+                    if (typeof game.addCash === "function") game.addCash(125, `🏀 ${bc.name} 3-PT!`);
+                    if (typeof game.addTurfInfluence === "function") game.addTurfInfluence(60);
+                    game.player.speedBoostTimer = Math.max(game.player.speedBoostTimer || 0, 12.0);
                     if (game.audio) game.audio.playPickup("SCORE");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
                             `🏀 NOTHING BUT NET! STREETBALL KING!`,
-                            `${bc.name} • 3-POINT CONTEST WINNER!`,
+                            `${bc.name} • 3-POINT CONTEST WINNER (+$125)!`,
                             "#f97316",
                             2.4
                         );
@@ -2964,7 +3043,7 @@ class WorldObjectEngine {
                             x: bc.x,
                             y: bc.y,
                             z: 2.68,
-                            text: `🏀 SWISH! 3-POINT CONTEST WINNER!`,
+                            text: `🏀 SWISH! 3-POINT WINNER! +$125`,
                             color: "#f97316",
                             life: 2.2
                         });
@@ -2977,11 +3056,12 @@ class WorldObjectEngine {
             const mg = this.map.industrialAndParkDetails.miniGolf;
             if (Math.hypot(px - mg.x, py - mg.y) < 88) {
                 this.miniGolfCooldown = 45.0;
+                if (typeof game.addCash === "function") game.addCash(120, "⛳ MINI-GOLF HOLE-IN-ONE!");
                 if (game.audio) game.audio.playPickup("SCORE");
                 if (typeof game.showBigBanner === "function") {
                     game.showBigBanner(
                         "⛳ WINDMILL HOLE-IN-ONE!",
-                        "PORT GELLHORN RETRO MINI-GOLF CHAMPION!",
+                        "PORT GELLHORN RETRO MINI-GOLF CHAMPION (+$120)!",
                         "#4ade80",
                         2.4
                     );
@@ -2991,7 +3071,7 @@ class WorldObjectEngine {
                         x: mg.x,
                         y: mg.y,
                         z: 2.68,
-                        text: "⛳ MINI-GOLF HOLE-IN-ONE!",
+                        text: "⛳ MINI-GOLF HOLE-IN-ONE! +$120",
                         color: "#4ade80",
                         life: 2.2
                     });
@@ -3005,13 +3085,7 @@ class WorldObjectEngine {
             for (const cm of this.carMeets) {
                 if ((cm.cooldown || 0) <= 0 && Math.hypot(px - cm.x, py - cm.y) < 92) {
                     cm.cooldown = 60.0;
-                    const pCar = game.player.inVehicle;
-                    if (pCar) {
-                        pCar.hp = pCar.maxHp || 100;
-                        pCar.burnTimer = 0;
-                        pCar.vx = (pCar.vx || 0) * 1.25;
-                        pCar.vy = (pCar.vy || 0) * 1.25;
-                    }
+                    this.repairNearbyPlayerVehicle(game, px, py, true);
                     game.player.hp = game.player.maxHp || 100;
                     game.player.armor = 100;
                     if (game.audio) game.audio.playPickup("WEAPON");
@@ -3209,11 +3283,12 @@ class WorldObjectEngine {
                 if ((sc.cooldown || 0) <= 0 && Math.hypot(px - sc.x, py - sc.y) < 74) {
                     sc.cooldown = 45.0;
                     this.cameraFlashTimer = 0.35;
+                    if (typeof game.addCash === "function") game.addCash(75, `🏰 ${sc.name} PHOTO!`);
                     if (game.audio) game.audio.playPickup("HEALTH");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
                             `🏰 VICE BEACH MASTER SANDCASTLE!`,
-                            `${sc.name} • SNAPSHOT TAKEN!`,
+                            `${sc.name} • VIRAL SNAPSHOT (+$75)!`,
                             "#facc15",
                             2.3
                         );
@@ -3223,7 +3298,7 @@ class WorldObjectEngine {
                             x: sc.x,
                             y: sc.y,
                             z: 2.66,
-                            text: `🏰 SANDCASTLE SNAPSHOT!`,
+                            text: `🏰 SANDCASTLE SNAPSHOT! +$75`,
                             color: "#facc15",
                             life: 2.1
                         });
@@ -3336,12 +3411,8 @@ class WorldObjectEngine {
                     lv.cooldown = 60.0;
                     game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
                     game.player.hp = 150;
-                    game.player.armor = 150;
-                    if (game.player.inVehicle) {
-                        game.player.inVehicle.hp = game.player.inVehicle.maxHp || 100;
-                        game.player.inVehicle.burnTimer = 0;
-                        game.player.inVehicle.damage = 0;
-                    }
+                    game.player.armor = 100;
+                    this.repairNearbyPlayerVehicle(game, px, py, false);
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
@@ -3501,12 +3572,8 @@ class WorldObjectEngine {
             for (const mc of this.monsterCrushPads) {
                 if ((mc.cooldown || 0) <= 0 && Math.hypot(px - mc.x, py - mc.y) < 92) {
                     mc.cooldown = 60.0;
-                    game.player.armor = 150;
-                    if (game.player.inVehicle) {
-                        game.player.inVehicle.hp = game.player.inVehicle.maxHp || 100;
-                        game.player.inVehicle.burnTimer = 0;
-                        game.player.inVehicle.damage = 0;
-                    }
+                    game.player.armor = 100;
+                    this.repairNearbyPlayerVehicle(game, px, py, false);
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
@@ -3727,13 +3794,13 @@ class WorldObjectEngine {
                             game.player.weaponsOwned.push("UZI");
                         }
                         if (game.player.ammo) {
-                            game.player.ammo.UZI = Math.max(game.player.ammo.UZI || 0, 120);
-                            game.player.ammo.PISTOL = Math.max(game.player.ammo.PISTOL || 0, 60);
+                            game.player.ammo.UZI = Math.min(999, Math.max(game.player.ammo.UZI || 0, 120));
+                            game.player.ammo.PISTOL = Math.min(999, Math.max(game.player.ammo.PISTOL || 0, 60));
                         }
                         title = "🎧 ONLY RAW RECORDS — DRE'QUAN PRIEST!";
-                        sub = "VIP SECURITY LOADOUT: +120 UZI AMMO & 150 HP/ARMOR!";
+                        sub = "VIP SECURITY LOADOUT: +120 UZI AMMO & 150 HP/100 ARMOR!";
                         col = "#ef4444";
-                        floatTxt = "🎧 ONLY RAW VIP! +120 UZI & 150 ARMOR";
+                        floatTxt = "🎧 ONLY RAW VIP! +120 UZI & FULL ARMOR";
                         sender = "Dre'Quan Priest";
                         sms = "Only Raw Records runs Ocean Drive! Take the black 4x4 SUV out front or roll with security.";
                     } else if (gs.kind === "RAUL") {
@@ -3741,13 +3808,17 @@ class WorldObjectEngine {
                             game.player.weaponsOwned.push("SHOTGUN");
                         }
                         if (game.player.ammo) {
-                            game.player.ammo.SHOTGUN = Math.max(game.player.ammo.SHOTGUN || 0, 32);
-                            game.player.ammo.PISTOL = Math.max(game.player.ammo.PISTOL || 0, 60);
+                            game.player.ammo.SHOTGUN = Math.min(999, Math.max(game.player.ammo.SHOTGUN || 0, 32));
+                            game.player.ammo.PISTOL = Math.min(999, Math.max(game.player.ammo.PISTOL || 0, 60));
                         }
-                        game.wantedLevel = 0;
+                        if (typeof game.setWantedLevel === "function") {
+                            game.setWantedLevel(0);
+                        } else {
+                            game.wantedLevel = 0;
+                        }
                         game.player.ankleScrambled = true;
                         title = "🗺️ RAUL BAUTISTA — LEONIDA HEIST INTEL!";
-                        sub = "WANTED HEAT CLEARED • +32 SHOTGUN SHELLS & 150 ARMOR!";
+                        sub = "WANTED HEAT CLEARED • +32 SHOTGUN SHELLS & FULL ARMOR!";
                         col = "#fbbf24";
                         floatTxt = "🗺️ HEIST INTEL! HEAT CLEARED + SHOTGUN";
                         sender = "Raul Bautista";
@@ -4022,11 +4093,12 @@ class WorldObjectEngine {
                 if ((dl.cooldown || 0) <= 0 && Math.hypot(px - dl.x, py - dl.y) < 78) {
                     dl.cooldown = 60.0;
                     this.cameraFlashTimer = 0.35;
+                    if (typeof game.addCash === "function") game.addCash(125, `🛸 ${dl.name} STREAM!`);
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
                             `🛸 VIRAL 4K DRONE LIVESTREAM!`,
-                            `${dl.name} • AERIAL LIVESTREAM BROADCAST!`,
+                            `${dl.name} • AERIAL SPONSOR PAYOUT (+$125)!`,
                             "#22d3ee",
                             2.4
                         );
@@ -4036,7 +4108,7 @@ class WorldObjectEngine {
                             x: dl.x,
                             y: dl.y,
                             z: 2.72,
-                            text: `🛸 VIRAL DRONE LIVESTREAM!`,
+                            text: `🛸 VIRAL DRONE LIVESTREAM! +$125`,
                             color: "#22d3ee",
                             life: 2.2
                         });
@@ -4119,14 +4191,10 @@ class WorldObjectEngine {
             for (const dp of this.derbyPitGarages) {
                 if ((dp.cooldown || 0) <= 0 && Math.hypot(px - dp.x, py - dp.y) < 72) {
                     dp.cooldown = 60.0;
-                    if (game.player.inVehicle) {
-                        game.player.inVehicle.hp = game.player.inVehicle.maxHp || 100;
-                        game.player.inVehicle.burnTimer = 0;
-                        game.player.inVehicle.damage = 0;
-                    }
+                    this.repairNearbyPlayerVehicle(game, px, py, false);
                     game.player.maxHp = Math.max(game.player.maxHp || 100, 150);
                     game.player.hp = 150;
-                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    game.player.armor = 100;
                     if (game.audio) game.audio.playPickup("ARMOR");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
@@ -4343,11 +4411,12 @@ class WorldObjectEngine {
             for (const dp of this.dominoParkTables) {
                 if ((dp.cooldown || 0) <= 0 && Math.hypot(px - dp.x, py - dp.y) < 64) {
                     dp.cooldown = 60.0;
+                    if (typeof game.addCash === "function") game.addCash(100, `🁣 ${dp.name}!`);
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
                             `🁣 CALLE OCHO DOMINO SLAM CHAMPION!`,
-                            `${dp.name} • CAPICÚ TABLE RUN!`,
+                            `${dp.name} • CAPICÚ TABLE RUN (+$100)!`,
                             "#fbbf24",
                             2.4
                         );
@@ -4357,7 +4426,7 @@ class WorldObjectEngine {
                             x: dp.x,
                             y: dp.y,
                             z: 2.68,
-                            text: `🁣 DOMINO SLAM CHAMPION!`,
+                            text: `🁣 DOMINO SLAM CHAMPION! +$100`,
                             color: "#fbbf24",
                             life: 2.2
                         });
@@ -4531,11 +4600,12 @@ class WorldObjectEngine {
             for (const na of this.neonArcadePavilions) {
                 if ((na.cooldown || 0) <= 0 && Math.hypot(px - na.x, py - na.y) < 64) {
                     na.cooldown = 60.0;
+                    if (typeof game.addCash === "function") game.addCash(100, `🕹️ ${na.name} HIGH SCORE!`);
                     if (game.audio) game.audio.playPickup("WEAPON");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
                             `🕹️ 1997 RETRO ARCADE HIGH SCORE!`,
-                            `${na.name} • NEON PINBALL WIZARD!`,
+                            `${na.name} • NEON PINBALL WIZARD (+$100)!`,
                             "#c084fc",
                             2.4
                         );
@@ -4545,7 +4615,7 @@ class WorldObjectEngine {
                             x: na.x,
                             y: na.y,
                             z: 2.70,
-                            text: `🕹️ ARCADE PINBALL WIZARD!`,
+                            text: `🕹️ ARCADE PINBALL WIZARD! +$100`,
                             color: "#c084fc",
                             life: 2.2
                         });
@@ -4923,12 +4993,8 @@ class WorldObjectEngine {
             for (const sp of this.solarPowerArrays) {
                 if ((sp.cooldown || 0) <= 0 && Math.hypot(px - sp.x, py - sp.y) < 74) {
                     sp.cooldown = 60.0;
-                    if (game.player.inVehicle) {
-                        game.player.inVehicle.hp = game.player.inVehicle.maxHp || 100;
-                        game.player.inVehicle.burnTimer = 0;
-                        game.player.inVehicle.damage = 0;
-                    }
-                    game.player.armor = Math.max(game.player.armor || 0, 150);
+                    this.repairNearbyPlayerVehicle(game, px, py, true);
+                    game.player.armor = 100;
                     if (game.audio) game.audio.playPickup("ARMOR");
                     if (typeof game.showBigBanner === "function") {
                         game.showBigBanner(
@@ -5194,8 +5260,19 @@ class WorldObjectEngine {
                 if (dBoat < 165 || dPier < 138) {
                     const ux = Math.cos(db.pierAng);
                     const uy = Math.sin(db.pierAng);
-                    const spawnX = db.worldX + ux * 20;
-                    const spawnY = db.worldY + uy * 20;
+                    let spawnX = db.worldX + ux * 20;
+                    let spawnY = db.worldY + uy * 20;
+                    if (this.map && typeof this.map.isWaterAtPixel === "function" && !this.map.isWaterAtPixel(spawnX, spawnY)) {
+                        for (const off of [42, 66, 92]) {
+                            const tx = db.worldX + ux * off;
+                            const ty = db.worldY + uy * off;
+                            if (this.map.isWaterAtPixel(tx, ty)) {
+                                spawnX = tx;
+                                spawnY = ty;
+                                break;
+                            }
+                        }
+                    }
                     if (typeof Vehicle === "function" && Array.isArray(game.vehicles)) {
                         const boatKey = (db.spr && String(db.spr).includes("jetski")) ? "JETSKI" : "SPEEDBOAT";
                         let boat = db._liveBoat && !db._liveBoat.destroyed && game.vehicles.includes(db._liveBoat) ? db._liveBoat : null;
@@ -5204,6 +5281,9 @@ class WorldObjectEngine {
                             boat.z = 2.0;
                             boat.isEstateCar = true;
                             game.vehicles.push(boat);
+                            if (typeof game.rebuildVehicleSpatialGrid === "function") {
+                                game.rebuildVehicleSpatialGrid();
+                            }
                             db._liveBoat = boat;
                         } else {
                             boat.z = 2.0;
@@ -5332,10 +5412,23 @@ class WorldObjectEngine {
                 }
                 if (!g.ped && !g.deadUntilReset && distVilla < 1150 && Array.isArray(game.peds) && typeof Pedestrian === "function") {
                     const guardArch = gi === 0 ? "g2_zaibatsu" : "g2_yakuza";
+                    let gx = g.baseX;
+                    let gy = g.baseY;
+                    if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                        const col = this.map.resolveCircleBuildingCollision(gx, gy, 9, bz, false);
+                        gx = col.x;
+                        gy = col.y;
+                    }
+                    if (this.map && typeof this.map.isWaterAtPixel === "function" && this.map.isWaterAtPixel(gx, gy)) {
+                        gx = ht.keypadX || gx;
+                        gy = ht.keypadY || gy;
+                    }
+                    g.baseX = gx;
+                    g.baseY = gy;
                     g.ped = new Pedestrian({
                         id: `villa_guard_${i}_${gi}_${Date.now()}`,
-                        x: g.baseX,
-                        y: g.baseY,
+                        x: gx,
+                        y: gy,
                         z: bz,
                         angle: g.ang,
                         speed: 28,
@@ -5344,8 +5437,8 @@ class WorldObjectEngine {
                         g2Remapped: true,
                         isVillaGuard: true,
                         missionTag: "VILLA_GUARD",
-                        guardBaseX: g.baseX,
-                        guardBaseY: g.baseY,
+                        guardBaseX: gx,
+                        guardBaseY: gy,
                         shirtColor: gi === 0 ? "#1e293b" : "#1e3a8a",
                         hp: 75,
                         maxHp: 75,
@@ -5354,6 +5447,9 @@ class WorldObjectEngine {
                         dead: false
                     });
                     game.peds.push(g.ped);
+                    if (typeof game.rebuildPedSpatialGrid === "function") {
+                        game.rebuildPedSpatialGrid();
+                    }
                 }
 
                 if (g.ped) {
@@ -5474,9 +5570,12 @@ class WorldObjectEngine {
                             const by = lp.y;
                             if (Array.isArray(game.vehicles)) {
                                 for (const v of game.vehicles) {
+                                    if (!v || v.destroyed) continue;
                                     const d = Math.hypot(v.x - bx, v.y - by);
                                     if (d > 1 && d < 165) {
                                         const push = (1.0 - d / 165) * 420;
+                                        v.isStaticParked = false;
+                                        v._worldModified = true;
                                         v.vx = (v.vx || 0) + ((v.x - bx) / d) * push;
                                         v.vy = (v.vy || 0) + ((v.y - by) / d) * push;
                                         v.speed = Math.max(v.speed || 0, 180);
@@ -5679,8 +5778,25 @@ class WorldObjectEngine {
             for (let i = this.cashDrops.length - 1; i >= 0; i--) {
                 const cd = this.cashDrops[i];
                 cd.age = (cd.age || 0) + dt;
+                const prevX = cd.x;
+                const prevY = cd.y;
                 cd.x += (cd.vx || 0) * dt;
                 cd.y += (cd.vy || 0) * dt;
+                if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                    const col = this.map.resolveCircleBuildingCollision(cd.x, cd.y, 10, cd.z || 2.0, false);
+                    if (col.collided) {
+                        cd.x = col.x;
+                        cd.y = col.y;
+                        cd.vx *= -0.25;
+                        cd.vy *= -0.25;
+                    }
+                }
+                if (this.map && typeof this.map.isWaterAtPixel === "function" && this.map.isWaterAtPixel(cd.x, cd.y)) {
+                    cd.x = prevX;
+                    cd.y = prevY;
+                    cd.vx = 0;
+                    cd.vy = 0;
+                }
                 cd.vx *= Math.pow(0.15, dt);
                 cd.vy *= Math.pow(0.15, dt);
                 if (p && Math.hypot(px - cd.x, py - cd.y) < 44) {
@@ -5953,6 +6069,7 @@ class WorldObjectEngine {
         if (this._cooldownSubTick === 0) {
             const cDt = dt * 6;
             const cdLists = this._cooldownArrayRefs || (this._cooldownArrayRefs = [
+                this.sodaMachines,
                 this.surfShacks, this.bbqSmokerStands, this.tattooParlors, this.sandbarPartyBarges,
                 this.sandcastles, this.kayakOutposts, this.baseJumpPads, this.kitesurfStands,
                 this.luxuryValetStands, this.gatorTourDocks, this.graffitiScaffolds, this.pierCarnivalGames,
@@ -12849,7 +12966,7 @@ class WorldObjectEngine {
        5. RENDER HARDWARE-DEPTH-BUFFERED 3D STATIC + DYNAMIC ANIMATED MESHES
        ======================================================================== */
     renderStatic3DMesh(gl, renderer, viewProj, nf = 0.0, sf = 0.0, emissivePass = false) {
-        if (!gl || !this.staticChunks || this.staticChunks.length === 0 || !this.meshProg || !renderer.spritesTex) return;
+        if (!gl || renderer.glLost || (typeof gl.isContextLost === "function" && gl.isContextLost()) || !this.staticChunks || this.staticChunks.length === 0 || !this.meshProg || !renderer.spritesTex) return;
 
         gl.useProgram(this.meshProg);
         gl.uniformMatrix4fv(this.meshLocs.uViewProj, false, viewProj);
@@ -17872,7 +17989,7 @@ class WorldObjectEngine {
        8. TRUE 3D WEBGL MULTI-ROOM INTERIOR ARCHITECTURE & FURNITURE ENGINE
        ======================================================================== */
     renderInterior3DMesh(gl, renderer, game, viewProj) {
-        if (!gl || !renderer || !game || !game.activeInterior) return;
+        if (!gl || renderer.glLost || (typeof gl.isContextLost === "function" && gl.isContextLost()) || !renderer || !game || !game.activeInterior) return;
         this.initShader(gl, renderer);
         if (!this.meshProg || !renderer.spritesTex) return;
 
@@ -18807,13 +18924,14 @@ class WorldObjectEngine {
             const bobZ = 2.15 + Math.sin(t * 4.2 + i) * 0.025;
             const spinA = t * 2.4 + i;
             let iconSpr = null;
+            const rt = st.rewardType || "";
             if (st.action === "BUY_PISTOL") iconSpr = "pistol";
-            else if (st.action === "BUY_UZI") iconSpr = "uzi";
+            else if (st.action === "BUY_UZI" || rt === "ARSENAL") iconSpr = "uzi";
             else if (st.action === "BUY_SHOTGUN") iconSpr = "shotgun";
-            else if (st.action === "BUY_ROCKET" || st.action === "ORBITAL_STRIKE") iconSpr = "rocket";
-            else if (st.action === "BUY_ARMOR" || st.action === "BUY_OUTFIT") iconSpr = "armor";
-            else if (st.action === "BUY_SNACK" || st.action === "BUY_MEAL" || st.action === "BUY_ENERGY" || st.action === "ZERO_G_HEAL" || st.action === "HEAL_FULL" || st.action === "SAVE_GAME") iconSpr = "medkit";
-            else if (st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH" || st.action === "EXPORT_CAR") iconSpr = "briefcase";
+            else if (st.action === "BUY_ROCKET" || st.action === "ORBITAL_STRIKE" || rt === "HEAVY_WEAPONS" || rt === "ROCKET_LAUNCH") iconSpr = "rocket";
+            else if (st.action === "BUY_ARMOR" || st.action === "BUY_OUTFIT" || st.action === "CHANGE_OUTFIT" || st.action === "BUY_OUTFIT_1" || st.action === "BUY_OUTFIT_2" || st.action === "BUY_OUTFIT_VIP" || st.action === "QUICK_FIT" || rt === "WARDROBE") iconSpr = "armor";
+            else if (st.action === "BUY_SNACK" || st.action === "BUY_MEAL" || st.action === "BUY_DRINK" || st.action === "BUY_COCKTAIL" || st.action === "BUY_ENERGY" || st.action === "RENT_SUITE" || st.action === "ZERO_G_HEAL" || st.action === "HEAL_FULL" || st.action === "SAVE_GAME" || rt === "LOUNGE" || rt === "EXTRA_LIFE") iconSpr = "medkit";
+            else if (st.action === "ROB_REGISTER" || st.action === "HOTEL_PERK" || st.action === "PLAY_LOTTO" || st.action === "PLAY_POOL" || st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH" || st.action === "EXPORT_CAR" || rt === "HEIST_SAFE" || rt === "MULTIPLIER_CASH" || rt === "JAIL_CARDS") iconSpr = "briefcase";
 
             if (iconSpr && ready) {
                 renderer.batchObjectSprite3D(iconSpr, st.x, st.y, bobZ, spinA, isNearSt ? 1.65 : 1.45, SPRITE_DRAW_ORDER.MAP_OBJECT);

@@ -1720,9 +1720,13 @@ class Vehicle {
             for (let si = 0; si < sirenVehicles.length; si++) {
                 const other = sirenVehicles[si];
                 if (!other || other === this || other.destroyed) continue;
+                // Only yield for MOVING priority life-safety emergency rigs (Police, Ambulance, Fire Engine — NOT slow/parked units or Tow Trucks!)
+                // so a parked Ambulance/Fire Truck on scene never freezes adjacent or oncoming street lanes!
                 const isPriorityVeh = Boolean(
-                    other.sirenActive ||
-                    (other.driver === "AI_TOW" && (other.towTarget || other.towingVehicle))
+                    other.sirenActive &&
+                    other.driver !== "AI_TOW" &&
+                    other.specKey !== "TOW_TRUCK" &&
+                    Math.abs(other.speed || Math.hypot(other.vx || 0, other.vy || 0)) > 16
                 );
                 if (!isPriorityVeh) continue;
                 if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) continue;
@@ -2029,7 +2033,8 @@ class Vehicle {
                     rightNav &&
                     rightNav.groundType === GROUND_TYPE.PAWEMENT &&
                     rightAheadNav &&
-                    rightAheadNav.groundType === GROUND_TYPE.PAWEMENT
+                    rightAheadNav.groundType === GROUND_TYPE.PAWEMENT &&
+                    (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision((rightBx + 0.5) * TILE_SIZE, (rightBy + 0.5) * TILE_SIZE, 10, curZ).hit)
                 ) {
                     this.aiPassengerStopTimer = this.specKey === "VICE_CAB" ? 3.2 : 4.2;
                     this.aiPassengerDropPending = true;
@@ -2222,9 +2227,10 @@ class Vehicle {
                 const fwd = dx * fx + dy * fy;
                 const lat = Math.abs(dx * rx + dy * ry);
                 const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
+                const ovCos = Math.cos((ov.angle || 0) - this.angle);
                 const ovLid = map.getBlockInfo ? map.getBlockInfo(ov.x >> 6, ov.y >> 6, 1).lid : 0;
-                if (ovLid === 25 && ovSpd < 12 && fwd > 12 && fwd < 155 && lat < 44) return true;
-                if (fwd > 22 && fwd < (150 + extraExitClearance) && lat < 24 && ovSpd < 10 && Math.cos(ov.angle - this.angle) > 0.65) return true;
+                if (ovLid === 25 && ovSpd < 12 && fwd > 12 && fwd < 155 && lat < 44 && !(ovCos < -0.35 && lat > 18)) return true;
+                if (fwd > 22 && fwd < (150 + extraExitClearance) && lat < 24 && ovSpd < 10 && ovCos > 0.65) return true;
                 return false;
             };
             if (gHead && gNext) {
@@ -2421,10 +2427,11 @@ class Vehicle {
 
                     if (inIntersectionBox && cosDiff <= 0.55 && forwardDist > 4 && forwardDist < 66 && lateralDist < 32) {
                         const tieBreakYield = Math.abs(theirForwardDist - forwardDist) < 8 && String(this.id) < String(other.id);
+                        const playerDirectlyInPath = other.driver === "PLAYER" && (otherSpd > 14 || (lateralDist < 18 && forwardDist < 44));
                         const mustYieldToOther =
-                            other.driver === "PLAYER" ||
-                            other.sirenActive ||
-                            (theirForwardDist > -10 && (theirForwardDist < forwardDist - 4 || tieBreakYield));
+                            playerDirectlyInPath ||
+                            (other.sirenActive && otherSpd > 14) ||
+                            (otherSpd > 14 && theirForwardDist > -10 && (theirForwardDist < forwardDist - 4 || tieBreakYield));
                         if (mustYieldToOther) {
                             crossTrafficYield = true;
                         }
@@ -2607,7 +2614,19 @@ class Vehicle {
                     const testY = this.y + ry * bSide * bOff;
                     const testAheadX = testX + fx * 42;
                     const testAheadY = testY + fy * 42;
+                    let sideBlockedByVeh = false;
+                    if (game && Array.isArray(game.vehicles)) {
+                        for (let vi = 0; vi < game.vehicles.length; vi++) {
+                            const sv = game.vehicles[vi];
+                            if (!sv || sv === this || sv === closestEntity || sv === this.towingVehicle) continue;
+                            if (Math.abs(sv.x - testX) < 34 && Math.abs(sv.y - testY) < 34 && Math.hypot(sv.x - testX, sv.y - testY) < 28) {
+                                sideBlockedByVeh = true;
+                                break;
+                            }
+                        }
+                    }
                     if (
+                        !sideBlockedByVeh &&
                         (!map.isWaterAtPixel || (!map.isWaterAtPixel(testX, testY) && !map.isWaterAtPixel(testAheadX, testAheadY))) &&
                         (!map.resolveCircleBuildingCollision || (!map.resolveCircleBuildingCollision(testX, testY, 13, curZ).hit && !map.resolveCircleBuildingCollision(testAheadX, testAheadY, 13, curZ).hit))
                     ) {
@@ -3548,12 +3567,12 @@ class Vehicle {
             this.medicTargetPed = null;
         }
 
-        // B. FIRE ENGINE: Responds to burning vehicles & burning wrecks within 1500px, deploys an on-foot VCFD Firefighter, and sprays high-pressure water cannon!
+        // B. FIRE ENGINE: Responds to burning vehicles & burning wrecks within 1650px, deploys an on-foot VCFD Firefighter, and sprays high-pressure water cannon!
         if (this.specKey === "FIRE_TRUCK" && Array.isArray(game.vehicles)) {
             if (this.deployedFireman) {
                 if (
                     this.deployedFireman.dead ||
-                    (this.deployedFireman.firemanOutTimer || 0) > 36.0 ||
+                    (this.deployedFireman.firemanOutTimer || 0) > 44.0 ||
                     !game.peds.includes(this.deployedFireman)
                 ) {
                     this.deployedFireman = null;
@@ -3561,12 +3580,13 @@ class Vehicle {
             }
 
             let burningCar = null;
-            let bestDist = 1500;
+            let bestDist = 1650;
             for (const v of game.vehicles) {
                 if (v === this || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) continue;
+                if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(Math.floor(v.x / TILE_SIZE), Math.floor(v.y / TILE_SIZE))) continue;
                 const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
-                const isBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 4.5;
+                const isBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 1.5;
                 if (!isLiveBurning && !isBurningWreck) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d < bestDist) {
@@ -3657,6 +3677,7 @@ class Vehicle {
                             if (burningCar.extinguishProgress >= 3.0) {
                                 burningCar.hp = Math.min(burningCar.maxHp, Math.max(burningCar.hp + 35 * dt, 58));
                                 burningCar.burnTimer = 0;
+                                burningCar.extinguishProgress = 0;
                                 if (!burningCar._vcfdSavedMsg && typeof game.addFloatingText === "function") {
                                     burningCar._vcfdSavedMsg = true;
                                     game.addFloatingText(burningCar.x, burningCar.y - 24, "🚒 VCFD — FIRE EXTINGUISHED!", "#38bdf8");
@@ -3765,7 +3786,6 @@ class Vehicle {
             if (this._returnToBaseTimer > 20.0) {
                 this._returnToBaseTimer = 0;
                 this.sirenActive = false;
-                this.driver = "AI_TRAFFIC";
                 return this.computeTrafficControls(dt, map, game);
             }
             if (dHome > 180) {
@@ -3790,7 +3810,7 @@ class Vehicle {
 
     computeTowControls(dt, map, game) {
         this.aiState = "TOW_TRUCK";
-        this.sirenActive = true;
+        this.sirenActive = Boolean(this.towTarget || this.towingVehicle);
 
         // If already towing a vehicle/wreck, haul it along the road network directly toward the nearest Municipal Impound / Vice Customs Yard!
         if (this.towingVehicle) {
@@ -3852,7 +3872,12 @@ class Vehicle {
 
         const isValidTowCandidate = (v) => {
             if (!v || v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) return false;
-            const isWreck = v.destroyed && (v.abandonedTimer || 0) > ((game && game.wreckTowDelay) || 90.0);
+            // NEVER target a burning vehicle or un-extinguished wreck — wait for VCFD Fire Engine to extinguish it first!
+            if (isVehBurning(v)) return false;
+            if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) return false;
+            if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(Math.floor(v.x / TILE_SIZE), Math.floor(v.y / TILE_SIZE))) return false;
+            const towDelay = Math.max(12.0, Math.min(45.0, (game && game.wreckTowDelay) || 45.0));
+            const isWreck = v.destroyed && (v.abandonedTimer || 0) > towDelay;
             const isAbandoned = !v.destroyed &&
                 v.driver === null &&
                 (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : (v.isPolice ? 42.0 : 35.0));
@@ -3871,6 +3896,7 @@ class Vehicle {
         if (
             !target ||
             !game.vehicles.includes(target) ||
+            isVehBurning(target) ||
             (target.driver !== null && !target.destroyed) ||
             (target.towedByTruck && target.towedByTruck !== this) ||
             target.isStaticParked ||
@@ -3881,28 +3907,25 @@ class Vehicle {
             this._towKTurnActive = false;
         }
 
-        // If we have no target, OR our current target is still burning while a cooled wreck is available nearby,
-        // OR we are blocked by an outer cooled wreck in a multi-car pileup, switch to the best outer cooled wreck!
-        if (!target || isVehBurning(target) || (this.approachNoProgress || 0) > 1.4) {
+        // Acquire nearest valid cooled wreck or abandoned car blocking a lane
+        if (!target || (this.approachNoProgress || 0) > 1.4) {
             let bestCand = null;
             let bestScore = 99999;
             for (const v of game.vehicles) {
                 if (!isValidTowCandidate(v)) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
                 if (d > 1400) continue;
-                const burning = isVehBurning(v);
-                const score = d + (burning ? 1200 : 0);
-                if (score < bestScore) {
-                    bestScore = score;
+                if (d < bestScore) {
+                    bestScore = d;
                     bestCand = v;
                 }
             }
             if (bestCand && bestCand !== target) {
                 const curDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
-                const candDist = Math.hypot(bestCand.x - this.x, bestCand.y - this.y);
-                if (!target || (isVehBurning(target) && !isVehBurning(bestCand)) || (!isVehBurning(bestCand) && candDist < curDist - 16)) {
+                if (!target || bestScore < curDist - 16) {
                     target = bestCand;
                     this.towTarget = target;
+                    this.sirenActive = true;
                     this.approachBestDist = undefined;
                     this.approachNoProgress = 0;
                     this._towKTurnActive = false;
@@ -3935,7 +3958,6 @@ class Vehicle {
                 if (this._returnToBaseTimer > 20.0) {
                     this._returnToBaseTimer = 0;
                     this.sirenActive = false;
-                    this.driver = "AI_TRAFFIC";
                     return this.computeTrafficControls(dt, map, game);
                 }
                 if (dHome > 180) {
@@ -4173,6 +4195,14 @@ class Vehicle {
                 this.angle += angDiff * Math.min(1.0, dt * 4.5);
                 this.x += dx * Math.min(1.0, dt * 5.2);
                 this.y += dy * Math.min(1.0, dt * 5.2);
+                if (map && typeof map.resolveCircleBuildingCollision === "function") {
+                    const tCol = map.resolveCircleBuildingCollision(this.x, this.y, 12, truck.z || 2.0, false);
+                    if (tCol.hit) {
+                        this.x = tCol.x;
+                        this.y = tCol.y;
+                    }
+                }
+                this.burnTimer = 0;
                 this.z = truck.z;
                 this.vx = truck.vx;
                 this.vy = truck.vy;
@@ -6266,6 +6296,7 @@ class TrafficManager {
             const by = Math.floor(v.y / TILE_SIZE);
             // Immediately remove any civilian/emergency traffic car that ever wanders or spawns inside a restricted compound (VCIA Airport / Penitentiary)
             if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(bx, by)) {
+                if (v.aiCurbParkingBay && v.aiCurbParkingBay._occupiedBy === v) v.aiCurbParkingBay._occupiedBy = null;
                 if (v.towingVehicle) {
                     const tIdx = game.vehicles.indexOf(v.towingVehicle);
                     if (tIdx >= 0) {
@@ -6291,6 +6322,7 @@ class TrafficManager {
             const checkRects = (isAbandonedOrWreck || isApproachingTowTruck || isEmergencyFleet || isActiveWantedCop) ? farWreckRects : outerRects;
             const nearAnyPlayer = checkRects.some((r) => this.isPointInRect(bx, by, r));
             if (!nearAnyPlayer) {
+                if (v.aiCurbParkingBay && v.aiCurbParkingBay._occupiedBy === v) v.aiCurbParkingBay._occupiedBy = null;
                 if (v.towingVehicle) {
                     const tIdx = game.vehicles.indexOf(v.towingVehicle);
                     if (tIdx >= 0) {
@@ -6392,6 +6424,17 @@ class TrafficManager {
 
             const vx = (bx + 0.5) * TILE_SIZE;
             const vy = (by + 0.5) * TILE_SIZE;
+            if (game.player && Math.hypot(game.player.x - vx, game.player.y - vy) < 120) continue;
+            if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+                let nearRemote = false;
+                for (const rp of game.net.remotePlayers.values()) {
+                    if (rp && Math.hypot((rp.x || 0) - vx, (rp.y || 0) - vy) < 120) {
+                        nearRemote = true;
+                        break;
+                    }
+                }
+                if (nearRemote) continue;
+            }
             let occupied = false;
             for (const other of game.vehicles) {
                 const minGap = (other.isStaticParked && !other.driver) ? 42 : 135;
@@ -6456,7 +6499,7 @@ class TrafficManager {
                 }
                 continue;
             }
-            if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN") continue;
+            if ((ped.missionTag && ped.missionTag !== "BEACH") || ped.kind === "MEDIC" || ped.kind === "FIREMAN" || ped.isTrafficWarden) continue;
             // Immediately remove any ambient civilian/criminal pedestrian inside Port Gellhorn Super-Speedway or Port of Vice City industrial zone
             if ((ped.kind === "CIVILIAN" || ped.kind === "CRIMINAL") && (
                 (bx >= 26 && bx <= 87 && by >= 149 && by <= 200) ||

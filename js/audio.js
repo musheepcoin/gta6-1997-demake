@@ -395,8 +395,9 @@ class RetroAudioEngine {
             }
             const url = VEHICLE_AUDIO_MANIFEST[key];
             if (!url) continue;
+            const fetchUrl = url.includes("?") ? url : `${url}?v=101_118`;
             this._fetchingKeys.add(key);
-            fetch(`${url}?v=101_118`, { cache: "force-cache" })
+            fetch(fetchUrl, { cache: "force-cache" })
                 .then((res) => (res && res.ok ? res.arrayBuffer() : null))
                 .then((buf) => {
                     this._fetchingKeys.delete(key);
@@ -569,12 +570,15 @@ class RetroAudioEngine {
             case "CHALLENGER_RT":
             case "MINT_STALLION":
             case "TULIP_MUSCLE":
+            case "FJORD_FASTBACK":
             case "MONSTER_BUGGY":
             case "GATOR_4X4":
+            case "PICKUP_4X4":
             case "VCPD_CRUISER":
                 return "V8";
 
             case "SPEEDBOAT":
+            case "YACHT":
                 return "BOAT";
 
             case "SUPERBIKE":
@@ -587,12 +591,14 @@ class RetroAudioEngine {
                 return "HARLEY";
 
             case "AIRBOAT":
+            case "SWAMP_BOAT":
                 return "AIRBOAT";
 
             case "BMX_BIKE":
                 return "BICYCLE";
 
             case "E_SCOOTER":
+            case "FAGGIO_SCOOTER":
                 return "ESCOOTER";
 
             case "PANZER_TANK":
@@ -814,20 +820,50 @@ class RetroAudioEngine {
     }
 
     _setParamSmooth(param, target, alpha = 0.25) {
-        if (!param) return;
-        const cur = param.value;
-        const next = cur + (target - cur) * Math.min(1.0, Math.max(0.05, alpha));
+        if (!param || !Number.isFinite(target)) return;
+        const cur = Number.isFinite(param.value) ? param.value : 0;
+        const safeAlpha = Number.isFinite(alpha) ? Math.min(1.0, Math.max(0.05, alpha)) : 0.25;
+        const next = cur + (target - cur) * safeAlpha;
+        if (!Number.isFinite(next)) return;
         if (Math.abs(next - cur) > 0.0002 || (target === 0 && cur !== 0)) {
             param.value = Math.abs(target) < 0.0003 && Math.abs(next) < 0.0005 ? 0 : next;
         }
     }
 
+    setMuted(muted) {
+        this.muted = Boolean(muted);
+        if (this.muted) {
+            this._wasMuted = true;
+            this.resetLoops();
+            if (this.sfxMasterGain && this.sfxMasterGain.gain) {
+                this.sfxMasterGain.gain.value = 0.0;
+            }
+            if (this.musicMasterGain && this.musicMasterGain.gain) {
+                this.musicMasterGain.gain.value = 0.0;
+            }
+        } else {
+            this._wasMuted = false;
+            if (this.sfxMasterGain && this.sfxMasterGain.gain) {
+                this.sfxMasterGain.gain.value = 4.2;
+            }
+            if (this.musicMasterGain && this.musicMasterGain.gain) {
+                this.musicMasterGain.gain.value = 1.45;
+            }
+            if (this.ctx && this.ctx.state !== "running" && (typeof document === "undefined" || !document.hidden)) {
+                this.ctx.resume().catch(() => {});
+            }
+        }
+    }
+
     playSample(key, vol = 0.12, rate = 1.0, maxDuration = 0) {
         if (!this.initialized || this.muted || !this.ctx) return false;
+        const safeInVol = Number.isFinite(vol) ? vol : 0.12;
+        const safeInRate = Number.isFinite(rate) ? rate : 1.0;
+        if (safeInVol <= 0) return false;
         const buf = this.buffers[key];
         if (!buf) {
             if (!this._pendingPlayOnDecode) this._pendingPlayOnDecode = {};
-            this._pendingPlayOnDecode[key] = { vol, rate, maxDuration, ts: performance.now() };
+            this._pendingPlayOnDecode[key] = { vol: safeInVol, rate: safeInRate, maxDuration, ts: performance.now() };
             this._decodeKey(key, true);
             return false;
         }
@@ -842,13 +878,13 @@ class RetroAudioEngine {
             }
             this._lastSampleByKey[key] = now;
 
-            const safeRate = Math.max(0.45, Math.min(2.2, rate));
+            const safeRate = Math.max(0.45, Math.min(2.2, safeInRate));
             const src = this.ctx.createBufferSource();
             src.buffer = buf;
             src.loop = false;
             src.playbackRate.value = safeRate;
             const g = this.ctx.createGain();
-            const scaledVol = Math.max(0.001, Math.min(0.35, vol * 0.85));
+            const scaledVol = Math.max(0.001, Math.min(0.35, safeInVol * 0.85));
             g.gain.setValueAtTime(scaledVol, now);
             const naturalDur = Math.min(3.2, buf.duration / safeRate);
             const effDur = (maxDuration > 0 && maxDuration < naturalDur) ? maxDuration : naturalDur;
@@ -896,6 +932,7 @@ class RetroAudioEngine {
             this._sirenNode = null;
             this._activeSirenKey = null;
         }
+        this._stopSynthSirenFallback();
         if (this._heliLoopNode) {
             try {
                 this._heliLoopNode.stop();
@@ -1032,12 +1069,57 @@ class RetroAudioEngine {
         }
     }
 
+    _stopSynthSirenFallback() {
+        if (this._sirenSynthOsc) {
+            try {
+                this._sirenSynthOsc.stop();
+                this._sirenSynthOsc.disconnect();
+            } catch (_e) {}
+            this._sirenSynthOsc = null;
+        }
+        if (this._sirenSynthGain) {
+            try {
+                this._sirenSynthGain.disconnect();
+            } catch (_e) {}
+            this._sirenSynthGain = null;
+        }
+    }
+
+    _updateSynthSirenFallback(dt, sirenType, prox, doppler = 1.0) {
+        if (!this.ctx || !this.sirenGain) return;
+        if (!this._sirenSynthOsc) {
+            try {
+                const osc = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                osc.type = "triangle";
+                osc.frequency.value = 640;
+                g.gain.value = 0.001;
+                osc.connect(g);
+                g.connect(this.sirenGain);
+                osc.start(this.ctx.currentTime);
+                this._sirenSynthOsc = osc;
+                this._sirenSynthGain = g;
+            } catch (_e) {
+                return;
+            }
+        }
+        this.sirenPhase = (this.sirenPhase || 0) + dt * (sirenType === "MEDIC" ? 3.2 : (sirenType === "FIRE" ? 1.15 : 1.75));
+        const lfo = 0.5 + 0.5 * Math.sin(this.sirenPhase * Math.PI * 2);
+        const baseLo = sirenType === "FIRE" ? 410 : (sirenType === "MEDIC" ? 660 : 580);
+        const baseHi = sirenType === "FIRE" ? 780 : (sirenType === "MEDIC" ? 940 : 1020);
+        const targetHz = (baseLo + (baseHi - baseLo) * lfo) * Math.max(0.9, Math.min(1.1, doppler || 1.0));
+        this._setParamSmooth(this._sirenSynthOsc.frequency, targetHz, 0.35);
+        this._setParamSmooth(this._sirenSynthGain.gain, 0.38, 0.25);
+        this._setParamSmooth(this.sirenGain.gain, prox * 0.055, 0.25);
+    }
+
     _ensureSirenLoop(sirenKey) {
         if (!this.ctx || !this.sirenGain) return false;
         if (!this.buffers[sirenKey]) {
-            this._decodeKey(sirenKey);
+            this._decodeKey(sirenKey, true);
             return false;
         }
+        this._stopSynthSirenFallback();
         if (this._activeSirenKey === sirenKey && this._sirenNode) {
             return true;
         }
@@ -1052,19 +1134,19 @@ class RetroAudioEngine {
             const src = this.ctx.createBufferSource();
             src.buffer = this.buffers[sirenKey];
             src.loop = true;
-            // Gentle anti-harshness EQ notch (-5.5 dB at 3100 Hz) + clear 1150..3400 Hz low-pass so sirens are clearly audible without piercing the ears!
+            // Gentle anti-harshness EQ notch (-4.5 dB at 3100 Hz) + warm 1450..3600 Hz low-pass so sirens are clearly audible without piercing the ears!
             if (!this._sirenNotch) {
                 this._sirenNotch = this.ctx.createBiquadFilter();
                 this._sirenNotch.type = "peaking";
                 this._sirenNotch.frequency.value = 3100;
                 this._sirenNotch.Q.value = 1.25;
-                this._sirenNotch.gain.value = -5.5;
+                this._sirenNotch.gain.value = -4.5;
             }
             if (!this._sirenLP) {
                 this._sirenLP = this.ctx.createBiquadFilter();
                 this._sirenLP.type = "lowpass";
                 this._sirenLP.Q.value = 0.65;
-                this._sirenLP.frequency.value = 2400;
+                this._sirenLP.frequency.value = 2600;
                 this._sirenNotch.connect(this._sirenLP);
                 this._sirenLP.connect(this.sirenGain);
             }
@@ -1171,7 +1253,23 @@ class RetroAudioEngine {
     }
 
     update(dt, state) {
-        if (!this.initialized || this.muted || !this.ctx) return;
+        if (!this.initialized || !this.ctx || !state) return;
+        if (this.muted) {
+            if (!this._wasMuted) {
+                this._wasMuted = true;
+                this.resetLoops();
+                if (this.sfxMasterGain && this.sfxMasterGain.gain) {
+                    this.sfxMasterGain.gain.value = 0.0;
+                }
+            }
+            return;
+        }
+        if (this._wasMuted) {
+            this._wasMuted = false;
+            if (this.sfxMasterGain && this.sfxMasterGain.gain) {
+                this.sfxMasterGain.gain.value = 4.2;
+            }
+        }
 
         const now = this.ctx.currentTime;
         this.inVehicle = Boolean(state.inVehicle);
@@ -1380,21 +1478,27 @@ class RetroAudioEngine {
         }
 
         // 2. Real Emergency Sirens (Balanced sweet spot: clearly audible from afar, warm & comfortable up close!)
-        const sirenDist = state.nearestSirenDist !== undefined ? state.nearestSirenDist : 9999;
+        const sirenDist = Number.isFinite(state.nearestSirenDist) ? state.nearestSirenDist : 9999;
         const playerSiren = Boolean(this.inVehicle && state.playerSirenActive);
-        if (playerSiren || (sirenDist !== undefined && sirenDist < 820)) {
-            const sirenType = state.nearestSirenType || "POLICE";
+        if (playerSiren || sirenDist < 920) {
+            const fallbackPlayerType = this._activeVehicleSpecKey === "MEDIC_AMBULANCE"
+                ? "MEDIC"
+                : (this._activeVehicleSpecKey === "FIRE_TRUCK" ? "FIRE" : "POLICE");
+            const sirenType = state.nearestSirenType || (playerSiren ? fallbackPlayerType : "POLICE");
             const sirenKey = sirenType === "MEDIC"
                 ? "siren_medic"
                 : (sirenType === "FIRE" ? "siren_firetruck" : "siren_police");
-            const rawLin = playerSiren ? 0.85 : Math.max(0, 1 - sirenDist / 820);
-            const prox = playerSiren ? 0.85 : Math.pow(rawLin, 1.30);
-            const maxSirenGain = playerSiren ? 0.072 : (this.inVehicle ? 0.056 : 0.068);
+            const rawLin = playerSiren ? 0.88 : Math.max(0, 1 - sirenDist / 920);
+            const prox = playerSiren ? 0.88 : Math.pow(rawLin, 1.15);
+            const maxSirenGain = playerSiren ? 0.105 : (this.inVehicle ? 0.088 : 0.098);
+            const dopplerSrc = state.sirenDoppler !== undefined ? state.sirenDoppler : (state.trafficDoppler || 1.0);
+            const doppler = playerSiren ? 1.0 : Math.max(0.90, Math.min(1.10, Number.isFinite(dopplerSrc) ? dopplerSrc : 1.0));
             if (this._ensureSirenLoop(sirenKey) && this._sirenNode) {
                 this._setParamSmooth(this.sirenGain.gain, prox * maxSirenGain, 0.25);
-                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 1150 + prox * 2250, 0.28);
-                const doppler = playerSiren ? 1.0 : Math.max(0.90, Math.min(1.10, state.trafficDoppler || 1.0));
+                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 1450 + prox * 2150, 0.28);
                 this._setParamSmooth(this._sirenNode.playbackRate, doppler, 0.25);
+            } else {
+                this._updateSynthSirenFallback(dt, sirenType, prox, doppler);
             }
         } else if (this.sirenGain) {
             if (this._sirenNode) {
@@ -1405,6 +1509,7 @@ class RetroAudioEngine {
                 this._sirenNode = null;
                 this._activeSirenKey = null;
             }
+            this._stopSynthSirenFallback();
             this.sirenGain.gain.value = 0.0;
         }
 
@@ -1470,13 +1575,14 @@ class RetroAudioEngine {
 
     playBeep(freq = 520, duration = 0.08, type = "square", vol = 0.06) {
         if (!this.initialized || this.muted || !this.ctx) return;
+        if (!Number.isFinite(freq) || freq <= 0 || !Number.isFinite(vol) || vol <= 0) return;
         const now = this.ctx.currentTime;
-        const safeDur = Math.max(0.015, Math.min(0.6, duration));
+        const safeDur = Math.max(0.015, Math.min(0.6, Number.isFinite(duration) ? duration : 0.08));
         const osc = this.ctx.createOscillator();
         const g = this.ctx.createGain();
         osc.type = type;
-        osc.frequency.setValueAtTime(freq, now);
-        g.gain.setValueAtTime(vol, now);
+        osc.frequency.setValueAtTime(Math.max(20, Math.min(16000, freq)), now);
+        g.gain.setValueAtTime(Math.min(0.35, vol), now);
         g.gain.linearRampToValueAtTime(0.0001, now + safeDur);
         osc.connect(g);
         g.connect(this.sfxOut());
@@ -1486,8 +1592,9 @@ class RetroAudioEngine {
         this._registerVoice(osc, [g], stopAt);
     }
 
-    playShot(weaponType = "PISTOL") {
+    playShot(weaponType = "PISTOL", volScale = 1.0) {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const vs = Number.isFinite(volScale) ? Math.max(0.18, Math.min(1.15, volScale)) : 1.0;
 
         // Per-weapon anti-stacking rate limiter so simultaneous AI cop/gang shots don't spike volume
         const now = this.ctx.currentTime;
@@ -1500,73 +1607,73 @@ class RetroAudioEngine {
         const busy = Array.isArray(this._activeVoices) && this._activeVoices.length >= 6;
 
         if (weaponType === "FIST") {
-            if (!this.playSample("melee_swing", 0.095, 0.92 + Math.random() * 0.18, 0.28)) {
-                this.playBandNoise(0.065, 420, 1.4, 0.025);
-                this.playBeep(115, 0.045, "sine", 0.022);
+            if (!this.playSample("melee_swing", 0.095 * vs, 0.92 + Math.random() * 0.18, 0.28)) {
+                this.playBandNoise(0.065, 420, 1.4, 0.025 * vs);
+                this.playBeep(115, 0.045, "sine", 0.022 * vs);
             }
             return;
         }
         if (weaponType === "FLAMETHROWER") {
-            const ok = this.playSample("gta_shot_flamethrower", 0.085, 0.92 + Math.random() * 0.16, 0.26);
+            const ok = this.playSample("gta_shot_flamethrower", 0.085 * vs, 0.92 + Math.random() * 0.16, 0.26);
             if (!ok) {
-                this.playNoise(0.11, 600, 0.032);
+                this.playNoise(0.11, 600, 0.032 * vs);
             }
             return;
         }
         if (weaponType === "ELECTRO") {
-            const ok = this.playSample("electro_zap", 0.085, 1.15 + Math.random() * 0.25, 0.22);
+            const ok = this.playSample("electro_zap", 0.085 * vs, 1.15 + Math.random() * 0.25, 0.22);
             if (!ok) {
-                this.playBandNoise(0.09, 3200, 2.2, 0.035);
-                this.playBeep(1180, 0.07, "sawtooth", 0.025);
+                this.playBandNoise(0.09, 3200, 2.2, 0.035 * vs);
+                this.playBeep(1180, 0.07, "sawtooth", 0.025 * vs);
             }
             return;
         }
         if (weaponType === "TANK_CANNON") {
-            const ok = this.playSample("cannon_blast", 0.165, 0.95 + Math.random() * 0.08, 1.65);
-            this.playSample("explosion_modern", 0.105, 0.78 + Math.random() * 0.08, 0.85);
+            const ok = this.playSample("cannon_blast", 0.165 * vs, 0.95 + Math.random() * 0.08, 1.65);
+            this.playSample("explosion_modern", 0.105 * vs, 0.78 + Math.random() * 0.08, 0.85);
             if (!ok) {
-                this.playSample("gta_shot_rocket", 0.135, 0.82, 0.85);
-                this.playNoise(0.38, 280, 0.095);
+                this.playSample("gta_shot_rocket", 0.135 * vs, 0.82, 0.85);
+                this.playNoise(0.38, 280, 0.095 * vs);
             }
             return;
         }
         if (weaponType === "ROCKET") {
-            const ok = this.playSample("gta_shot_rocket", 0.115, 0.94 + Math.random() * 0.08, 0.72);
+            const ok = this.playSample("gta_shot_rocket", 0.115 * vs, 0.94 + Math.random() * 0.08, 0.72);
             if (!ok) {
-                this.playNoise(0.28, 350, 0.065);
-                this.playBeep(140, 0.25, "sawtooth", 0.055);
+                this.playNoise(0.28, 350, 0.065 * vs);
+                this.playBeep(140, 0.25, "sawtooth", 0.055 * vs);
             }
             return;
         }
         if (weaponType === "SHOTGUN") {
-            const ok = this.playSample("shot_shotgun_1", 0.105, 0.94 + Math.random() * 0.08, 0.58);
-            if (!busy) {
+            const ok = this.playSample("shot_shotgun_1", 0.105 * vs, 0.94 + Math.random() * 0.08, 0.58);
+            if (!busy && vs > 0.45) {
                 setTimeout(() => {
                     if (this.ctx && !this.muted) {
-                        this.playSample("shotgun_reload", 0.045, 1.06 + Math.random() * 0.06, 0.36);
+                        this.playSample("shotgun_reload", 0.045 * vs, 1.06 + Math.random() * 0.06, 0.36);
                     }
                 }, 175);
             }
             if (!ok) {
-                this.playNoise(0.16, 1200, 0.055);
+                this.playNoise(0.16, 1200, 0.055 * vs);
             }
             return;
         }
         if (weaponType === "UZI") {
             this._uziCycle = ((this._uziCycle || 0) + 1) % 3;
             const uziKey = this._uziCycle === 0 ? "shot_uzi_1" : (this._uziCycle === 1 ? "shot_uzi_2" : "shot_uzi_3");
-            const ok = this.playSample(uziKey, 0.082, 0.95 + Math.random() * 0.12, 0.24);
+            const ok = this.playSample(uziKey, 0.082 * vs, 0.95 + Math.random() * 0.12, 0.24);
             if (!ok) {
-                this.playNoise(0.055, 1200, 0.045);
+                this.playNoise(0.055, 1200, 0.045 * vs);
             }
             return;
         }
 
         // Default: PISTOL (9mm Semi-Auto)
         const primaryKey = Math.random() < 0.72 ? "shot_pistol_1" : "shot_pistol_2";
-        const ok = this.playSample(primaryKey, 0.092, 0.96 + Math.random() * 0.08, 0.40);
+        const ok = this.playSample(primaryKey, 0.092 * vs, 0.96 + Math.random() * 0.08, 0.40);
         if (!ok) {
-            this.playNoise(0.085, 1200, 0.05);
+            this.playNoise(0.085, 1200, 0.05 * vs);
         }
     }
 
@@ -1579,14 +1686,15 @@ class RetroAudioEngine {
         }
     }
 
-    playExplosion() {
+    playExplosion(volScale = 1.0) {
         if (!this.initialized || this.muted || !this.ctx) return;
+        const vs = Number.isFinite(volScale) ? Math.max(0.20, Math.min(1.15, volScale)) : 1.0;
         const now = this.ctx.currentTime;
         if (this._lastExplosionTime && now - this._lastExplosionTime < 0.24) return;
         this._lastExplosionTime = now;
-        const ok = this.playSample("explosion_modern", 0.125, 0.90 + Math.random() * 0.14, 1.25);
-        if (!ok && !this.playSample("gta_explosion", 0.115, 0.94 + Math.random() * 0.10, 1.25)) {
-            this.playNoise(0.48, 280, 0.12);
+        const ok = this.playSample("explosion_modern", 0.125 * vs, 0.90 + Math.random() * 0.14, 1.25);
+        if (!ok && !this.playSample("gta_explosion", 0.115 * vs, 0.94 + Math.random() * 0.10, 1.25)) {
+            this.playNoise(0.48, 280, 0.12 * vs);
         }
     }
 
@@ -2034,18 +2142,19 @@ class RetroAudioEngine {
     }
 
     playBandNoise(duration = 0.06, centerFreq = 1200, q = 1.5, vol = 0.03) {
-        if (!this.ctx || !this._sharedNoiseBuffer) return;
-        const safeDur = Math.max(0.012, Math.min(0.85, duration));
+        if (!this.initialized || this.muted || !this.ctx || !this._sharedNoiseBuffer) return;
+        if (!Number.isFinite(centerFreq) || centerFreq <= 0 || !Number.isFinite(vol) || vol <= 0) return;
+        const safeDur = Math.max(0.012, Math.min(0.85, Number.isFinite(duration) ? duration : 0.06));
         const noise = this.ctx.createBufferSource();
         noise.buffer = this._sharedNoiseBuffer;
         noise.loop = false;
         const filter = this.ctx.createBiquadFilter();
         filter.type = "bandpass";
-        filter.frequency.value = centerFreq;
-        filter.Q.value = q;
+        filter.frequency.value = Math.max(40, Math.min(16000, centerFreq));
+        filter.Q.value = Number.isFinite(q) ? Math.max(0.1, Math.min(20, q)) : 1.5;
         const g = this.ctx.createGain();
         const now = this.ctx.currentTime;
-        g.gain.setValueAtTime(vol, now);
+        g.gain.setValueAtTime(Math.min(0.35, vol), now);
         g.gain.linearRampToValueAtTime(0.0001, now + safeDur);
         noise.connect(filter);
         filter.connect(g);
@@ -2057,17 +2166,18 @@ class RetroAudioEngine {
     }
 
     playNoise(duration = 0.1, filterFreq = 1000, vol = 0.06) {
-        if (!this.ctx || !this._sharedNoiseBuffer) return;
-        const safeDur = Math.max(0.015, Math.min(0.85, duration));
+        if (!this.initialized || this.muted || !this.ctx || !this._sharedNoiseBuffer) return;
+        if (!Number.isFinite(filterFreq) || filterFreq <= 0 || !Number.isFinite(vol) || vol <= 0) return;
+        const safeDur = Math.max(0.015, Math.min(0.85, Number.isFinite(duration) ? duration : 0.1));
         const noise = this.ctx.createBufferSource();
         noise.buffer = this._sharedNoiseBuffer;
         noise.loop = false;
         const filter = this.ctx.createBiquadFilter();
         filter.type = "lowpass";
-        filter.frequency.value = filterFreq;
+        filter.frequency.value = Math.max(40, Math.min(16000, filterFreq));
         const g = this.ctx.createGain();
         const now = this.ctx.currentTime;
-        g.gain.setValueAtTime(vol, now);
+        g.gain.setValueAtTime(Math.min(0.35, vol), now);
         g.gain.linearRampToValueAtTime(0.0001, now + safeDur);
         noise.connect(filter);
         filter.connect(g);

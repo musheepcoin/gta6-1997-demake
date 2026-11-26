@@ -125,10 +125,15 @@ class RetroRenderer {
                 console.info("WebGL context restored — rebuilding GPU resources");
                 this.glLost = false;
                 this.cityChunks = [];
+                this._interiorFloorTexCache = {};
                 this.initWebGL();
                 if (this.gta1Ready && this.gta1Meta) {
                     const enhancedViceTiles = this.processViceTilesRtx(this.gta1TilesViceImg);
                     this.tilesTexVice = this.createGLTexture(enhancedViceTiles, true);
+                    if (enhancedViceTiles && enhancedViceTiles !== this.gta1TilesViceImg) {
+                        enhancedViceTiles.width = 1;
+                        enhancedViceTiles.height = 1;
+                    }
                     this.tilesTexNyc = (this.gta1TilesImg && this.gta1TilesImg.width > 0)
                         ? this.createGLTexture(this.gta1TilesImg, true)
                         : this.tilesTexVice;
@@ -139,13 +144,21 @@ class RetroRenderer {
                         enhancedSprites.width = 1;
                         enhancedSprites.height = 1;
                     }
+                    this.buildCityMesh();
                     if (this.map && this.map.objectEngine) {
                         this.map.objectEngine.meshProg = null;
                         this.map.objectEngine.meshVbo = null;
                         this.map.objectEngine.dynVbo = null;
                         this.map.objectEngine.interiorVbo = null;
+                        this.map.objectEngine.staticChunks = [];
+                        this.map.objectEngine._dynVboCap = 0;
+                        if (typeof this.map.objectEngine.buildStatic3DMesh === "function") {
+                            this.map.objectEngine.buildStatic3DMesh(this.gl, this);
+                        }
                     }
-                    this.buildCityMesh();
+                    if (typeof this.buildDayLightTexture === "function") {
+                        this.buildDayLightTexture();
+                    }
                 }
             }, false);
         }
@@ -1499,6 +1512,10 @@ class RetroRenderer {
         if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
             console.error("Program link error:", gl.getProgramInfoLog(p));
         }
+        gl.detachShader(p, vs);
+        gl.detachShader(p, fs);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
         return p;
     }
 
@@ -6361,7 +6378,7 @@ class RetroRenderer {
        ======================================================================== */
     buildCityMesh(skipAux = false) {
         const gl = this.gl;
-        if (!gl || !this.map.cmpLoaded || !this.gta1Meta) return;
+        if (!gl || this.glLost || (typeof gl.isContextLost === "function" && gl.isContextLost()) || !this.map.cmpLoaded || !this.gta1Meta) return;
 
         // Clean up any previous buffers
         for (const ch of this.cityChunks) {
@@ -7904,13 +7921,19 @@ class RetroRenderer {
         }
 
         // Floating cash/score popups projected from 3D world to screen
+        let indoorFtIdx = 0;
         for (const ft of game.floatingTexts) {
+            if (!ft || typeof ft.x !== "number" || typeof ft.y !== "number" || !Number.isFinite(ft.x) || !Number.isFinite(ft.y)) continue;
             if (game.activeInterior) {
-                this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), this.canvas.width * 0.5, 118, 1.35, "center");
+                const fy = 112 + (indoorFtIdx++) * 22;
+                if (fy < this.canvas.height - 80) {
+                    this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), this.canvas.width * 0.5, fy, 1.35, "center");
+                }
             } else {
                 if (Math.abs(ft.x - this.camX) > 960 || Math.abs(ft.y - this.camY) > 720) continue;
                 const ftZ = ft.z !== undefined ? ft.z : (this.camZBlocks + 0.35);
                 const sp = this.worldToScreen(ft.x, ft.y, ftZ);
+                if (!Number.isFinite(sp.x) || !Number.isFinite(sp.y)) continue;
                 if (sp.x < -160 || sp.x > this.canvas.width + 160 || sp.y < -60 || sp.y > this.canvas.height + 60) continue;
                 this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), sp.x, sp.y, 1.35, "center");
             }
@@ -8001,7 +8024,7 @@ class RetroRenderer {
     renderWebGLScene(game, viewProj) {
         this.lastGameRef = game;
         const gl = this.gl;
-        if (!gl) return;
+        if (!gl || this.glLost || (typeof gl.isContextLost === "function" && gl.isContextLost())) return;
 
         const nf = Math.max(0, Math.min(1, this.nightFactor !== undefined ? this.nightFactor : (this.nightMode ? 1.0 : 0.0)));
         const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0.0));
@@ -8161,7 +8184,7 @@ class RetroRenderer {
 
     renderEmissiveWindowsWebGL(game, viewProj) {
         const gl = this.gl;
-        if (!gl || !viewProj || (game && game.activeInterior)) return false;
+        if (!gl || this.glLost || (typeof gl.isContextLost === "function" && gl.isContextLost()) || !viewProj || (game && game.activeInterior)) return false;
         const winLit = this.getWindowLitFactor(game);
         if (winLit <= 0.03) return false;
         const activeTilesTex = this.mapStyle === "VICE"
@@ -12825,13 +12848,13 @@ class RetroRenderer {
             }
             // Active Mission 3D Ground Beacon Corona (pulsing gold & cyan objective marker on the street!)
             if (game.missions && game.missions.activeMission && dist < 900) {
-                const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
+                const pulse = 0.5 + 0.5 * Math.sin(this.time * 8.0);
                 const tz = (game.map && typeof game.map.getHeightAtPixel === "function"
                     ? game.map.getHeightAtPixel(target.x, target.y, this.camZBlocks)
                     : 2.0) + 0.03;
                 const ringSz = 38 + pulse * 14;
-                this.pushSolidQuad3D(target.x, target.y, tz, ringSz, ringSz, performance.now() * 0.002, 1.0, 0.85, 0.15, 0.28 + pulse * 0.22, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                this.pushSolidQuad3D(target.x, target.y, tz + 0.01, ringSz * 0.58, ringSz * 0.58, -performance.now() * 0.003, 0.0, 0.94, 1.0, 0.35 + pulse * 0.25, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(target.x, target.y, tz, ringSz, ringSz, this.time * 2.0, 1.0, 0.85, 0.15, 0.28 + pulse * 0.22, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                this.pushSolidQuad3D(target.x, target.y, tz + 0.01, ringSz * 0.58, ringSz * 0.58, -this.time * 3.0, 0.0, 0.94, 1.0, 0.35 + pulse * 0.25, SPRITE_DRAW_ORDER.TIRE_MARKS);
             }
         }
     }
@@ -12845,6 +12868,7 @@ class RetroRenderer {
         if (W <= 0 || H <= 0) return;
 
         const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
+        const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0));
         const dayInt = Math.max(0, Math.min(1, (0.72 - nf) / 0.65));
         if (dayInt <= 0.01) return;
 
@@ -12856,7 +12880,7 @@ class RetroRenderer {
         const sunX = W * (0.82 - dayProgress * 0.64);
         const maxDim = Math.hypot(W, H);
 
-        // Crisp Golden Florida Solar Corona & Corner Rim Glow (100% sunny tropical Miami atmosphere, zero dark grey screen vignette!)
+        // Crisp Golden Florida Solar Corona & Sunset Apricot-Rose Rim Glow (zero dark grey screen vignette!)
         if (!this._sunCoronaStamp) {
             const sc = document.createElement("canvas");
             sc.width = 96;
@@ -12871,11 +12895,31 @@ class RetroRenderer {
             sctx.fillRect(0, 0, 96, 96);
             this._sunCoronaStamp = sc;
         }
+        if (sf > 0.04 && !this._sunsetCoronaStamp) {
+            const ssc = document.createElement("canvas");
+            ssc.width = 96;
+            ssc.height = 96;
+            const ssctx = ssc.getContext("2d");
+            const ssg = ssctx.createRadialGradient(48, 0, 2, 48, 0, 92);
+            ssg.addColorStop(0.0, "rgba(255, 192, 140, 1.0)");
+            ssg.addColorStop(0.36, "rgba(255, 118, 158, 0.46)");
+            ssg.addColorStop(0.72, "rgba(192, 92, 224, 0.14)");
+            ssg.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+            ssctx.fillStyle = ssg;
+            ssctx.fillRect(0, 0, 96, 96);
+            this._sunsetCoronaStamp = ssc;
+        }
         const coronaR = maxDim * 0.48;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.14 * dayInt;
-        ctx.drawImage(this._sunCoronaStamp, sunX - coronaR * 0.5, 0, coronaR, coronaR * 0.65);
+        if (sf < 0.98) {
+            ctx.globalAlpha = 0.14 * dayInt * (1.0 - sf * 0.75);
+            ctx.drawImage(this._sunCoronaStamp, sunX - coronaR * 0.5, 0, coronaR, coronaR * 0.65);
+        }
+        if (sf > 0.04 && this._sunsetCoronaStamp) {
+            ctx.globalAlpha = 0.18 * dayInt * sf;
+            ctx.drawImage(this._sunsetCoronaStamp, sunX - coronaR * 0.5, 0, coronaR * 1.08, coronaR * 0.72);
+        }
         ctx.globalAlpha = 1.0;
         ctx.restore();
     }
@@ -12906,26 +12950,26 @@ class RetroRenderer {
         // Artificial lights (streetlamps, neon signs, headlights) fade on smoothly at sunset/twilight (sf > 0.32 or nf > 0.08)
         const lightInt = Math.max(0, Math.min(1, Math.max((nf - 0.08) / 0.52, (sf - 0.32) * 0.65)));
 
-        // 1. Fill offscreen lightmap with smooth Day (255,255,255) -> Golden-Pink Sunset -> Deep Midnight Darkness (34,44,76)
-        const ambR = Math.round(Math.max(24, Math.min(255, 255 * (1.0 - nf) + 34 * nf - sf * 10 * (1.0 - nf))));
-        const ambG = Math.round(Math.max(30, Math.min(255, 255 * (1.0 - nf) + 44 * nf - sf * 52 * (1.0 - nf * 0.5))));
-        const ambB = Math.round(Math.max(52, Math.min(255, 255 * (1.0 - nf) + 76 * nf - sf * 24 * (1.0 - nf * 0.5))));
-
+        const useAlphaCutout = true;
         lctx.save();
-        lctx.globalCompositeOperation = "source-over";
-        lctx.fillStyle = `rgb(${ambR}, ${ambG}, ${ambB})`;
-        lctx.fillRect(0, 0, lw, lh);
-
-        // Switch to additive light accumulation on the lightmap
-        lctx.globalCompositeOperation = "lighter";
-        lctx.globalAlpha = lightInt;
+        if (!useAlphaCutout) {
+            const ambR = Math.round(Math.max(24, Math.min(255, 255 * (1.0 - nf) + 34 * nf - sf * 10 * (1.0 - nf))));
+            const ambG = Math.round(Math.max(30, Math.min(255, 255 * (1.0 - nf) + 44 * nf - sf * 52 * (1.0 - nf * 0.5))));
+            const ambB = Math.round(Math.max(52, Math.min(255, 255 * (1.0 - nf) + 76 * nf - sf * 24 * (1.0 - nf * 0.5))));
+            lctx.globalCompositeOperation = "source-over";
+            lctx.fillStyle = `rgb(${ambR}, ${ambG}, ${ambB})`;
+            lctx.fillRect(0, 0, lw, lh);
+            lctx.globalCompositeOperation = "lighter";
+            lctx.globalAlpha = lightInt;
+        }
 
         if (!this._lightStampCache) {
             this._lightStampCache = new Map();
         }
-        const getLightStamp = (key, stops) => {
+        const getLightStamp = (key, stopsOrFn) => {
             let stamp = this._lightStampCache.get(key);
             if (!stamp) {
+                const stops = typeof stopsOrFn === "function" ? stopsOrFn() : stopsOrFn;
                 stamp = document.createElement("canvas");
                 stamp.width = 64;
                 stamp.height = 64;
@@ -12937,6 +12981,31 @@ class RetroRenderer {
                 sctx.fillStyle = g;
                 sctx.fillRect(0, 0, 64, 64);
                 this._lightStampCache.set(key, stamp);
+            }
+            return stamp;
+        };
+        const getPoolStamp = (innerCol, midCol) => {
+            const key = `pool|${innerCol}|${midCol}`;
+            let stamp = this._lightStampCache.get(key);
+            if (!stamp) {
+                stamp = getLightStamp(key, [
+                    [0.05, 0.0, innerCol],
+                    [0.05, 0.48, midCol],
+                    [0.05, 1.0, "rgba(0, 0, 0, 0)"]
+                ]);
+            }
+            return stamp;
+        };
+        const getFlareStamp = (col) => {
+            const key = `flare|${col}`;
+            let stamp = this._lightStampCache.get(key);
+            if (!stamp) {
+                stamp = getLightStamp(key, [
+                    [0.08, 0.0, "rgba(255, 252, 235, 0.92)"],
+                    [0.08, 0.32, col],
+                    [0.08, 0.68, col.replace(/[\d.]+\)$/, "0.18)")],
+                    [0.08, 1.0, "rgba(0, 0, 0, 0)"]
+                ]);
             }
             return stamp;
         };
@@ -12984,22 +13053,28 @@ class RetroRenderer {
             return stamp;
         };
 
-        const useAlphaCutout = true;
-        const nightPools = [];
-        const nightCones = [];
+        const nightPools = this._nightPoolBuf || (this._nightPoolBuf = []);
+        const nightCones = this._nightConeBuf || (this._nightConeBuf = []);
+        let nightPoolCount = 0;
+        let nightConeCount = 0;
 
         const addLightPool = (sx, sy, radPx, innerCol, midCol) => {
             const x = sx * scale;
             const y = sy * scale;
             const r = Math.max(4, radPx * scale);
             if (x + r < 0 || x - r > lw || y + r < 0 || y - r > lh) return;
-            const stamp = getLightStamp(`pool|${innerCol}|${midCol}`, [
-                [0.05, 0.0, innerCol],
-                [0.05, 0.48, midCol],
-                [0.05, 1.0, "rgba(0, 0, 0, 0)"]
-            ]);
+            const stamp = getPoolStamp(innerCol, midCol);
             if (useAlphaCutout) {
-                nightPools.push({ x, y, r, stamp });
+                let slot = nightPools[nightPoolCount];
+                if (!slot) {
+                    slot = { x: 0, y: 0, r: 0, stamp: null };
+                    nightPools[nightPoolCount] = slot;
+                }
+                slot.x = x;
+                slot.y = y;
+                slot.r = r;
+                slot.stamp = stamp;
+                nightPoolCount++;
             } else {
                 lctx.drawImage(stamp, x - r, y - r, r * 2, r * 2);
             }
@@ -13014,7 +13089,20 @@ class RetroRenderer {
             const sinA = Math.sin(angle);
             const stamp = getConeStamp(`cone|${innerCol}|${midCol}`, innerCol, midCol);
             if (useAlphaCutout) {
-                nightCones.push({ x: x0, y: y0, cosA, sinA, len, spread: spreadRad, bw, stamp });
+                let slot = nightCones[nightConeCount];
+                if (!slot) {
+                    slot = { x: 0, y: 0, cosA: 1, sinA: 0, len: 0, spread: 0, bw: 0, stamp: null };
+                    nightCones[nightConeCount] = slot;
+                }
+                slot.x = x0;
+                slot.y = y0;
+                slot.cosA = cosA;
+                slot.sinA = sinA;
+                slot.len = len;
+                slot.spread = spreadRad;
+                slot.bw = bw;
+                slot.stamp = stamp;
+                nightConeCount++;
             } else {
                 const scX = len / 112.0;
                 const scY = Math.max(bw / 6.0, (len * spreadRad) / (112.0 * 0.32));
@@ -13025,8 +13113,10 @@ class RetroRenderer {
         };
 
         // Collect crisp flares (streetlamp bulbs, dual headlight bulbs, red taillights) for the high-res pass
-        const highResFlares = [];
-        const highResCones = [];
+        const highResFlares = this._highResFlareBuf || (this._highResFlareBuf = []);
+        highResFlares.length = 0;
+        const highResCones = this._highResConeBuf || (this._highResConeBuf = []);
+        highResCones.length = 0;
 
         // 2. GTA 2 Style 3D Curb Streetlamps, Ocean Drive Neon Palms & Española Bistro Lights!
         if (this.map && Array.isArray(this.map.streetlights)) {
@@ -13418,16 +13508,18 @@ class RetroRenderer {
                 addLightPool(sc.x, sc.y, (js.isSpeedboat ? 54 : 42) * pxScale, "rgba(220, 248, 255, 0.68)", "rgba(56, 189, 248, 0.24)");
                 const beamLen = (js.isSpeedboat ? 142 : 112) * pxScale;
                 addHeadlightCone(fSc.x, fSc.y, jAng, beamLen, 0.22, 2.2 * pxScale, "rgba(255, 250, 225, 0.94)", "rgba(215, 232, 255, 0.48)");
-                highResCones.push({
-                    x: fSc.x,
-                    y: fSc.y,
-                    angle: jAng,
-                    len: beamLen * 0.92,
-                    spread: 0.20,
-                    baseHalfW: 2.2 * pxScale,
-                    col0: "rgba(255, 250, 220, 0.20)",
-                    col1: "rgba(180, 220, 255, 0.06)"
-                });
+                if (!useAlphaCutout) {
+                    highResCones.push({
+                        x: fSc.x,
+                        y: fSc.y,
+                        angle: jAng,
+                        len: beamLen * 0.92,
+                        spread: 0.20,
+                        baseHalfW: 2.2 * pxScale,
+                        col0: "rgba(255, 250, 220, 0.20)",
+                        col1: "rgba(180, 220, 255, 0.06)"
+                    });
+                }
                 highResFlares.push({ x: fSc.x, y: fSc.y, r: 5.8 * pxScale, col: "rgba(255, 252, 230, 0.94)" });
             }
         }
@@ -13478,16 +13570,18 @@ class RetroRenderer {
                     "rgba(235, 248, 255, 0.92)",
                     "rgba(145, 210, 255, 0.42)"
                 );
-                highResCones.push({
-                    x: nSc.x,
-                    y: nSc.y,
-                    angle: coneAng,
-                    len: coneLen * 0.96,
-                    spread: 0.25,
-                    baseHalfW: 3.0 * hScale,
-                    col0: "rgba(220, 245, 255, 0.22)",
-                    col1: "rgba(135, 205, 255, 0.07)"
-                });
+                if (!useAlphaCutout) {
+                    highResCones.push({
+                        x: nSc.x,
+                        y: nSc.y,
+                        angle: coneAng,
+                        len: coneLen * 0.96,
+                        spread: 0.25,
+                        baseHalfW: 3.0 * hScale,
+                        col0: "rgba(220, 245, 255, 0.22)",
+                        col1: "rgba(135, 205, 255, 0.07)"
+                    });
+                }
 
                 // Soft ground spot bloom + nose xenon gimbal flare + flashing red/blue tail aviation strobe
                 highResFlares.push({ x: bSc.x, y: bSc.y, r: 44 * bScale, col: "rgba(205, 240, 255, 0.30)" });
@@ -13540,16 +13634,18 @@ class RetroRenderer {
                         "rgba(225, 244, 255, 0.72)",
                         "rgba(135, 200, 255, 0.32)"
                     );
-                    highResCones.push({
-                        x: nSc.x,
-                        y: nSc.y,
-                        angle: coneAng,
-                        len: coneLen * 0.96,
-                        spread: 0.24,
-                        baseHalfW: 3.0 * hScale,
-                        col0: "rgba(215, 242, 255, 0.16)",
-                        col1: "rgba(135, 205, 255, 0.05)"
-                    });
+                    if (!useAlphaCutout) {
+                        highResCones.push({
+                            x: nSc.x,
+                            y: nSc.y,
+                            angle: coneAng,
+                            len: coneLen * 0.96,
+                            spread: 0.24,
+                            baseHalfW: 3.0 * hScale,
+                            col0: "rgba(215, 242, 255, 0.16)",
+                            col1: "rgba(135, 205, 255, 0.05)"
+                        });
+                    }
 
                     highResFlares.push({ x: bSc.x, y: bSc.y, r: 34 * bScale, col: "rgba(195, 235, 255, 0.18)" });
                     highResFlares.push({ x: nSc.x, y: nSc.y, r: 8.5 * hScale, col: "rgba(245, 252, 255, 0.92)" });
@@ -13578,16 +13674,18 @@ class RetroRenderer {
                 const coneLen = Math.hypot(bSc.x - tSc.x, bSc.y - tSc.y) + 34 * bScale;
                 addLightPool(bSc.x, bSc.y, 96 * bScale, "rgba(255, 244, 195, 0.90)", "rgba(235, 185, 85, 0.36)");
                 addHeadlightCone(tSc.x, tSc.y, coneAng, coneLen, 0.24, 2.5 * bScale, "rgba(255, 245, 200, 0.88)", "rgba(235, 190, 95, 0.36)");
-                highResCones.push({
-                    x: tSc.x,
-                    y: tSc.y,
-                    angle: coneAng,
-                    len: coneLen * 0.95,
-                    spread: 0.22,
-                    baseHalfW: 2.4 * bScale,
-                    col0: "rgba(255, 244, 195, 0.18)",
-                    col1: "rgba(235, 190, 95, 0.06)"
-                });
+                if (!useAlphaCutout) {
+                    highResCones.push({
+                        x: tSc.x,
+                        y: tSc.y,
+                        angle: coneAng,
+                        len: coneLen * 0.95,
+                        spread: 0.22,
+                        baseHalfW: 2.4 * bScale,
+                        col0: "rgba(255, 244, 195, 0.18)",
+                        col1: "rgba(235, 190, 95, 0.06)"
+                    });
+                }
             }
         }
         if (this.map && this.map.seraCompound && Array.isArray(this.map.seraCompound.towers)) {
@@ -13605,16 +13703,18 @@ class RetroRenderer {
                 const coneLen = Math.hypot(bSc.x - tSc.x, bSc.y - tSc.y) + 32 * bScale;
                 addLightPool(bSc.x, bSc.y, 92 * bScale, "rgba(220, 245, 255, 0.90)", "rgba(120, 195, 255, 0.36)");
                 addHeadlightCone(tSc.x, tSc.y, coneAng, coneLen, 0.24, 2.5 * bScale, "rgba(225, 248, 255, 0.88)", "rgba(130, 200, 255, 0.36)");
-                highResCones.push({
-                    x: tSc.x,
-                    y: tSc.y,
-                    angle: coneAng,
-                    len: coneLen * 0.95,
-                    spread: 0.22,
-                    baseHalfW: 2.4 * bScale,
-                    col0: "rgba(220, 245, 255, 0.18)",
-                    col1: "rgba(130, 200, 255, 0.06)"
-                });
+                if (!useAlphaCutout) {
+                    highResCones.push({
+                        x: tSc.x,
+                        y: tSc.y,
+                        angle: coneAng,
+                        len: coneLen * 0.95,
+                        spread: 0.22,
+                        baseHalfW: 2.4 * bScale,
+                        col0: "rgba(220, 245, 255, 0.18)",
+                        col1: "rgba(130, 200, 255, 0.06)"
+                    });
+                }
             }
         }
 
@@ -13679,17 +13779,17 @@ class RetroRenderer {
             if (lightInt > 0.01) {
                 lctx.globalCompositeOperation = "destination-out";
                 lctx.globalAlpha = Math.min(1.0, lightInt * 0.94);
-                const cutoutPoolStamp = getLightStamp("cutout|pool", [
+                const cutoutPoolStamp = this._cutoutPoolStamp || (this._cutoutPoolStamp = getLightStamp("cutout|pool", [
                     [0.05, 0.0, "rgba(0, 0, 0, 0.96)"],
                     [0.05, 0.52, "rgba(0, 0, 0, 0.50)"],
                     [0.05, 1.0, "rgba(0, 0, 0, 0)"]
-                ]);
-                for (let i = 0; i < nightPools.length; i++) {
+                ]));
+                for (let i = 0; i < nightPoolCount; i++) {
                     const p = nightPools[i];
                     lctx.drawImage(cutoutPoolStamp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
                 }
-                const cutoutConeStamp = getConeStamp("cutout|cone", "rgba(0, 0, 0, 0.96)", "rgba(0, 0, 0, 0.52)");
-                for (let i = 0; i < nightCones.length; i++) {
+                const cutoutConeStamp = this._cutoutConeStamp || (this._cutoutConeStamp = getConeStamp("cutout|cone", "rgba(0, 0, 0, 0.96)", "rgba(0, 0, 0, 0.52)"));
+                for (let i = 0; i < nightConeCount; i++) {
                     const c = nightCones[i];
                     const scX = c.len / 112.0;
                     const scY = Math.max(c.bw / 6.0, (c.len * c.spread) / (112.0 * 0.32));
@@ -13700,12 +13800,12 @@ class RetroRenderer {
 
                 lctx.globalCompositeOperation = "lighter";
                 lctx.globalAlpha = Math.min(1.0, lightInt * 0.56);
-                for (let i = 0; i < nightPools.length; i++) {
+                for (let i = 0; i < nightPoolCount; i++) {
                     const p = nightPools[i];
                     lctx.drawImage(p.stamp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
                 }
                 lctx.globalAlpha = Math.min(1.0, lightInt * 0.58);
-                for (let i = 0; i < nightCones.length; i++) {
+                for (let i = 0; i < nightConeCount; i++) {
                     const c = nightCones[i];
                     const scX = c.len / 112.0;
                     const scY = Math.max(c.bw / 6.0, (c.len * c.spread) / (112.0 * 0.32));
@@ -13722,12 +13822,7 @@ class RetroRenderer {
                         const fx = f.x * scale;
                         const fy = f.y * scale;
                         const r = Math.max(1.5, f.r * scale);
-                        const stamp = getLightStamp(`flare|${f.col}`, [
-                            [0.08, 0.0, "rgba(255, 252, 235, 0.92)"],
-                            [0.08, 0.32, f.col],
-                            [0.08, 0.68, f.col.replace(/[\d.]+\)$/, "0.18)")],
-                            [0.08, 1.0, "rgba(0, 0, 0, 0)"]
-                        ]);
+                        const stamp = getFlareStamp(f.col);
                         lctx.drawImage(stamp, fx - r, fy - r, r * 2, r * 2);
                     }
                 }
@@ -14234,40 +14329,44 @@ class RetroRenderer {
             }
         }
 
-        // 4. Local Player 2.5D Kingpin Crown, Social Emote Capsule [U] & Speech Bubble [T]
+        // 4. Local Player 2.5D Kingpin Crown, Social Emote Capsule [U] & Speech Bubble [T] (Dynamically Stacked — Zero Overlap!)
         const pObj = p.inVehicle || p;
         const pz = this.getEntityZ(pObj, 0.24);
         const pSc = this.worldToScreen(pObj.x, pObj.y, pz);
+        let localCapsuleTopY = Math.round(pSc.y - (p.inVehicle ? 40 : 32));
         const isLocalKing = typeof game.isCurrentDistrictControlledByMe === "function" && game.isCurrentDistrictControlledByMe();
         if (isLocalKing && !p.dead) {
             const cTxt = `👑 KINGPIN (${game.net && game.net.syndicate === "CYAN" ? "⚡CYAN" : "🦩FLAMINGO"})`;
             const cbw = Math.max(96, ctx.measureText(cTxt).width + 18);
             const cbh = 19;
             const cbx = Math.round(pSc.x - cbw * 0.5);
-            const cby = Math.round(pSc.y - (p.inVehicle ? 40 : 32));
+            const cby = localCapsuleTopY;
             this.drawArcadeCapsule(ctx, cbx, cby, cbw, cbh, "rgba(15, 23, 42, 0.94)", "#fde047", 6, 1.8);
             ctx.fillStyle = "#fde047";
             ctx.fillText(cTxt, pSc.x, cby + cbh * 0.5);
-        }
-        if (p.socialEmote && (p.socialEmote.timer || 0) > 0) {
-            const emTxt = `${p.socialEmote.icon} ${p.socialEmote.label}`;
-            const ebw = Math.max(100, ctx.measureText(emTxt).width + 22);
-            const ebh = 22;
-            const ebx = Math.round(pSc.x - ebw * 0.5);
-            const eby = Math.round(pSc.y - (p.inVehicle ? 64 : 56));
-            this.drawArcadeCapsule(ctx, ebx, eby, ebw, ebh, "rgba(10, 15, 32, 0.96)", p.socialEmote.color || "#39ff14", 7, 2.0);
-            ctx.fillStyle = p.socialEmote.color || "#39ff14";
-            ctx.fillText(emTxt, pSc.x, eby + ebh * 0.5);
+            localCapsuleTopY -= 24;
         }
         if ((p.chatTimer || 0) > 0 && p.chatText) {
             const bubbleTxt = `💬 ${p.chatText.slice(0, 56)}`;
             const bbw = Math.max(84, ctx.measureText(bubbleTxt).width + 20);
             const bbh = 21;
             const bbx = Math.round(pSc.x - bbw * 0.5);
-            const bby = Math.round(pSc.y - (p.inVehicle ? 44 : 36));
+            const bby = localCapsuleTopY;
             this.drawArcadeCapsule(ctx, bbx, bby, bbw, bbh, "rgba(15, 23, 42, 0.95)", "#ff2a85", 6, 1.6);
             ctx.fillStyle = "#ffffff";
             ctx.fillText(bubbleTxt, pSc.x, bby + bbh * 0.5);
+            localCapsuleTopY -= 25;
+        }
+        if (p.socialEmote && (p.socialEmote.timer || 0) > 0) {
+            const emTxt = `${p.socialEmote.icon} ${p.socialEmote.label}`;
+            const ebw = Math.max(100, ctx.measureText(emTxt).width + 22);
+            const ebh = 22;
+            const ebx = Math.round(pSc.x - ebw * 0.5);
+            const eby = localCapsuleTopY;
+            this.drawArcadeCapsule(ctx, ebx, eby, ebw, ebh, "rgba(10, 15, 32, 0.96)", p.socialEmote.color || "#39ff14", 7, 2.0);
+            ctx.fillStyle = p.socialEmote.color || "#39ff14";
+            ctx.fillText(emTxt, pSc.x, eby + ebh * 0.5);
+            localCapsuleTopY -= 25;
         }
 
         // 5. Physical 2.5D Dropped Kingpin Crown Trophy & Nearby Car Meet Respect Capsule [Y]
@@ -14428,6 +14527,85 @@ class RetroRenderer {
                 const uw = (v.w || 48) * 1.10;
                 const uh = (v.h || 24) * 1.20;
                 ctx.fillRect(-uw * 0.5, -uh * 0.5, uw, uh);
+                ctx.restore();
+            }
+        }
+
+        // 3. Active Mission 2.5D World Crates, Dropped Briefcase, Target Beacon & Diegetic GTA 1 Orbiting GPS Arrow!
+        const activeM = game.missions ? game.missions.activeMission : null;
+        if (activeM && activeM.id === "M2_GRASSRIVERS" && Array.isArray(activeM.crates)) {
+            for (let ci = 0; ci < activeM.crates.length; ci++) {
+                const cr = activeM.crates[ci];
+                if (Math.abs(cr.x - pObj.x) > 880 || Math.abs(cr.y - pObj.y) > 680) continue;
+                const cSc = this.worldToScreen(cr.x, cr.y, 2.08);
+                if (cSc.x < -80 || cSc.x > W + 80 || cSc.y < -60 || cSc.y > H + 60) continue;
+                const cp = 0.5 + 0.5 * Math.sin(t * 9.0 + ci);
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cSc.x, cSc.y, 14 + cp * 6, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(163, 230, 53, 0.22)";
+                ctx.fill();
+                ctx.strokeStyle = "#a3e635";
+                ctx.lineWidth = 2.0;
+                ctx.stroke();
+                ctx.fillStyle = "#78350f";
+                ctx.fillRect(cSc.x - 8, cSc.y - 8, 16, 16);
+                ctx.strokeStyle = "#fde047";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(cSc.x - 8, cSc.y - 8, 16, 16);
+                ctx.restore();
+            }
+        }
+        const mTarget = game.missions ? game.missions.getTargetPosition() : null;
+        if (mTarget && !p.dead) {
+            const dx = mTarget.x - pObj.x;
+            const dy = mTarget.y - pObj.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 1050) {
+                const tSc = this.worldToScreen(mTarget.x, mTarget.y, 2.06);
+                if (tSc.x >= -120 && tSc.x <= W + 120 && tSc.y >= -120 && tSc.y <= H + 120) {
+                    const mp = 0.5 + 0.5 * Math.sin(t * 8.5);
+                    const isBriefcase = Boolean(activeM && activeM.targetPos && activeM.targetPos.isBriefcase);
+                    const ringCol = isBriefcase ? "#fde047" : (mTarget.color || "#ff2a85");
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(tSc.x, tSc.y, (isBriefcase ? 16 : 24) + mp * 8, 0, Math.PI * 2);
+                    ctx.fillStyle = isBriefcase ? "rgba(250, 204, 21, 0.22)" : "rgba(255, 42, 133, 0.16)";
+                    ctx.fill();
+                    ctx.strokeStyle = ringCol;
+                    ctx.lineWidth = 2.2;
+                    ctx.stroke();
+                    if (isBriefcase) {
+                        ctx.fillStyle = "#b45309";
+                        ctx.fillRect(tSc.x - 9, tSc.y - 7, 18, 14);
+                        ctx.strokeStyle = "#fde047";
+                        ctx.lineWidth = 1.6;
+                        ctx.strokeRect(tSc.x - 9, tSc.y - 7, 18, 14);
+                    }
+                    ctx.restore();
+                }
+            }
+            // Authentic 1997 GTA 1 Diegetic Orbiting GPS Arrow around Lucia / her vehicle!
+            if (dist > 64) {
+                const pSc = this.worldToScreen(pObj.x, pObj.y, (pObj.z || 2.0) + 0.14);
+                const ang = Math.atan2(dy, dx);
+                const orbitR = p.inVehicle ? 54 : 44;
+                const ax = pSc.x + Math.cos(ang) * orbitR;
+                const ay = pSc.y + Math.sin(ang) * orbitR;
+                ctx.save();
+                ctx.translate(ax, ay);
+                ctx.rotate(ang);
+                ctx.beginPath();
+                ctx.moveTo(11, 0);
+                ctx.lineTo(-7, -7);
+                ctx.lineTo(-3, 0);
+                ctx.lineTo(-7, 7);
+                ctx.closePath();
+                ctx.fillStyle = "#ff2a85";
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
                 ctx.restore();
             }
         }
@@ -14632,7 +14810,7 @@ class RetroRenderer {
     }
 
     getOrBakeInteriorFloorTex(gl, intr) {
-        if (!gl || !intr) return null;
+        if (!gl || this.glLost || (typeof gl.isContextLost === "function" && gl.isContextLost()) || !intr) return null;
         if (!this._interiorFloorTexCache) {
             this._interiorFloorTexCache = {};
         }
@@ -14936,7 +15114,16 @@ class RetroRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+        c.width = 1;
+        c.height = 1;
 
+        const existingKeys = Object.keys(this._interiorFloorTexCache);
+        if (existingKeys.length >= 24) {
+            const oldestKey = existingKeys[0];
+            const oldTex = this._interiorFloorTexCache[oldestKey];
+            if (oldTex) gl.deleteTexture(oldTex);
+            delete this._interiorFloorTexCache[oldestKey];
+        }
         this._interiorFloorTexCache[key] = glTex;
         return glTex;
     }
@@ -15747,7 +15934,7 @@ class RetroRenderer {
         ctx.fill();
 
         // 2. Top-Center GTA Arcade Venue Header Banner (pinned cleanly at top center of viewport)
-        const banW = Math.max(360, Math.min(540, W - 360));
+        const banW = Math.min(W - 24, Math.max(360, Math.min(640, W - 300)));
         const banH = 44;
         const banX = Math.round(W * 0.5 - banW * 0.5);
         const banY = 12;
@@ -15758,12 +15945,24 @@ class RetroRenderer {
         ctx.lineWidth = 2.0;
         ctx.strokeRect(banX + 0.5, banY + 0.5, banW - 1, banH - 1);
 
+        const fitIntText = (txtStr, maxPx) => {
+            const raw = String(txtStr || "");
+            if (!raw || ctx.measureText(raw).width <= maxPx) return raw;
+            let lo = 0, hi = raw.length;
+            while (lo < hi) {
+                const mid = (lo + hi + 1) >> 1;
+                if (ctx.measureText(raw.slice(0, mid).trimEnd() + "…").width <= maxPx) lo = mid;
+                else hi = mid - 1;
+            }
+            return lo > 0 ? raw.slice(0, lo).trimEnd() + "…" : "";
+        };
+
         ctx.font = "bold 16px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#fde047";
-        ctx.fillText(intr.name, banX + banW * 0.5, banY + 16);
+        ctx.fillText(fitIntText(intr.name, banW - 20), banX + banW * 0.5, banY + 16);
         ctx.font = "bold 11px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#f8fafc";
-        ctx.fillText(intr.subtitle, banX + banW * 0.5, banY + 33);
+        ctx.fillText(fitIntText(intr.subtitle, banW - 20), banX + banW * 0.5, banY + 33);
 
         // 3. 3D-Projected Interactive Station Badges (Clean, legible GTA pills when visible, expanded [E] card when near!)
         const placedRects = [];
@@ -15799,10 +15998,10 @@ class RetroRenderer {
                 const subTxt = ready ? `[E] BUY / USE • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`;
                 ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
                 const subW = (isNear || !ready) ? ctx.measureText(subTxt).width : 0;
-                const bw = isNear ? Math.max(210, Math.round(Math.max(lblW, subW) + 26)) : Math.max(132, Math.round(lblW + 18));
+                const bw = Math.min(W - 16, isNear ? Math.max(210, Math.round(Math.max(lblW, subW) + 26)) : Math.max(132, Math.round(lblW + 18)));
                 const bh = (isNear || !ready) ? 36 : 22;
-                const bx = Math.round(stTop.x - bw * 0.5);
-                const rawBy = Math.round(stTop.y - bh - (isNear ? 14 : 6));
+                const bx = Math.max(8, Math.min(W - bw - 8, Math.round(stTop.x - bw * 0.5)));
+                const rawBy = Math.max(62, Math.min(H - bh - 8, Math.round(stTop.y - bh - (isNear ? 14 : 6))));
                 const by = resolveLabelOverlap(bx, rawBy, bw, bh);
 
                 ctx.fillStyle = isNear ? "rgba(8, 13, 26, 0.96)" : "rgba(10, 16, 30, 0.88)";
@@ -15815,11 +16014,11 @@ class RetroRenderer {
 
                 ctx.font = isNear ? "bold 13px Consolas, 'Courier New', monospace" : "bold 11px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = ready ? "#ffffff" : "#cbd5e1";
-                ctx.fillText(st.label, bx + bw * 0.5 + 2, by + ((isNear || !ready) ? 11.5 : 11));
+                ctx.fillText(fitIntText(st.label, bw - 14), bx + bw * 0.5 + 2, by + ((isNear || !ready) ? 11.5 : 11));
                 if (isNear || !ready) {
                     ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
                     ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
-                    ctx.fillText(subTxt, bx + bw * 0.5 + 2, by + 26);
+                    ctx.fillText(fitIntText(subTxt, bw - 14), bx + bw * 0.5 + 2, by + 26);
                     if (isNear && ready && Array.isArray(this.cheatButtons)) {
                         this.cheatButtons.push({ id: "TRIGGER_STATION", x: bx, y: by, w: bw, h: bh, station: st });
                     }
@@ -15892,7 +16091,7 @@ class RetroRenderer {
                 const speech = robbedLine || (distNpc < 110 ? npc.dialog : null);
                 if (speech) {
                     ctx.font = "bold 11px Consolas, 'Courier New', monospace";
-                    const sw = Math.min(380, ctx.measureText(speech).width + 18);
+                    const sw = Math.min(Math.min(420, W - 28), Math.round(ctx.measureText(speech).width + 18));
                     const sx = Math.max(14, Math.min(W - sw - 14, Math.round(nScr.x - sw * 0.5)));
                     const sy = resolveLabelOverlap(sx, ty - 23, sw, 20);
                     ctx.fillStyle = robbedLine ? "rgba(69, 10, 10, 0.96)" : "rgba(15, 23, 42, 0.95)";
@@ -15901,7 +16100,7 @@ class RetroRenderer {
                     ctx.lineWidth = 1.5;
                     ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 19);
                     ctx.fillStyle = robbedLine ? "#fecaca" : "#ffffff";
-                    ctx.fillText(speech, sx + sw * 0.5, sy + 10);
+                    ctx.fillText(fitIntText(speech, sw - 14), sx + sw * 0.5, sy + 10);
                 }
             }
         }
@@ -16116,7 +16315,15 @@ class RetroRenderer {
 
         let fullPhoneStateKey = "";
         if (!isMinimized) {
-            fullPhoneStateKey = `${W}x${H}:${isPlacesApp ? 1 : 0}:${this.tourScrollOffset || 0}:${this.minimapZoomIdx || 0}:${this.activePhoneMissionIdx || 0}:${game && game.activeMission ? game.activeMission.id : ""}:${game && game.ytMusicEnabled !== false ? 1 : 0}:${game ? (game.ytStationIdx || 0) : 0}:${Math.round(((game && game.ytMusicVolume) ?? 0.28) * 100)}:${timeInfo.phase}:${liveClockStr}`;
+            const selPhoneIdx = (game && game.missions && typeof game.missions.selectedPhoneIndex === "number") ? game.missions.selectedPhoneIndex : 0;
+            const actMid = (game && game.missions && game.missions.activeMission) ? (game.missions.activeMission.id || "ACT") : "";
+            const stIdx = (game && game.audio && typeof game.audio.currentStationIndex === "number") ? game.audio.currentStationIndex : 0;
+            const ytVolVal = game ? (game.ytVolume ?? 28) : 28;
+            const mpLiveCnt = (game && game.net && typeof game.net.getPlayerCount === "function") ? game.net.getPlayerCount() : 1;
+            const pgrTextLen = (this._phoneDomEls && this._phoneDomEls.pagerEl && this._phoneDomEls.pagerEl.textContent)
+                ? this._phoneDomEls.pagerEl.textContent.length
+                : 0;
+            fullPhoneStateKey = `${W}x${H}:${isPlacesApp ? 1 : 0}:${this.tourScrollOffset || 0}:${this.minimapZoomMode || 0}:${selPhoneIdx}:${actMid}:${game && game.ytMusicEnabled !== false ? 1 : 0}:${stIdx}:${ytVolVal}:${timeInfo.phase}:${liveClockStr}:${(game && game.currentDistrict) || ""}:${(game && game._lastPagerSpeaker) || ""}:${mpLiveCnt}:${pgrTextLen}`;
             this._fullPhoneTick = ((this._fullPhoneTick || 0) + 1) | 0;
             if (
                 this._fullPhoneCacheCanvas &&
@@ -16589,11 +16796,28 @@ class RetroRenderer {
             ctx.fillRect(musX + 7 + b * 3, musY + 16 - eqH, 2, eqH);
         }
 
+        const fitPhoneText = (c, text, x, y, maxWidth, startPx = 8.5, minPx = 7.1) => {
+            const raw = String(text || "");
+            let sz = startPx;
+            c.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
+            while (sz > minPx && c.measureText(raw).width > maxWidth) {
+                sz = Math.round((sz - 0.3) * 10) / 10;
+                c.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
+            }
+            let out = raw;
+            if (c.measureText(out).width > maxWidth) {
+                while (out.length > 4 && c.measureText(out + "…").width > maxWidth) {
+                    out = out.slice(0, -1).trimEnd();
+                }
+                out = out + "…";
+            }
+            c.fillText(out, x, y);
+        };
+
         ctx.fillStyle = "#00f0ff";
-        ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
         const curSt = (game.audio && typeof game.audio.getCurrentStation === "function") ? game.audio.getCurrentStation() : null;
         const stLabel = (curSt && curSt.name) ? curSt.name : "VICE CITY FM • OST";
-        ctx.fillText(stLabel.slice(0, 21), musX + 25, musY + 10.5);
+        fitPhoneText(ctx, stLabel, musX + 25, musY + 10.5, musW - 54, 8.5, 7.2);
 
         if (!this._phoneDomEls) {
             this._phoneDomEls = {
@@ -16664,21 +16888,25 @@ class RetroRenderer {
                 this._lastContactName = contactName;
             }
         }
-        const dmSpeakerId = (game && typeof game.resolveSpeakerPortraitInfo === "function")
-            ? game.resolveSpeakerPortraitInfo((game && game._lastPagerSpeaker) || contactName).charId
-            : "JASON";
+        const dmInfo = (game && typeof game.resolveSpeakerPortraitInfo === "function")
+            ? game.resolveSpeakerPortraitInfo((game && game._lastPagerSpeaker) || contactName)
+            : { charId: "JASON", isSystem: false };
+        const dmSpeakerId = dmInfo.charId || "JASON";
         this.drawPixelPortraitRect(ctx, avX, avY, 20, 20, dmSpeakerId);
         ctx.fillStyle = "#090d16";
         ctx.fillRect(avX + 15, avY + 15, 6, 6);
-        ctx.fillStyle = "#4ade80";
+        ctx.fillStyle = dmInfo.isSystem ? "#00f0ff" : "#4ade80";
         ctx.fillRect(avX + 16, avY + 16, 4, 4);
 
+        let cleanDisplayContact = contactName.replace(/\s*\([^)]*\)\s*/g, "").trim() || contactName;
+        const maxContactW = smsW - 68 - 4 - 30;
         ctx.fillStyle = "#f8fafc";
-        ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-        ctx.fillText(contactName.slice(0, 14), avX + 24, smsY + 10);
+        ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+        const preferContact = ctx.measureText(contactName).width <= maxContactW ? contactName : cleanDisplayContact;
+        fitPhoneText(ctx, preferContact, avX + 24, smsY + 10, maxContactW, 8.8, 7.3);
         ctx.fillStyle = "#38bdf8";
         ctx.font = "bold 7.5px Consolas, 'Courier New', monospace";
-        ctx.fillText("5G • ViceNet DM", avX + 24, smsY + 19.5);
+        ctx.fillText(dmInfo.isSystem ? "5G • ViceNet Alert" : "5G • ViceNet DM", avX + 24, smsY + 19.5);
 
         // Interactive 2026 Online Multiplayer Pill Button [O]
         const mpCount = (game && game.net && typeof game.net.getPlayerCount === "function")
@@ -16774,13 +17002,13 @@ class RetroRenderer {
             const statW = smsW - abortW - 14;
             drawPixelBox(ctx, smsX + 6, mBarY, statW, mBarH, "#3b0764", "#ff2a85", "#f472b6", "#1e0536", 2);
             ctx.fillStyle = "#fde047";
-            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
-            const objShort = String(activeM.title || activeM.objectiveLabel || "ACTIVE MISSION").slice(0, 20);
-            ctx.fillText(`🎯 ${objShort}`, smsX + 10, mBarY + mBarH * 0.5 + 0.5);
+            const objShort = String(activeM.title || activeM.objectiveLabel || "ACTIVE MISSION");
+            fitPhoneText(ctx, `🎯 ${objShort}`, smsX + 10, mBarY + mBarH * 0.5 + 0.5, statW - 8, 8.0, 7.0);
 
             const abX = smsX + 8 + statW;
             drawPixelBox(ctx, abX, mBarY, abortW, mBarH, "#7f1d1d", "#ef4444", "#f87171", "#450a0a", 2);
             ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 8px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.fillText("✖ ABORT", abX + abortW * 0.5, mBarY + mBarH * 0.5 + 0.5);
             ctx.textAlign = "left";
@@ -16801,15 +17029,15 @@ class RetroRenderer {
                 2
             );
             ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 8.1px Consolas, 'Courier New', monospace";
             const btnTitle = selPhone.shortTitle || "MISSION";
             const prefix = selPhone.completed ? "🔄 REPLAY " : "▶ START ";
-            ctx.fillText(`${prefix}${btnTitle}`.slice(0, 23), smsX + 9, mBarY + mBarH * 0.5 + 0.5);
+            fitPhoneText(ctx, `${prefix}${btnTitle}`, smsX + 9, mBarY + mBarH * 0.5 + 0.5, startW - 8, 8.1, 7.0);
             this.cheatButtons.push({ id: "PHONE_MISSION_START", x: smsX + 6, y: mBarY, w: startW, h: mBarH });
 
             const nxX = smsX + 8 + startW;
             drawPixelBox(ctx, nxX, mBarY, nextW, mBarH, "#1e293b", "#38bdf8", "#7dd3fc", "#020617", 2);
             ctx.fillStyle = "#38bdf8";
+            ctx.font = "bold 8.1px Consolas, 'Courier New', monospace";
             ctx.textAlign = "center";
             ctx.fillText("⏭", nxX + nextW * 0.5, mBarY + mBarH * 0.5 + 0.5);
             ctx.textAlign = "left";
@@ -16918,16 +17146,41 @@ class RetroRenderer {
         ctx.fillStyle = "#090f1d";
         ctx.fillRect(gx + 8, gy + 6, 1, 2);
 
-        ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+        const fitGpsText = (c, text, x, y, maxWidth, startPx = 8.8, minPx = 7.1) => {
+            const raw = String(text || "");
+            let sz = startPx;
+            c.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
+            while (sz > minPx && c.measureText(raw).width > maxWidth) {
+                sz = Math.round((sz - 0.3) * 10) / 10;
+                c.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
+            }
+            let out = raw;
+            if (c.measureText(out).width > maxWidth) {
+                while (out.length > 4 && c.measureText(out + "…").width > maxWidth) {
+                    out = out.slice(0, -1).trimEnd();
+                }
+                out = out + "…";
+            }
+            c.fillText(out, x, y);
+        };
+
         ctx.textBaseline = "middle";
-        const distName = (game.currentDistrict || "VICE CITY").toUpperCase();
+        const rawDistName = (game.currentDistrict || "VICE CITY").toUpperCase().trim();
+        const maxDistHdrW = Math.max(64, gw - 78);
+        let distHdrLabel = rawDistName;
+        ctx.font = "bold 8.5px Consolas, 'Courier New', monospace";
+        if (rawDistName.includes(" - ") && ctx.measureText(rawDistName).width > maxDistHdrW) {
+            const parts = rawDistName.split(" - ").map((s) => s.trim()).filter(Boolean);
+            distHdrLabel = parts.length >= 2 ? parts[parts.length - 1] : parts[0];
+        }
         ctx.fillStyle = "#f8fafc";
-        ctx.fillText(distName.slice(0, 15), gx + 14, gy + 10);
+        fitGpsText(ctx, distHdrLabel, gx + 14, gy + 10, maxDistHdrW, 8.8, 7.2);
 
         const zoomLabels = ["1x", "2x", "ALL"];
         const zBtnW = 28;
         const zBtnX = gx + gw - 62;
         drawPxBtn(zBtnX, gy + 2, zBtnW, 15, "#0369a1", "#38bdf8", "#7dd3fc");
+        ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
         ctx.fillStyle = "#ffffff";
         ctx.fillText(zoomLabels[zoomMode], zBtnX + 4, gy + 10);
         this.cheatButtons.push({ id: "MINIMAP_ZOOM", x: zBtnX, y: gy + 2, w: zBtnW, h: 15 });
@@ -17108,6 +17361,33 @@ class RetroRenderer {
                 }
             }
 
+            // Spec-Ops Hot Drop Crate & Dropped Kingpin Crown Blips on Smartphone GPS
+            if (game.activeFlashEvent) {
+                const ev = game.activeFlashEvent;
+                const px = ox + (ev.x - viewWorldX) * invW;
+                const py = oy + (ev.y - viewWorldY) * invH;
+                const cx = Math.max(ox + 5, Math.min(ox + mw - 5, px));
+                const cy = Math.max(oy + 5, Math.min(oy + mh - 5, py));
+                const pulse = 4 + Math.sin(this.time * 10) * 2;
+                mctx.fillStyle = "#fde047";
+                mctx.fillRect(cx - 3, cy - 3, 6, 6);
+                mctx.strokeStyle = "#ef4444";
+                mctx.lineWidth = 1.6;
+                mctx.strokeRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
+            }
+            if (game.droppedKingpinCrown) {
+                const cr = game.droppedKingpinCrown;
+                const px = ox + (cr.x - viewWorldX) * invW;
+                const py = oy + (cr.y - viewWorldY) * invH;
+                const cx = Math.max(ox + 5, Math.min(ox + mw - 5, px));
+                const cy = Math.max(oy + 5, Math.min(oy + mh - 5, py));
+                mctx.fillStyle = "#fde047";
+                mctx.fillRect(cx - 3.5, cy - 3.5, 7, 7);
+                mctx.strokeStyle = "#ffffff";
+                mctx.lineWidth = 1.2;
+                mctx.strokeRect(cx - 3.5, cy - 3.5, 7, 7);
+            }
+
             // Active Mission Target Blip
             const mTarget = game.missions ? game.missions.getTargetPosition() : null;
             if (mTarget) {
@@ -17241,16 +17521,16 @@ class RetroRenderer {
             }
 
             const nearShort = nearestLm.short || nearestLm.shortName || "LANDMARK";
-            ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+            const goW = 34;
+            const goX = gx + gw - goW - 3;
             ctx.fillStyle = "#38bdf8";
             const statusTxt = distMeters < 35
                 ? `★ AT ${nearShort}`
                 : `📍 ${nearShort} (${distMeters}m ${dirStr})`;
-            ctx.fillText(statusTxt.slice(0, 21), gx + 5, ftrY + 10);
+            fitGpsText(ctx, statusTxt, gx + 5, ftrY + 10, Math.max(60, goX - (gx + 8)), 8.8, 7.1);
 
-            const goW = 34;
-            const goX = gx + gw - goW - 3;
             drawPxBtn(goX, ftrY + 2, goW, 14, "#059669", "#10b981", "#34d399");
+            ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
             ctx.fillStyle = "#ffffff";
             ctx.fillText("GO►", goX + 5, ftrY + 10);
 
@@ -17637,6 +17917,24 @@ class RetroRenderer {
             ctx.save();
             ctx.textBaseline = "middle";
 
+            const fitHudCapsuleLeft = (text, x, y, maxW, startPx = 9.0, minPx = 7.2) => {
+                const raw = String(text || "");
+                let sz = startPx;
+                ctx.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
+                while (sz > minPx && ctx.measureText(raw).width > maxW) {
+                    sz = Math.round((sz - 0.3) * 10) / 10;
+                    ctx.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
+                }
+                let out = raw;
+                if (ctx.measureText(out).width > maxW) {
+                    while (out.length > 5 && ctx.measureText(out + "…").width > maxW) {
+                        out = out.slice(0, -1).trimEnd();
+                    }
+                    out = out + "…";
+                }
+                ctx.fillText(out, x, y);
+            };
+
             // 0. 🔥 Active Flash District Magnet & 🦩 vs ⚡ Syndicate Crew Tug-of-War Capsule
             if (typeof game.ensureActiveFlashDistrict === "function") {
                 const fd = game.ensureActiveFlashDistrict();
@@ -17654,11 +17952,12 @@ class RetroRenderer {
                         7,
                         inHot ? 2.0 : 1.5
                     );
-                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     ctx.textAlign = "left";
                     ctx.fillStyle = fd.color || "#ff2a85";
-                    const shortHot = String(fd.key || "OCEAN_DRIVE").replace("_", " ").slice(0, 12);
-                    ctx.fillText(`🔥 HOT: ${shortHot} ${inHot ? "(2X!)" : ""}`, lbX + 7, curY + 10);
+                    const hotMap = { OCEAN_DRIVE: "OCEAN DRIVE", STAR_ISLAND: "STAR ISLAND", DOWNTOWN: "DOWNTOWN", WYNWOOD_HAITI: "WYNWOOD" };
+                    const shortHot = hotMap[fd.key] || String(fd.key || "OCEAN DRIVE").replace(/_/g, " ");
+                    fitHudCapsuleLeft(`🔥 HOT: ${shortHot}${inHot ? " (2X!)" : ""}`, lbX + 7, curY + 10, lbW - 44, 9.0, 7.4);
+                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "#fde047";
                     ctx.fillText(`${Math.ceil(fd.timer || 0)}s`, lbX + lbW - 7, curY + 10);
@@ -17698,11 +17997,12 @@ class RetroRenderer {
                 if (turf && (turf.leaderName || myTurfCount > 0)) {
                     const boxH = 22;
                     this.drawArcadeCapsule(ctx, lbX, curY, lbW, boxH, "rgba(18, 12, 34, 0.90)", turf.leaderColor || "#c084fc", 6, 1.4);
-                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     ctx.textAlign = "left";
                     ctx.fillStyle = turf.leaderColor || "#fde047";
-                    const lName = turf.leaderName ? turf.leaderName.slice(0, 10) : "OPEN TURF";
-                    ctx.fillText(`👑 ${turf.shortLabel.slice(0, 10)}: ${lName}`, lbX + 7, curY + 11);
+                    const lName = turf.leaderName || "OPEN TURF";
+                    const tLabel = turf.shortLabel === "WYNWOOD / HAITI" ? "WYNWOOD" : (turf.shortLabel || "DISTRICT");
+                    fitHudCapsuleLeft(`👑 ${tLabel}: ${lName}`, lbX + 7, curY + 11, lbW - 38, 8.8, 7.1);
+                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "#39ff14";
                     ctx.fillText(`${myTurfCount}/8`, lbX + lbW - 7, curY + 11);
@@ -17733,13 +18033,15 @@ class RetroRenderer {
                 const b = game.activeServerBounty;
                 const boxH = 22;
                 this.drawArcadeCapsule(ctx, lbX, curY, lbW, boxH, "rgba(76, 12, 24, 0.92)", "#ff2a85", 6, 1.5);
-                ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-                ctx.textAlign = "left";
-                ctx.fillStyle = "#ff2a85";
-                ctx.fillText(`🎯 BOUNTY: ${String(b.targetName || "PLAYER").slice(0, 9)}`, lbX + 7, curY + 11);
+                const rwdTxt = `$${Number(b.reward || 1200).toLocaleString()} (${Math.ceil(b.timer)}s)`;
+                ctx.font = "bold 8.8px Consolas, 'Courier New', monospace";
+                const rwdW = ctx.measureText(rwdTxt).width;
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#fde047";
-                ctx.fillText(`$${Number(b.reward || 1200).toLocaleString()} (${Math.ceil(b.timer)}s)`, lbX + lbW - 7, curY + 11);
+                ctx.fillText(rwdTxt, lbX + lbW - 7, curY + 11);
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#ff2a85";
+                fitHudCapsuleLeft(`🎯 ${String(b.targetName || "PLAYER")}`, lbX + 7, curY + 11, Math.max(54, lbW - rwdW - 18), 8.8, 7.1);
             }
             ctx.restore();
         }
@@ -18575,6 +18877,31 @@ class RetroRenderer {
             DETECTIVE: 8
         };
         const upperChar = String(character || "LUCIA").toUpperCase();
+        if (upperChar === "VICENET") {
+            // Crisp 2026 ViceNet 5G System / Radio Broadcast Radar Emblem (never sticks a random human mugshot onto server alerts!)
+            ctx.fillStyle = "#081226";
+            ctx.fillRect(rx, ry, rw, rh);
+            const cx = rx + rw * 0.5;
+            const cy = ry + rh * 0.5;
+            const rMax = Math.min(rw, rh) * 0.36;
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.55)";
+            ctx.lineWidth = Math.max(1.2, rw * 0.06);
+            ctx.beginPath();
+            ctx.arc(cx, cy + rMax * 0.18, rMax, Math.PI * 1.15, Math.PI * 1.85);
+            ctx.stroke();
+            ctx.strokeStyle = "#ff2a85";
+            ctx.beginPath();
+            ctx.arc(cx, cy + rMax * 0.18, rMax * 0.62, Math.PI * 1.15, Math.PI * 1.85);
+            ctx.stroke();
+            ctx.fillStyle = "#00f0ff";
+            const dotSz = Math.max(2.5, rw * 0.16);
+            ctx.fillRect(cx - dotSz * 0.5, cy + rMax * 0.12, dotSz, dotSz);
+            ctx.strokeStyle = opts.alert ? "#ff1e38" : "#00f0ff";
+            ctx.lineWidth = Math.max(1.5, rw * 0.05);
+            ctx.strokeRect(rx + 1, ry + 1, rw - 2, rh - 2);
+            ctx.restore();
+            return;
+        }
         if (this.gta6CastPortraitsReady && this.gta6CastPortraitsImg && this.gta6CastPortraitsImg.width > 0 && gta6CastIndex[upperChar] !== undefined) {
             const idx = gta6CastIndex[upperChar];
             const col = idx % 2;

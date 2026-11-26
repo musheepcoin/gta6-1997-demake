@@ -81,6 +81,14 @@ class MissionManager {
         this.loadLocalStoryProgress();
     }
 
+    get selectedPhoneIndex() {
+        return this.selectedMissionIdx || 0;
+    }
+
+    set selectedPhoneIndex(val) {
+        this.selectedMissionIdx = Math.max(0, Number(val) || 0);
+    }
+
     getStoryBitmask() {
         let mask = 0;
         for (let i = 1; i < this.payphones.length && i <= 4; i++) {
@@ -103,6 +111,9 @@ class MissionManager {
         }
         if (saveLocal) {
             this.saveLocalStoryProgress();
+        }
+        if (this.game && typeof this.game.updateHud === "function") {
+            this.game.updateHud();
         }
     }
 
@@ -138,7 +149,7 @@ class MissionManager {
         if (sel && this.game && typeof this.game.sendPager === "function") {
             const statusTag = sel.completed ? " [REPLAY]" : ` [$${(sel.rewardCash || 1500).toLocaleString()}]`;
             this.game.sendPager(
-                `📱 ${sel.caller.toUpperCase()}`,
+                sel.caller.toUpperCase(),
                 `${sel.briefing}${statusTag}`,
                 false
             );
@@ -165,7 +176,7 @@ class MissionManager {
             }
             if (typeof g.sendPager === "function") {
                 g.sendPager(
-                    "📱 SMARTPHONE // DISPATCH",
+                    "VICE NET DISPATCH",
                     "Mission contract aborted. Tap [START] on your Smartphone whenever you want to launch a mission.",
                     false
                 );
@@ -216,7 +227,33 @@ class MissionManager {
             g.rebuildVehicleSpatialGrid();
         }
         if (Array.isArray(g.peds)) {
+            const prevLen = g.peds.length;
             g.peds = g.peds.filter((pd) => !pd || pd.missionTag !== "FIXER_VIP");
+            if (g.peds.length !== prevLen && typeof g.rebuildPedSpatialGrid === "function") {
+                g.rebuildPedSpatialGrid();
+            }
+        }
+    }
+
+    clearSpawnOverlapVehicles(wx, wy, clearRad = 58) {
+        const g = this.game;
+        if (!g || !Array.isArray(g.vehicles)) return;
+        const pVeh = g.player ? g.player.inVehicle : null;
+        let removed = false;
+        for (let i = g.vehicles.length - 1; i >= 0; i--) {
+            const ov = g.vehicles[i];
+            if (!ov || ov === pVeh || ov.driver === "PLAYER" || ov.driver === "REMOTE" || ov.missionTag || String(ov.id || "").startsWith("fleet_")) continue;
+            if (ov.driver === "AI_COP" || ov.driver === "AI_EMERGENCY" || ov.driver === "AI_TOW") continue;
+            if (Math.hypot(ov.x - wx, ov.y - wy) < clearRad) {
+                if (ov.aiCurbParkingBay && ov.aiCurbParkingBay._occupiedBy === ov) {
+                    ov.aiCurbParkingBay._occupiedBy = null;
+                }
+                g.vehicles.splice(i, 1);
+                removed = true;
+            }
+        }
+        if (removed && typeof g.rebuildVehicleSpatialGrid === "function") {
+            g.rebuildVehicleSpatialGrid();
         }
     }
 
@@ -255,10 +292,11 @@ class MissionManager {
         const g = this.game;
         const p = g.player;
 
-        if (!this.activeMission) {
+        if (!this.activeMission || !p || p.dead) {
             return;
         }
 
+        const pObj = p.inVehicle || p;
         const m = this.activeMission;
         if (m.timer !== null && m.timer !== undefined) {
             m.timer -= dt;
@@ -270,7 +308,7 @@ class MissionManager {
 
         if (m.id === "M1_UNCLE_JACK") {
             if (m.stage === 1) {
-                const d = Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y);
+                const d = g.activeInterior ? 99999 : Math.hypot(pObj.x - m.targetPos.x, pObj.y - m.targetPos.y);
                 if (d < 68) {
                     m.stage = 2;
                     g.addCash(m.phone && m.phone.completed ? 100 : 300, "REGISTER ROBBED!", true);
@@ -284,22 +322,33 @@ class MissionManager {
                     m.objectiveLabel = "RESPRAY AT VICE CUSTOMS (COLLINS AVE)";
                 }
             } else if (m.stage === 2) {
-                if (g.wantedLevel === 0) {
+                if (g.wantedLevel === 0 && !p.dead) {
                     this.completeMission(m.phone, "TRUST? — HOLD-UP COMPLETE", 1500);
                 }
             }
         } else if (m.id === "M2_GRASSRIVERS") {
             if (m.stage === 1) {
-                for (let i = m.crates.length - 1; i >= 0; i--) {
-                    const c = m.crates[i];
-                    if (Math.hypot(p.x - c.x, p.y - c.y) < 58) {
-                        m.crates.splice(i, 1);
-                        g.addCash(m.phone && m.phone.completed ? 75 : 200, "CONTRABAND CRATE", true);
-                        g.audio.playCashSound();
+                if (!g.activeInterior) {
+                    for (let i = m.crates.length - 1; i >= 0; i--) {
+                        const c = m.crates[i];
+                        if (Math.hypot(pObj.x - c.x, pObj.y - c.y) < 62) {
+                            m.crates.splice(i, 1);
+                            g.addCash(m.phone && m.phone.completed ? 75 : 200, "CONTRABAND CRATE", true);
+                            g.audio.playCashSound();
+                        }
                     }
                 }
                 if (m.crates.length > 0) {
-                    m.targetPos = { x: m.crates[0].x, y: m.crates[0].y };
+                    let bestCr = m.crates[0];
+                    let bestCrDist = Infinity;
+                    for (let ci = 0; ci < m.crates.length; ci++) {
+                        const dc = Math.hypot(pObj.x - m.crates[ci].x, pObj.y - m.crates[ci].y);
+                        if (dc < bestCrDist) {
+                            bestCrDist = dc;
+                            bestCr = m.crates[ci];
+                        }
+                    }
+                    m.targetPos = { x: bestCr.x, y: bestCr.y };
                     m.objectiveLabel = `COLLECT BEACH & PIER CRATES (${3 - m.crates.length}/3)`;
                 } else {
                     m.stage = 2;
@@ -314,7 +363,7 @@ class MissionManager {
                 }
             } else if (m.stage === 2) {
                 const insideHotelDixon = Boolean(g.activeInterior && g.activeInterior.id === "HOTEL_DIXON");
-                if (insideHotelDixon || Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 82) {
+                if (insideHotelDixon || (!g.activeInterior && Math.hypot(pObj.x - m.targetPos.x, pObj.y - m.targetPos.y) < 86)) {
                     this.completeMission(m.phone, "VICE BEACH CONTRABAND RUN", 2500);
                 }
             }
@@ -354,11 +403,13 @@ class MissionManager {
                     this.failMission("THE TARGET CHEETAH WAS DESTROYED!");
                     return;
                 }
-                const craneDist = Math.min(
-                    Math.hypot(p.x - mx256(171.5) * TILE_SIZE, p.y - my256(162.5) * TILE_SIZE),
-                    Math.hypot(p.x - 333.2 * TILE_SIZE, p.y - 306.5 * TILE_SIZE)
-                );
-                if (p.inVehicle === m.targetCar && (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 95 || craneDist < 110)) {
+                const tc = m.targetCar;
+                const craneDist = tc ? Math.min(
+                    Math.hypot(tc.x - mx256(171.5) * TILE_SIZE, tc.y - my256(162.5) * TILE_SIZE),
+                    Math.hypot(tc.x - 333.2 * TILE_SIZE, tc.y - 306.5 * TILE_SIZE)
+                ) : 99999;
+                const playerWithCar = tc && (p.inVehicle === tc || (!g.activeInterior && Math.hypot(p.x - tc.x, p.y - tc.y) < 68));
+                if (playerWithCar && (Math.hypot(tc.x - m.targetPos.x, tc.y - m.targetPos.y) < 98 || craneDist < 112)) {
                     this.completeMission(m.phone, "STAR ISLAND GRAND THEFT", 4000);
                 }
             }
@@ -382,8 +433,8 @@ class MissionManager {
                     );
                 }
             } else if (m.stage === 2) {
-                const altAirDist = Math.hypot(p.x - mx256(66.5) * TILE_SIZE, p.y - my256(152.0) * TILE_SIZE);
-                if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 92 || altAirDist < 92) {
+                const altAirDist = Math.hypot(pObj.x - mx256(66.5) * TILE_SIZE, pObj.y - my256(152.0) * TILE_SIZE);
+                if (!g.activeInterior && (Math.hypot(pObj.x - m.targetPos.x, pObj.y - m.targetPos.y) < 96 || altAirDist < 96)) {
                     g.player.ankleScrambled = true;
                     g.setWantedLevel(0);
                     this.completeMission(m.phone, "LEONIDA KINGPIN — ANKLE MONITOR OVERRIDDEN!", 7500);
@@ -417,7 +468,7 @@ class MissionManager {
                         m.targetPos = { x: m.dropPos.x, y: m.dropPos.y };
                         m.objectiveLabel = `DELIVER ${m.targetCar.name} TO ${m.dropName}`;
                         g.sendPager(
-                            "📱 VICENET AI FIXER",
+                            "BOOBIE IKE (FIXER)",
                             `🔥 You're in the ${m.targetCar.name}! VCPD alerted (2★)! Deliver it intact to ${m.dropName} before the 90s timer runs out!`,
                             true
                         );
@@ -427,7 +478,9 @@ class MissionManager {
                         this.failMission("THE TARGET VEHICLE WAS WRECKED BEFORE DELIVERY!");
                         return;
                     }
-                    if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 92) {
+                    const tc = m.targetCar;
+                    const playerWithCar = (p.inVehicle === tc || (!g.activeInterior && Math.hypot(p.x - tc.x, p.y - tc.y) < 68));
+                    if (playerWithCar && Math.hypot(tc.x - m.targetPos.x, tc.y - m.targetPos.y) < 96) {
                         this.completeMission(null, `FIXER BOOST: ${m.targetCar.name}`, (m.reward || 1200) + speedBonus);
                     }
                 }
@@ -437,24 +490,42 @@ class MissionManager {
                     if (tc && !tc.destroyed && tc.hp > tc.maxHp * 0.48 && p.inVehicle !== tc) {
                         m.targetPos = { x: tc.x, y: tc.y };
                     } else {
-                        const dropX = tc ? tc.x : m.targetPos.x;
-                        const dropY = tc ? tc.y : m.targetPos.y;
+                        let dropX = tc ? tc.x : m.targetPos.x;
+                        let dropY = tc ? tc.y : m.targetPos.y;
+                        const dropZ = (tc && tc.z !== undefined) ? tc.z : (p.z || 2.0);
                         if (p.inVehicle === tc) {
                             this.completeMission(null, "COURIER HIJACKED & LOOTED", (m.reward || 1500) + speedBonus);
                             return;
                         }
+                        if (tc) {
+                            tc.missionTag = null;
+                            if (!tc.destroyed && tc.driver === "AI_CRIMINAL") {
+                                tc.driver = "AI_TRAFFIC";
+                                if (typeof tc.triggerPanic === "function") tc.triggerPanic(8.0);
+                            }
+                        }
+                        if (g.map && typeof g.map.resolveCircleBuildingCollision === "function") {
+                            const dCol = g.map.resolveCircleBuildingCollision(dropX, dropY, 12, dropZ, false);
+                            dropX = dCol.x;
+                            dropY = dCol.y;
+                        }
+                        if (g.map && g.map.isWaterAtPixel && g.map.isWaterAtPixel(dropX, dropY)) {
+                            dropX = pObj.x + Math.cos(pObj.angle || 0) * 36;
+                            dropY = pObj.y + Math.sin(pObj.angle || 0) * 36;
+                        }
                         m.stage = 2;
-                        m.targetPos = { x: dropX, y: dropY };
+                        m.targetCar = null;
+                        m.targetPos = { x: dropX, y: dropY, z: dropZ, isBriefcase: true };
                         m.objectiveLabel = "GRAB THE DROPPED CARTEL BRIEFCASE!";
                         g.addFloatingText(dropX, dropY - 24, "💼 BRIEFCASE DROPPED!", "#fde047");
                         g.sendPager(
-                            "📱 VICENET AI FIXER",
+                            "BRIAN HEDER (FIXER)",
                             "💼 The courier panicked and dropped the briefcase! Grab the cash at the marker right now!",
                             true
                         );
                     }
                 } else if (m.stage === 2) {
-                    if (Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 46) {
+                    if (!g.activeInterior && Math.hypot(pObj.x - m.targetPos.x, pObj.y - m.targetPos.y) < 56) {
                         this.completeMission(null, "CARTEL COURIER EXTORTION", (m.reward || 1500) + speedBonus);
                     }
                 }
@@ -473,7 +544,7 @@ class MissionManager {
                         m.targetPos = { x: m.dropPos.x, y: m.dropPos.y };
                         m.objectiveLabel = `KEEP SPEED HIGH -> ${m.dropName}`;
                         g.sendPager(
-                            "📱 VICENET AI FIXER",
+                            "CAL HAMPTON (FIXER)",
                             `💣 NITRO RIG ARMED! Keep the ${m.targetCar.name} moving fast to ${m.dropName}! If you stop for 4.5 seconds, it blows!`,
                             true
                         );
@@ -503,7 +574,7 @@ class MissionManager {
                     } else {
                         m.slowTimer = Math.max(0, (m.slowTimer || 0) - dt * 1.6);
                     }
-                    if (p.inVehicle === m.targetCar && Math.hypot(p.x - m.targetPos.x, p.y - m.targetPos.y) < 90) {
+                    if (p.inVehicle === m.targetCar && Math.hypot(m.targetCar.x - m.targetPos.x, m.targetCar.y - m.targetPos.y) < 94) {
                         this.completeMission(null, `NITRO SPEED DELIVERY (${m.dropName})`, (m.reward || 1800) + speedBonus);
                     }
                 }
@@ -520,26 +591,51 @@ class MissionManager {
     findNearbyRoadSpot(minDist = 720, maxDist = 1040) {
         const g = this.game;
         const p = g.player;
-        const pz = p.z || 2.0;
-        const safeMin = Math.max(680, minDist);
-        const safeMax = Math.max(safeMin + 240, maxDist);
-        for (let att = 0; att < 44; att++) {
-            const ang = Math.random() * Math.PI * 2;
-            const dist = safeMin + Math.random() * (safeMax - safeMin);
-            const tx = Math.floor((p.x + Math.cos(ang) * dist) / TILE_SIZE);
-            const ty = Math.floor((p.y + Math.sin(ang) * dist) / TILE_SIZE);
-            if (g.map.isRestrictedNoTrafficZone && g.map.isRestrictedNoTrafficZone(tx, ty)) continue;
+        const pObj = p.inVehicle || p;
+        const pz = pObj.z || p.z || 2.0;
+        const allowCloseOnScreen = minDist < 420;
+        const safeMin = allowCloseOnScreen ? Math.max(140, minDist) : Math.max(680, minDist);
+        const safeMax = Math.max(safeMin + 220, maxDist);
+        const isGoodRoadBlock = (tx, ty, enforceOffScreen) => {
+            if (tx < 2 || tx >= MAP_COLS - 2 || ty < 2 || ty >= MAP_ROWS - 2) return null;
+            if (g.map.isRestrictedNoTrafficZone && g.map.isRestrictedNoTrafficZone(tx, ty)) return null;
             const nb = g.map.getNavigationBlock ? g.map.getNavigationBlock(tx, ty, pz) : null;
-            if (!nb || nb.groundType !== GROUND_TYPE.ROAD) continue;
+            if (!nb || nb.groundType !== GROUND_TYPE.ROAD || nb.isRailway) return null;
             const wx = (tx + 0.5) * TILE_SIZE;
             const wy = (ty + 0.5) * TILE_SIZE;
-            if (typeof g.isPointInAnyPlayerCameraView === "function" && g.isPointInAnyPlayerCameraView(wx, wy, 140)) continue;
-            if (g.map.resolveCircleBuildingCollision && g.map.resolveCircleBuildingCollision(wx, wy, 22, pz).hit) continue;
+            if (g.map.isWaterAtPixel && g.map.isWaterAtPixel(wx, wy)) return null;
+            if (enforceOffScreen && typeof g.isPointInAnyPlayerCameraView === "function" && g.isPointInAnyPlayerCameraView(wx, wy, 140)) return null;
+            if (g.map.resolveCircleBuildingCollision && g.map.resolveCircleBuildingCollision(wx, wy, 22, pz).hit) return null;
+            if (Array.isArray(g.vehicles) && g.vehicles.some((ov) => ov && Math.hypot(ov.x - wx, ov.y - wy) < 64)) return null;
             const wz = g.map.getHeightAtPixel ? g.map.getHeightAtPixel(wx, wy, pz) : 2.0;
-            const roadAng = g.map.getAlignedRoadAngle ? g.map.getAlignedRoadAngle(tx, ty, ang, pz) : 0;
+            const refAng = Math.atan2(wy - pObj.y, wx - pObj.x);
+            const roadAng = g.map.getAlignedRoadAngle ? g.map.getAlignedRoadAngle(tx, ty, refAng, pz) : 0;
             return { x: wx, y: wy, z: wz, angle: roadAng };
+        };
+
+        for (let att = 0; att < 56; att++) {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = safeMin + Math.random() * (safeMax - safeMin);
+            const tx = Math.floor((pObj.x + Math.cos(ang) * dist) / TILE_SIZE);
+            const ty = Math.floor((pObj.y + Math.sin(ang) * dist) / TILE_SIZE);
+            const hit = isGoodRoadBlock(tx, ty, !allowCloseOnScreen);
+            if (hit) return hit;
         }
-        return { x: p.x + 820, y: p.y, z: pz, angle: 0 };
+
+        // Guaranteed dry road fallback via spiral search (never spawns in the Atlantic Ocean!)
+        const baseBx = Math.floor(pObj.x / TILE_SIZE);
+        const baseBy = Math.floor(pObj.y / TILE_SIZE);
+        const startR = Math.max(3, Math.round(safeMin / TILE_SIZE));
+        for (let r = startR; r <= startR + 28; r++) {
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                    const hit = isGoodRoadBlock(baseBx + dx, baseBy + dy, false);
+                    if (hit) return hit;
+                }
+            }
+        }
+        return { x: 443.5 * TILE_SIZE, y: 285.5 * TILE_SIZE, z: 2.0, angle: Math.PI * 0.5 };
     }
 
     startDynamicFixerMission(phone) {
@@ -553,7 +649,8 @@ class MissionManager {
         const arch = archetypes[(this._fixerRollIdx++) % archetypes.length];
 
         if (arch === "HIJACK_LIVE_TARGET") {
-            const spot = this.findNearbyRoadSpot(200, 360);
+            const spot = this.findNearbyRoadSpot(220, 420);
+            this.clearSpawnOverlapVehicles(spot.x, spot.y, 58);
             const pool = ["VICE_CHEETAH", "BANSHEE_GT", "STINGER_CABRIO", "PENETRATOR_GT", "CHALLENGER_RT"];
             const spec = pool[Math.floor(Math.random() * pool.length)];
             const targetCar = new Vehicle(fixerVehId, spec, spot.x, spot.y, spot.angle);
@@ -590,13 +687,14 @@ class MissionManager {
                 objectiveLabel: `BOOST ${targetCar.name} IN ${distName}`
             };
             g.sendPager(
-                "📱 BOOBIE IKE (JACK OF HEARTS)",
+                "BOOBIE IKE (JACK OF HEARTS)",
                 `Yo ${pName}! Boobie Ike here — my spotter in ${distName} just tagged a ${targetCar.name}! Boost it and deliver it to ${bestDrop.name} for $1,200!`,
                 true
             );
             g.showBigBanner("⚡ BOOBIE IKE: LIVE BOOST", `STEAL THE ${targetCar.name} & DELIVER TO ${bestDrop.name}`, "#00f0ff", 2.6);
         } else if (arch === "RAM_AND_EXTORT") {
-            const spot = this.findNearbyRoadSpot(220, 390);
+            const spot = this.findNearbyRoadSpot(240, 440);
+            this.clearSpawnOverlapVehicles(spot.x, spot.y, 58);
             const pool = ["CHALLENGER_RT", "TULIP_MUSCLE", "PENETRATOR_GT"];
             const spec = pool[Math.floor(Math.random() * pool.length)];
             const courier = new Vehicle(fixerVehId, spec, spot.x, spot.y, spot.angle);
@@ -621,15 +719,28 @@ class MissionManager {
                 objectiveLabel: `RAM OR SHOOT THE ${courier.name} COURIER!`
             };
             g.sendPager(
-                "📱 BRIAN HEDER (LEONIDA KEYS)",
+                "BRIAN HEDER (LEONIDA KEYS)",
                 `${pName}, Brian Heder here. A deadbeat courier in a ${courier.name} is cutting through ${distName} with $1,500 of my Keys money! Ram his car until he drops the briefcase!`,
                 true
             );
             g.showBigBanner("💥 BRIAN HEDER: SHAKEDOWN", `SMASH THE ${courier.name} COURIER FOR $1,500!`, "#f97316", 2.6);
         } else if (arch === "SPEED_BOMB_RUN") {
-            let bombCar = (p.inVehicle && !p.inVehicle.destroyed && !p.inVehicle.waterOnly) ? p.inVehicle : null;
+            const pv = p.inVehicle;
+            const eligiblePlayerCar = Boolean(
+                pv &&
+                !pv.destroyed &&
+                (p.seatIndex || 0) === 0 &&
+                !pv.waterOnly &&
+                !pv.towedByTruck &&
+                !pv.towingVehicle &&
+                !pv.crushesCars &&
+                pv.specKey !== "BMX_BIKE" &&
+                pv.specKey !== "E_SCOOTER"
+            );
+            let bombCar = eligiblePlayerCar ? pv : null;
             if (!bombCar) {
-                const spot = this.findNearbyRoadSpot(90, 190);
+                const spot = this.findNearbyRoadSpot(140, 260);
+                this.clearSpawnOverlapVehicles(spot.x, spot.y, 58);
                 bombCar = new Vehicle(fixerVehId, "BANSHEE_GT", spot.x, spot.y, spot.angle);
                 bombCar.z = spot.z;
                 g.vehicles.push(bombCar);
@@ -663,17 +774,23 @@ class MissionManager {
                 objectiveLabel: alreadyIn ? `SPEED RUN -> ${dropLm.shortName || "DROP ZONE"}` : `BOARD THE NITRO ${bombCar.name}`
             };
             g.sendPager(
-                "📱 CAL HAMPTON (RADIO SCANNER)",
+                "CAL HAMPTON (RADIO SCANNER)",
                 `💣 ${pName}, Cal Hampton here! I intercepted Coast Guard & VCPD channels — this ${bombCar.name} is wired with a speed-sensitive nitro rig. Floor it to ${this.activeMission.dropName} without stopping for $1,800!`,
                 true
             );
             g.showBigBanner("💣 CAL HAMPTON: NITRO RUN", `FLOOR IT TO ${this.activeMission.dropName} — DO NOT STOP!`, "#ef4444", 2.6);
         } else {
-            const spot = this.findNearbyRoadSpot(230, 390);
+            const spot = this.findNearbyRoadSpot(230, 410);
+            let vx = spot.x, vy = spot.y;
+            if (g.map && typeof g.map.resolveCircleBuildingCollision === "function") {
+                const vCol = g.map.resolveCircleBuildingCollision(vx, vy, 10, spot.z || 2.0, false);
+                vx = vCol.x;
+                vy = vCol.y;
+            }
             const vip = new Pedestrian({
                 id: `fixer_vip_${Date.now()}`,
-                x: spot.x,
-                y: spot.y,
+                x: vx,
+                y: vy,
                 z: spot.z,
                 kind: "CRIMINAL",
                 g24Type: "g2_zaibatsu",
@@ -687,10 +804,21 @@ class MissionManager {
             vip.attackedByPlayer = true;
             g.peds.push(vip);
             for (let b = 0; b < 2; b++) {
+                let gx = vx + (b === 0 ? -18 : 18);
+                let gy = vy + 14;
+                if (g.map && typeof g.map.resolveCircleBuildingCollision === "function") {
+                    const gCol = g.map.resolveCircleBuildingCollision(gx, gy, 9, spot.z || 2.0, false);
+                    gx = gCol.x;
+                    gy = gCol.y;
+                }
+                if (g.map && g.map.isWaterAtPixel && g.map.isWaterAtPixel(gx, gy)) {
+                    gx = vx;
+                    gy = vy;
+                }
                 const guard = new Pedestrian({
                     id: `fixer_guard_${Date.now()}_${b}`,
-                    x: spot.x + (b === 0 ? -18 : 18),
-                    y: spot.y + 14,
+                    x: gx,
+                    y: gy,
                     z: spot.z,
                     kind: "CRIMINAL",
                     g24Type: "g2_russian",
@@ -717,7 +845,7 @@ class MissionManager {
                 objectiveLabel: `ELIMINATE SYNDICATE LIEUTENANT IN ${distName}`
             };
             g.sendPager(
-                "📱 RAUL BAUTISTA (HEIST CREW)",
+                "RAUL BAUTISTA (HEIST CREW)",
                 `🎯 Raul Bautista here, ${pName}: A Syndicate banker who burned my crew and his 2 bodyguards were just spotted in ${distName}. Take him out within 90s for $1,500!`,
                 true
             );
@@ -780,6 +908,7 @@ class MissionManager {
         } else if (phone.missionId === "M3_OCEAN_DRIVE") {
             const cx = mx256(173.5) * TILE_SIZE;
             const cy = my256(107.5) * TILE_SIZE;
+            this.clearSpawnOverlapVehicles(cx, cy, 58);
             const pidTag = (g.net && g.net.playerId) ? String(g.net.playerId).slice(-6) : "p1";
             const cheetah = new Vehicle(`mcheetah_${pidTag}`, "VICE_CHEETAH", cx, cy, 0);
             cheetah.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(cx, cy, 4.0) : 2.0;
@@ -797,7 +926,7 @@ class MissionManager {
                 objectiveLabel: "STEAL THE CHEETAH ON STAR ISLAND"
             };
             g.sendPager(
-                "JASON (SMARTPHONE)",
+                "BOOBIE IKE",
                 "MISSION 3: 'STAR ISLAND CHEETAH BOOST' — A VIP Grotti Cheetah is parked on Star Island. Boost it and deliver it to the Port of Vice City!",
                 true
             );
@@ -805,6 +934,7 @@ class MissionManager {
         } else if (phone.missionId === "M4_ANKLE_OVERRIDE") {
             const bx = 70.5 * TILE_SIZE;
             const by = 213.5 * TILE_SIZE;
+            this.clearSpawnOverlapVehicles(bx, by, 58);
             const pidTag = (g.net && g.net.playerId) ? String(g.net.playerId).slice(-6) : "p1";
             const brinks = new Vehicle(`mbrinks_${pidTag}`, "BRINKS_TRUCK", bx, by, 0);
             brinks.z = g.map && typeof g.map.getHeightAtPixel === "function" ? g.map.getHeightAtPixel(bx, by, 4.0) : 2.0;
@@ -865,7 +995,7 @@ class MissionManager {
         if (wasDynamicFixer) {
             this.selectedMissionIdx = 0;
             g.sendPager(
-                "📱 VICENET AI FIXER",
+                "RAUL BAUTISTA (FIXER)",
                 `Contract cleared (+$${finalReward.toLocaleString()})! Hit [START] on your Smartphone (or type @fixer in chat) whenever you want another 90s contract!`,
                 false
             );
@@ -884,20 +1014,23 @@ class MissionManager {
         } else {
             this.selectedMissionIdx = 0;
             g.sendPager(
-                "STATE OF LEONIDA",
+                "VICE NET DISPATCH",
                 "ALL STORY MISSIONS COMPLETED! Lucia's DOC Ankle Monitor is permanently scrambled. Launch ⚡ FIXER: LIVE 90S contracts anytime!",
                 true
             );
         }
     }
 
-    failMission(reason) {
+    failMission(reason, silentBanner = false) {
         const g = this.game;
+        if (!this.activeMission) return;
         this.cleanupMissionVehicles();
         this.activeMission = null;
-        g.showBigBanner("MISSION FAILED", reason, "#ff1e38", 3.0);
+        if (!silentBanner) {
+            g.showBigBanner("MISSION FAILED", reason, "#ff1e38", 3.0);
+        }
         g.sendPager(
-            "SMARTPHONE // DISPATCH",
+            "VICE NET DISPATCH",
             `${reason} — Tap [START] on your Smartphone whenever you're ready to retry the contract.`,
             true
         );

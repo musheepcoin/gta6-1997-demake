@@ -50,6 +50,7 @@ const PedNav = (function () {
             if (x >= 64 && x <= 165 && y >= 299 && y <= 368) return true;
             if (x >= 331 && x <= 360 && y >= 299 && y <= 336 && x !== 342 && x !== 345) return true;
             if (x >= 56 && x <= 68 && y >= 76 && y <= 146) return true; // prison compound
+            if (x >= 458 && x <= 481 && y >= 21 && y <= 45) return true; // gated SERA Spaceport compound
             return false;
         }
 
@@ -567,11 +568,14 @@ const PedNav = (function () {
         const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) * 0.001;
         const sx = Math.floor(ped.x / TILE_SIZE), sy = Math.floor(ped.y / TILE_SIZE);
         const gx = Math.floor(tx / TILE_SIZE), gy = Math.floor(ty / TILE_SIZE);
+        const navInst = getNav(game);
+        const goalRestricted = navInst._restricted(gx, gy);
         let rt = ped._route;
         const stale = !rt || Math.abs(now - rt.t) > 1.8 || Math.hypot(rt.tx - tx, rt.ty - ty) > 70 || rt.idx >= rt.pts.length;
         if (stale) {
             const ok = (x, y) => {
                 if (x < 2 || y < 2 || x >= MAP_COLS - 2 || y >= MAP_ROWS - 2) return false;
+                if (!goalRestricted && navInst._restricted(x, y)) return false;
                 const nb = map.getNavigationBlock(x, y, z);
                 if (!nb) return false;
                 if (nb.groundType === GROUND_TYPE.BUILDING || nb.groundType === GROUND_TYPE.WATER || nb.groundType === GROUND_TYPE.AIR) return false;
@@ -657,7 +661,15 @@ const PedNav = (function () {
         return rt.pts[rt.idx];
     }
 
-    return { nextStep, stats, getNav, isGoodSpawnTile, routeWaypoint };
+    function invalidateCache(game) {
+        spawnCache.clear();
+        if (game && game._pedNavigator) {
+            game._pedNavigator.walkCache.fill(0);
+            game._pedNavigator.crossCache.clear();
+        }
+    }
+
+    return { nextStep, stats, getNav, isGoodSpawnTile, routeWaypoint, invalidateCache };
 })();
 if (typeof window !== "undefined") {
     window.PedNav = PedNav;

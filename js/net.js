@@ -1060,30 +1060,11 @@ class ViceNetworkManager {
         const cleanRoom = roomCode ? this.normalizeRoomCode(roomCode) : "";
         this._profileSynced = false;
         if (cleanRoom && cleanRoom !== this.roomCode) {
-            this.roomCode = cleanRoom;
-            this.remotePlayers.clear();
-            if (this.chatRoomBadge) {
-                this.chatRoomBadge.textContent = `[${this.getRoomDisplayName()}]`;
-            }
-            if (this.wsConnected && this.ws) {
-                try {
-                    this.ws.send(JSON.stringify({
-                        t: "SWITCH_ROOM",
-                        id: this.playerId,
-                        name: this.playerName,
-                        color: this.playerColor,
-                        pedType: this.pedSpriteType,
-                        room: this.roomCode
-                    }));
-                } catch (_e) {}
-            }
-            this.initBroadcastChannel();
-            if (!this.wsUrl) {
-                this.claimRoomSlot(0);
-            }
+            this.switchServer(cleanRoom);
         } else {
             this.sendPacket({
                 t: "JOIN",
+                ver: 101181,
                 started: true,
                 id: this.playerId,
                 name: this.playerName,
@@ -1570,6 +1551,11 @@ class ViceNetworkManager {
         }
 
         if (pkt.t === "CHAT") {
+            if (pkt.isAiReply) {
+                const aiMsg = String(pkt.text || "").trim().slice(0, 140);
+                if (aiMsg) this.addChatLog(pkt.name || "VICE NET AI", aiMsg, pkt.color || "#39ff14", true);
+                return;
+            }
             const rp = this.ensureRemotePlayer(pkt);
             const msg = String(pkt.text || "").trim().slice(0, 140);
             if (!msg) return;
@@ -1579,7 +1565,9 @@ class ViceNetworkManager {
             if (rp._lastChatText && rp._lastChatText.toLowerCase() === msg.toLowerCase() && (nowMs - (rp._lastChatMs || 0)) < 4500) return;
             rp._lastChatMs = nowMs;
             rp._lastChatText = msg;
-            rp.name = pkt.name || rp.name;
+            if (pkt.name && !String(pkt.name).includes("📱") && !String(pkt.name).includes("🎙️") && !String(pkt.name).includes("📡")) {
+                rp.name = pkt.name;
+            }
             rp.color = pkt.color || rp.color;
             rp.chatText = msg;
             rp.chatTimer = 6.5;
@@ -2360,14 +2348,6 @@ class ViceNetworkManager {
                 if (typeof g.sendPager === "function") {
                     g.sendPager(agentName, reply, false);
                 }
-                this.sendPacket({
-                    t: "CHAT",
-                    name: agentName,
-                    color: agentColor,
-                    text: reply,
-                    x: p ? Math.round(p.x) : 0,
-                    y: p ? Math.round(p.y) : 0
-                });
             }
         }, 550);
     }
@@ -2452,17 +2432,18 @@ class ViceNetworkManager {
                 ((v.aiPanicTimer || 0) > 0 ? 64 : 0) |
                 (v.fireExtinguished ? 128 : 0) |
                 (v.towedByTruck ? 256 : 0);
+            const wrapAng = Number.isFinite(v.angle) ? Math.atan2(Math.sin(v.angle), Math.cos(v.angle)) : 0;
             const row = [
                 v.id,
                 v.specKey || "MINT_STALLION",
                 Math.round(v.x),
                 Math.round(v.y),
                 Math.round((v.z || 2.0) * 100) / 100,
-                Math.round((v.angle || 0) * 1000) / 1000,
-                Math.round(v.vx || 0),
-                Math.round(v.vy || 0),
-                drvToCode(v.driver),
-                Math.round(v.hp || 0),
+                Math.round(wrapAng * 1000) / 1000,
+                v.destroyed ? 0 : Math.round(v.vx || 0),
+                v.destroyed ? 0 : Math.round(v.vy || 0),
+                v.destroyed ? 0 : drvToCode(v.driver),
+                v.destroyed ? 0 : Math.max(0, Math.round(v.hp || 0)),
                 flags,
                 v.remapIdx || 0,
                 v.missionTag || 0,
@@ -2817,11 +2798,14 @@ class ViceNetworkManager {
                     v.vy = vy;
                     v.speed = Math.hypot(vx, vy);
                 }
-                if (Number.isFinite(hp)) {
-                    v.hp = (hp >= (v.maxHp || 100) && !(flags & 28)) ? hp : (Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp);
-                }
                 const wasDestroyed = v.destroyed;
                 const nowDestroyed = Boolean(flags & 1);
+                if (nowDestroyed) {
+                    v.hp = 0;
+                } else if (Number.isFinite(hp)) {
+                    v.hp = (hp >= (v.maxHp || 100) && !(flags & 28)) ? hp : (Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp);
+                    if (v.hp <= 0) v.hp = 1;
+                }
                 if (isInitialServerBootstrap && v.driver === null && v.isPolice && !nowDestroyed) {
                     v.abandonedTimer = Math.max(v.abandonedTimer || 0, 10.0);
                 }
@@ -3400,8 +3384,19 @@ class ViceNetworkManager {
                     const nx = (lv.x - rp.x) / d;
                     const ny = (lv.y - rp.y) / d;
                     const push = (36 - d) * 0.5;
-                    lv.x += nx * push;
-                    lv.y += ny * push;
+                    let pushedX = lv.x + nx * push;
+                    let pushedY = lv.y + ny * push;
+                    if (this.game.map && typeof this.game.map.resolveCircleBuildingCollision === "function") {
+                        const col = this.game.map.resolveCircleBuildingCollision(pushedX, pushedY, 16, lv.z || 2.0, false);
+                        pushedX = col.x;
+                        pushedY = col.y;
+                    }
+                    if (!lv.isBoat && this.game.map && typeof this.game.map.isWaterAtPixel === "function" && this.game.map.isWaterAtPixel(pushedX, pushedY)) {
+                        pushedX = lv.x;
+                        pushedY = lv.y;
+                    }
+                    lv.x = pushedX;
+                    lv.y = pushedY;
                     lv.vx += nx * Math.min(90, rSpeed * 0.35) * dt * 15;
                     lv.vy += ny * Math.min(90, rSpeed * 0.35) * dt * 15;
                 }
@@ -3625,9 +3620,30 @@ class ViceNetworkManager {
             p.inVehicle._worldModified = true;
             p.inVehicle.isStaticParked = false;
         }
-        targetObj.x = target.x - 64;
-        targetObj.y = target.y;
-        targetObj.z = target.z || 2.0;
+        const candOffsets = [[-64, 0], [64, 0], [0, -64], [0, 64], [-96, 0], [96, 0], [0, 0]];
+        let safeTpX = target.x;
+        let safeTpY = target.y;
+        const rad = p.inVehicle ? 16 : 10;
+        const allowWater = Boolean(p.inVehicle && p.inVehicle.isBoat);
+        for (const [ox, oy] of candOffsets) {
+            let cx = target.x + ox;
+            let cy = target.y + oy;
+            if (!allowWater && this.game && this.game.map && typeof this.game.map.isWaterAtPixel === "function" && this.game.map.isWaterAtPixel(cx, cy)) {
+                continue;
+            }
+            if (this.game && this.game.map && typeof this.game.map.resolveCircleBuildingCollision === "function") {
+                const col = this.game.map.resolveCircleBuildingCollision(cx, cy, rad, target.z || 2.0, false);
+                if (col.hit) continue;
+            }
+            safeTpX = cx;
+            safeTpY = cy;
+            break;
+        }
+        targetObj.x = safeTpX;
+        targetObj.y = safeTpY;
+        targetObj.z = (this.game && this.game.map && typeof this.game.map.getHeightAtPixel === "function")
+            ? this.game.map.getHeightAtPixel(safeTpX, safeTpY, target.z || 2.0)
+            : (target.z || 2.0);
         targetObj.vx = 0;
         targetObj.vy = 0;
         if (targetObj.speed !== undefined) targetObj.speed = 0;
