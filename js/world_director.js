@@ -1242,16 +1242,22 @@ class ViceWorldDirector {
                 const inViewSt = typeof g.isPointInAnyPlayerCameraView === "function"
                     ? g.isPointInAnyPlayerCameraView(st.x, st.y, 220)
                     : false;
-                const useStationGate = distStToTarget >= this.config.stationGateMinDist &&
-                    distStToTarget <= this.config.stationGateMaxDist &&
+                const isFastRescue = (serviceType === "FIRE" || serviceType === "MEDIC");
+                const minGateDist = isFastRescue ? 780 : this.config.stationGateMinDist;
+                const maxGateDist = isFastRescue ? 1800 : this.config.stationGateMaxDist;
+                const useStationGate = distStToTarget >= minGateDist &&
+                    distStToTarget <= maxGateDist &&
                     !inViewSt;
                 const dirFromTargetToSt = Math.atan2(st.y - targetY, st.x - roadTargetX);
-                const corridorDist = Math.max(1350, Math.min(distStToTarget, 1750));
+                const corridorDist = isFastRescue
+                    ? Math.max(880, Math.min(distStToTarget, 1180))
+                    : Math.max(1520, Math.min(distStToTarget, 1920));
                 const anchorX = useStationGate ? st.x : (roadTargetX + Math.cos(dirFromTargetToSt) * corridorDist);
                 const anchorY = useStationGate ? st.y : (targetY + Math.sin(dirFromTargetToSt) * corridorDist);
                 const baseBx = Math.floor(anchorX / tileSize);
                 const baseBy = Math.floor(anchorY / tileSize);
 
+                const minTargetClearance = isFastRescue ? 760 : 1320;
                 for (let r = 0; r <= 36; r++) {
                     for (let dy = -r; dy <= r; dy++) {
                         for (let dx = -r; dx <= r; dx++) {
@@ -1269,7 +1275,7 @@ class ViceWorldDirector {
                             }
                             const sx = (bx + 0.5) * tileSize;
                             const sy = (by + 0.5) * tileSize;
-                            if (Math.hypot(sx - targetX, sy - targetY) < 1180) continue;
+                            if (Math.hypot(sx - targetX, sy - targetY) < minTargetClearance) continue;
                             if (typeof g.isPointInAnyPlayerCameraView === "function" && g.isPointInAnyPlayerCameraView(sx, sy, 220)) continue;
                             const alignTargetX = (targetOnEastBeach && bx >= 443) ? roadTargetX : targetX;
                             const toTargetAng = Math.atan2(targetY - sy, alignTargetX - sx);

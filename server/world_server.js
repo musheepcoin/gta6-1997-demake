@@ -2528,19 +2528,42 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         }
 
         // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
-        // (permanent fleet: units are parked at their depot, drive out on a call, and drive back to park again - never created/deleted)
-        for (const [vid, vrow] of Object.entries(room.modifiedVehs || {})) {
-            if (!Array.isArray(vrow) || !(vrow[10] & 1)) continue;
+        // Prioritize wrecks closest to active online players and skip unreachable gated/off-road wrecks so fleet units NEVER deadlock!
+        const roomPlayerPts = [];
+        for (const meta of clients.values()) {
+            if (meta.room === roomCode && !meta.isOutdated && meta.lastState && Number.isFinite(meta.lastState.x)) {
+                roomPlayerPts.push(meta.lastState);
+            }
+        }
+        const wreckList = Object.entries(room.modifiedVehs || {}).filter(([, vrow]) => Array.isArray(vrow) && (vrow[10] & 1));
+        wreckList.sort((a, b) => {
+            const da = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot(a[1][2] - p.x, a[1][3] - p.y)), 999999);
+            const db = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot(b[1][2] - p.x, b[1][3] - p.y)), 999999);
+            return da - db;
+        });
+        for (const [vid, vrow] of wreckList) {
             const wx = vrow[2];
             const wy = vrow[3];
             if (!Number.isFinite(wx) || !Number.isFinite(wy) || wx < 128 || wy < 128) continue;
+            const wbx = Math.floor(wx / TS), wby = Math.floor(wy / TS);
+            const inNoTraffic = serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(wbx, wby);
+            const snappedGoal = snapStationToNearestRoad(wx, wy);
+            const roadReachable = !inNoTraffic && Math.hypot(snappedGoal.x - wx, snappedGoal.y - wy) <= 185;
+            const wreckAgeMs = nowMs - ((room.modifiedVehTs && room.modifiedVehTs[vid]) || nowMs);
             if (!(vrow[10] & 128)) {
+                if (!roadReachable) {
+                    if (wreckAgeMs > 35000) {
+                        vrow[10] |= 128;
+                        if (room.vehs && room.vehs[vid]) room.vehs[vid][10] |= 128;
+                        isDirty = true;
+                    }
+                    continue;
+                }
                 const hasFireUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "FIRE" && nv.targetId === vid);
-                if (!hasFireUnit) launchFleetUnit(room, "FIRE", vid, wx, wy);
-            } else {
+                if (!hasFireUnit) launchFleetUnit(room, "FIRE", vid, snappedGoal.x, snappedGoal.y);
+            } else if (roadReachable) {
                 const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
-                const wreckAgeMs = nowMs - ((room.modifiedVehTs && room.modifiedVehTs[vid]) || nowMs);
-                if (!hasTowUnit && wreckAgeMs > 120000) launchFleetUnit(room, "TOW", vid, wx, wy);
+                if (!hasTowUnit && wreckAgeMs > 120000) launchFleetUnit(room, "TOW", vid, snappedGoal.x, snappedGoal.y);
             }
         }
     }
@@ -2583,14 +2606,21 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         const specKey = row[1] || "MINT_STALLION";
         const sirenActive = Boolean(flags & 2);
 
-        // Handle Municipal Fleet scene work & station return (EMS, FIRE, TOW)
+        // Handle Municipal Fleet scene work, mission timeout anti-deadlock & station return (EMS, FIRE, TOW)
         if (nav.role && Number.isFinite(nav.goalX) && Number.isFinite(nav.goalY)) {
+            nav.elapsedSec = (nav.elapsedSec || 0) + dt;
             const distGoal = Math.hypot(nav.goalX - x, nav.goalY - y);
-            if (nav.phase === "TO_SCENE" && distGoal < 125) {
+            const timedOutToScene = (nav.phase === "TO_SCENE" && nav.elapsedSec > 65.0);
+            if (nav.phase === "RETURNING" && nav.elapsedSec > 75.0 && String(vid).startsWith("fleet_")) {
+                parkFleetUnit(room, vid);
+                continue;
+            }
+            if ((nav.phase === "TO_SCENE" && distGoal < 165) || timedOutToScene) {
                 row[6] = 0;
                 row[7] = 0;
-                nav.workTimer = (nav.workTimer || 0) + dt;
+                nav.workTimer = (nav.workTimer || 0) + (timedOutToScene ? 3.0 : dt);
                 if (nav.workTimer >= 2.2) {
+                    nav.elapsedSec = 0;
                     if (nav.role === "EMS" && nav.targetId && room.corpses && room.corpses[nav.targetId]) {
                         const crow = room.corpses[nav.targetId];
                         delete room.corpses[nav.targetId];

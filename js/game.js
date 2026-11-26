@@ -17883,13 +17883,14 @@ class LeonidaGame {
                 // Coherent Hospital Fleet Logic: 1 Ambulance for 1-3 victims, maximum 2 Ambulances for 4+ victims so they never pile up!
                 const desiredMedics = Math.min(2, Math.ceil(unassignedCasualties.length / 3));
                 let activeNearMedics = 0;
-                let totalMedics = 0;
+                let localMedics = 0;
 
                 for (const v of this.vehicles) {
                     if (v.specKey === "MEDIC_AMBULANCE" && !v.destroyed && v.driver === "AI_EMERGENCY") {
-                        totalMedics++;
+                        const isRemoteFleet = String(v.id || "").startsWith("fleet_");
+                        if (!isRemoteFleet) localMedics++;
                         const dPlayer = this.getDistanceToNearestHumanPlayer(v.x, v.y);
-                        if (dPlayer < 1750) {
+                        if (dPlayer < 1380) {
                             activeNearMedics++;
                             if (!v.deployedMedic && (!v.medicTargetPed || v.medicTargetPed.revived || !v.medicTargetPed.dead)) {
                                 const pickCas = unassignedCasualties[activeNearMedics % unassignedCasualties.length];
@@ -17900,8 +17901,8 @@ class LeonidaGame {
                     }
                 }
 
-                // Dispatch at most 2 Ambulances from the Hospital, spaced by a 9.5s cooldown!
-                if (activeNearMedics < desiredMedics && totalMedics < 2) {
+                // Dispatch at most 2 local Ambulances from the Hospital, spaced by a 9.5s cooldown!
+                if (activeNearMedics < desiredMedics && localMedics < 2) {
                     this.medicDispatchTimer = (this.medicDispatchTimer || 0) + emergDt;
                     if (this.medicDispatchTimer > 4.2) {
                         this.medicDispatchTimer = 2.0;
@@ -17909,7 +17910,7 @@ class LeonidaGame {
                         const pz = targetCas.z || 2.0;
                         const spawnInfo = this.findStationDispatchSpawn("MEDIC", targetCas.x, targetCas.y, pz);
                         if (spawnInfo) {
-                            const medCar = new Vehicle(`medic_${Date.now()}_${totalMedics}`, "MEDIC_AMBULANCE", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                            const medCar = new Vehicle(`medic_${Date.now()}_${localMedics}`, "MEDIC_AMBULANCE", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
                             medCar.z = spawnInfo.z;
                             medCar.driver = "AI_EMERGENCY";
                             medCar.isPersistentFleet = true;
@@ -17945,13 +17946,14 @@ class LeonidaGame {
             if (burningVehsNearPlayer.length > 0 && this.fireDispatchCooldown <= 0) {
                 const desiredFireTrucks = Math.min(2, Math.ceil(burningVehsNearPlayer.length / 2));
                 let activeNearFireTrucks = 0;
-                let totalFireTrucks = 0;
+                let localFireTrucks = 0;
 
                 for (const v of this.vehicles) {
                     if (!v.destroyed && v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY") {
-                        totalFireTrucks++;
+                        const isRemoteFleet = String(v.id || "").startsWith("fleet_");
+                        if (!isRemoteFleet) localFireTrucks++;
                         const dPlayer = this.getDistanceToNearestHumanPlayer(v.x, v.y);
-                        if (dPlayer < 1850) {
+                        if (dPlayer < 1420) {
                             activeNearFireTrucks++;
                             if (!v.deployedFireman && (!v.fireTargetCar || v.fireTargetCar.fireExtinguished)) {
                                 v.fireTargetCar = burningVehsNearPlayer[activeNearFireTrucks % burningVehsNearPlayer.length];
@@ -17961,15 +17963,15 @@ class LeonidaGame {
                     }
                 }
 
-                if (activeNearFireTrucks < desiredFireTrucks && totalFireTrucks < 2) {
+                if (activeNearFireTrucks < desiredFireTrucks && localFireTrucks < 2) {
                     this.fireDispatchTimer = (this.fireDispatchTimer || 0) + emergDt;
-                    if (this.fireDispatchTimer > 3.8) {
-                        this.fireDispatchTimer = 2.0;
+                    if (this.fireDispatchTimer > 3.2) {
+                        this.fireDispatchTimer = 1.6;
                         const targetFireVeh = burningVehsNearPlayer[activeNearFireTrucks % burningVehsNearPlayer.length];
                         const fz = targetFireVeh.z || 2.0;
                         const spawnInfo = this.findStationDispatchSpawn("FIRE", targetFireVeh.x, targetFireVeh.y, fz);
                         if (spawnInfo) {
-                            const fireCar = new Vehicle(`vcfd_${Date.now()}_${totalFireTrucks}`, "FIRE_TRUCK", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
+                            const fireCar = new Vehicle(`vcfd_${Date.now()}_${localFireTrucks}`, "FIRE_TRUCK", spawnInfo.x, spawnInfo.y, spawnInfo.angle);
                             fireCar.z = spawnInfo.z;
                             fireCar.driver = "AI_EMERGENCY";
                             fireCar.isPersistentFleet = true;
