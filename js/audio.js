@@ -696,15 +696,20 @@ class RetroAudioEngine {
             this.trafficGain.connect(this.sfxMasterGain);
             this._ensureTrafficSampleLoops();
 
-            // 4. Looping Ocean Waves / Beach Surf Noise Buffer (3-second seamless pink/brown noise loop)
-            const loopLen = Math.floor(this.ctx.sampleRate * 3.0);
+            // 4. Looping Ocean Waves / Beach Surf Noise Buffer (6-second seamless crossfaded pink/brown noise loop — zero 3s seam!)
+            const loopLen = Math.floor(this.ctx.sampleRate * 6.0);
             const loopBuf = this.ctx.createBuffer(1, loopLen, this.ctx.sampleRate);
             const ch = loopBuf.getChannelData(0);
             let lastOut = 0;
             for (let i = 0; i < loopLen; i++) {
                 const white = Math.random() * 2 - 1;
                 lastOut = (lastOut + 0.04 * white) / 1.04;
-                ch[i] = lastOut * 2.8;
+                ch[i] = lastOut * 2.4;
+            }
+            const fadeSamples = Math.min(4096, Math.floor(loopLen * 0.08));
+            for (let i = 0; i < fadeSamples; i++) {
+                const t = i / fadeSamples;
+                ch[loopLen - fadeSamples + i] = ch[loopLen - fadeSamples + i] * (1 - t) + ch[i] * t;
             }
             const oceanSrc = this.ctx.createBufferSource();
             oceanSrc.buffer = loopBuf;
@@ -1557,20 +1562,14 @@ class RetroAudioEngine {
         }
 
         const nf = state.nightFactor || 0;
-        if (!this.inVehicle && waterProx > 0.35 && nf < 0.55) {
+        if (!this.inVehicle && waterProx > 0.45 && nf < 0.45) {
             this.seagullCooldown -= dt;
             if (this.seagullCooldown <= 0) {
-                this.seagullCooldown = 7.5 + Math.random() * 9.0;
+                this.seagullCooldown = 16.0 + Math.random() * 18.0;
                 this.playSeagullCall(waterProx);
             }
         }
-        if (!this.inVehicle && nf > 0.48) {
-            this.cricketCooldown -= dt;
-            if (this.cricketCooldown <= 0) {
-                this.cricketCooldown = 2.4 + Math.random() * 3.8;
-                this.playCricketChirp(nf);
-            }
-        }
+        // Harsh 3-second `night_crickets` evening/night loop intentionally disabled so nocturnal Vice City stays clean & atmospheric!
     }
 
     playBeep(freq = 520, duration = 0.08, type = "square", vol = 0.06) {
@@ -2129,16 +2128,11 @@ class RetroAudioEngine {
 
     playSeagullCall(prox = 0.7) {
         if (!this.initialized || this.muted || !this.ctx) return;
-        if (!this.playSample("bird_call", 0.072 * prox, 0.92 + Math.random() * 0.16, 0.85)) {
-            this.playBeep(1520, 0.22, "sine", 0.024 * prox);
-        }
+        this.playSample("bird_call", 0.032 * prox, 0.94 + Math.random() * 0.12, 0.75);
     }
 
-    playCricketChirp(nf = 0.8) {
-        if (!this.initialized || this.muted || !this.ctx) return;
-        if (!this.playSample("night_crickets", 0.058 * nf, 0.96 + Math.random() * 0.08, 0.95)) {
-            this.playBeep(4150, 0.022, "sine", 0.015 * nf);
-        }
+    playCricketChirp() {
+        // Disabled harsh nocturnal cricket sample loop
     }
 
     playBandNoise(duration = 0.06, centerFreq = 1200, q = 1.5, vol = 0.03) {

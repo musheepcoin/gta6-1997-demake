@@ -2850,11 +2850,13 @@ function runSimulations() {
             `RetroAudioEngine guards NaN AudioParams, maps FJORD_FASTBACK/SWAMP_BOAT/YACHT/FAGGIO_SCOOTER accurately, and exposes setMuted()`
         );
 
-        // 3. Verify zero-double-question-mark audio fetch URL logic in audio.js source
+        // 3. Verify zero-double-question-mark audio fetch URL logic & disabled harsh 3s night_crickets loop in audio.js source
         const audioSrc = fs.readFileSync(path.join(ROOT, "js", "audio.js"), "utf8");
         assert(
-            audioSrc.includes('url.includes("?") ? url :') && audioSrc.includes("_updateSynthSirenFallback"),
-            `audio.js prevents double '?v=' query strings on emergency sirens and provides instant synthesized siren fallback while decoding`
+            audioSrc.includes('url.includes("?") ? url :') &&
+            audioSrc.includes("_updateSynthSirenFallback") &&
+            !audioSrc.includes('this.playSample("night_crickets"'),
+            `audio.js prevents double '?v=' query strings on sirens, provides synth siren fallback, and eliminates harsh 3s night_crickets loop`
         );
         console.log("");
     }
