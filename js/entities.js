@@ -3175,20 +3175,18 @@ class Vehicle {
         if (isTankUnit) {
             this.turretAngle = Math.atan2(wantedTarget.y - this.y, wantedTarget.x - this.x);
         }
+        const effWantedStars = wantedTarget.wantedLevel || (game && game.wantedLevel) || 1;
         const canDriveByShoot =
             !wantedTarget.isSearchPoint &&
             clearOfBuildings && (
                 (wantedTarget.isCriminalNPC && wantedTarget.inVehicle) ||
-                (!wantedTarget.isCriminalNPC && (
-                    (wantedTarget.wantedLevel || (game && game.wantedLevel) || 0) >= 2 ||
-                    (wantedTarget.inVehicle && distToPlayer < 260)
-                ))
+                (!wantedTarget.isCriminalNPC && effWantedStars >= 2)
             );
         const maxShootDist = isTankUnit ? 420 : 285;
         if (canDriveByShoot && distToPlayer < maxShootDist && (!isTankUnit || distToPlayer > 75) && game && typeof game.fireWeapon === "function") {
             this.copDriveByTimer = (this.copDriveByTimer || 0) - dt;
             if (this.copDriveByTimer <= 0) {
-                this.copDriveByTimer = isTankUnit ? (2.2 + Math.random() * 0.8) : (0.65 + Math.random() * 0.45);
+                this.copDriveByTimer = isTankUnit ? (2.2 + Math.random() * 0.8) : (0.78 + Math.random() * 0.55);
                 const aimAng = Math.atan2(wantedTarget.y - this.y, wantedTarget.x - this.x);
                 if (isTankUnit) {
                     this.turretAngle = aimAng;
@@ -3200,6 +3198,10 @@ class Vehicle {
             }
         }
 
+        const copPursuitThrottle = effWantedStars <= 1
+            ? (forceDirect ? 0.58 : 0.62)
+            : (effWantedStars === 2 ? (forceDirect ? 0.70 : 0.74) : (effWantedStars === 3 ? 0.82 : 0.90));
+
         return this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -3208,7 +3210,7 @@ class Vehicle {
             wantedTarget.y,
             wantedTarget.vx || 0,
             wantedTarget.vy || 0,
-            forceDirect ? 0.86 : 0.90,
+            copPursuitThrottle,
             Boolean(wantedTarget.inVehicle && (targetOnRoad || forceDirect)),
             forceDirect
         );

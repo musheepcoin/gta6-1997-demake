@@ -6689,6 +6689,8 @@ class LeonidaGame {
 
         if (reason === "COP_DEPLOY" || vehicle.isPolice) {
 
+            vehicle.sirenActive = false;
+
             const isSwat = vehicle.specKey === "SWAT_ENFORCER";
 
             const copHp = isSwat ? 145 : 105;
@@ -8379,19 +8381,14 @@ class LeonidaGame {
             (!this.player.inVehicle && this.player.weapon && this.player.weapon !== "FIST" && (this.player.weaponDrawnTimer || 0) > 0)
         );
 
-        // Case 1: Direct Police Sight (or player is already actively spotted by VCPD) -> Immediate radio alert!
-        if ((this.wantedLevel > 0 && this.isPoliceSpotted) || this.hasCopWitnessNear(x, y, isExplosion ? 600 : 460)) {
+        // Case 1: Direct Police Sight (or player is already actively spotted by VCPD) -> Radio alert!
+        if ((this.wantedLevel > 0 && this.isPoliceSpotted) || this.hasCopWitnessNear(x, y, isExplosion ? 520 : 330)) {
             this.setWantedLevel(Math.max(this.wantedLevel || 0, clampedStars), { x, y }, true, involvedVeh);
             return true;
         }
 
         // Case 2: Civilian Witness 911 Call -> Find nearest living civilian witness within sight (or gunshot/explosion hearing) who dials 911!
-        // Real-Life Causal Principle:
-        // - Silent melee (FIST) or roadkill requires unobstructed visual line-of-sight (!traceSegment2D.hit) within 380px.
-        // - Loud gunfire can be heard up to 175px even around a corner, or seen up to 420px with line-of-sight.
-        // - The witness takes ~3.8s (2.5s for explosions) to dial 911 and describe the crime scene {x, y}.
-        //   If the player silences/stuns/kills the witness before the timer finishes, the 911 call is aborted!
-        const maxWitnessDist = isExplosion ? 660 : (isGunfire ? 420 : 380);
+        const maxWitnessDist = isExplosion ? 560 : (isGunfire ? 335 : 285);
         let bestWitness = null;
         let bestDist = maxWitnessDist;
         const pz = (this.player.inVehicle ? this.player.inVehicle.z : this.player.z) || 2.0;
@@ -8422,7 +8419,7 @@ class LeonidaGame {
         }
 
         if (bestWitness) {
-            const callDuration = isExplosion ? 2.5 : 3.8;
+            const callDuration = isExplosion ? 5.0 : 7.5;
             bestWitness.calling911Timer = bestWitness.calling911Timer > 0
                 ? Math.min(bestWitness.calling911Timer, callDuration)
                 : callDuration;
@@ -8474,10 +8471,8 @@ class LeonidaGame {
 
         if (prevWanted === 0 && clamped > 0) {
 
-            // Real-Life Dispatch Timing:
-            // - Direct police sight: unit responds within ~1.1s (9.5 - 8.4).
-            // - Civilian 911 call completed: VCPD Central Dispatch takes ~3.2s (9.5 - 6.3) to radio & dispatch a unit from VCPD Central Precinct HQ!
-            this.copSpawnTimer = isDirect ? 8.4 : 6.3;
+            // Measured Dispatch Timing: give the player generous breathing room (~14.5s..17.5s) before the first precinct unit is dispatched!
+            this.copSpawnTimer = isDirect ? 3.0 : 0.0;
             this.wantedPeakLevel = clamped;
             this.hasBeenDirectlySpottedByCop = isDirect;
             this._crimeSceneAnnounced = false;
@@ -8485,7 +8480,6 @@ class LeonidaGame {
         } else if (clamped > prevWanted) {
 
             this.wantedPeakLevel = Math.max(this.wantedPeakLevel || 1, clamped);
-            this.copSpawnTimer = Math.max(this.copSpawnTimer || 0, isDirect ? 7.2 : 5.8);
             if (isDirect) this.hasBeenDirectlySpottedByCop = true;
 
         } else if (clamped === 0) {
@@ -10984,7 +10978,7 @@ class LeonidaGame {
 
             copCar.driver = null;
 
-            copCar.sirenActive = true;
+            copCar.sirenActive = false;
 
             copCar.doorOpenTimer = 0.65;
 
@@ -17506,7 +17500,7 @@ class LeonidaGame {
             const isEvadingNow = this.wantedLevel > 0 && !anyCopHasVisual && (this.wantedDecayTimer || 0) > 1.5 && totalActiveUnits >= maxCops;
             this.copSpawnTimer += dt * (isEvadingNow ? 0.32 : 1.0);
 
-            const spawnInterval = tWanted <= 1 ? 9.5 : (tWanted === 2 ? 8.0 : (tWanted === 3 ? 6.5 : 5.2));
+            const spawnInterval = tWanted <= 1 ? 17.5 : (tWanted === 2 ? 14.5 : (tWanted === 3 ? 11.5 : 9.0));
 
             if (totalActiveUnits < maxCops && activeCopCars < maxCops && emptyCopCarsNearScene < 3 && this.copSpawnTimer > spawnInterval) {
 
@@ -17514,11 +17508,11 @@ class LeonidaGame {
 
                 const pz = spawnTarget.z || 2.0;
 
-                // Persistent World Priority #1: Alert an existing patrolling VCPD Cruiser already on the streets at a realistic off-screen patrol distance (1180..2200px)!
-                // Never convert a nearby traffic cruiser (< 1180px) into an instant ambush on a 911 call if that cruiser did not witness the crime!
-                const minPatrolAlertDist = this.isPoliceSpotted ? 480 : 1180;
+                // Persistent World Priority #1: Alert an existing patrolling VCPD Cruiser strictly far off-screen (1620..2800px)!
+                // Never convert a nearby traffic cruiser into an instant ambush!
+                const minPatrolAlertDist = 1620;
                 let alertedPatrolCop = null;
-                let bestPatrolDist = 2200;
+                let bestPatrolDist = 2800;
                 for (const v of this.vehicles) {
                     if (!v.destroyed && v.isPolice && v.driver === "AI_TRAFFIC") {
                         const d = Math.hypot(v.x - spawnTarget.x, v.y - spawnTarget.y);
@@ -17559,7 +17553,7 @@ class LeonidaGame {
 
             if (tWanted >= 3 && this.roadblockCooldown <= 0 && activeCopCars < 5) {
 
-                this.roadblockCooldown = 28;
+                this.roadblockCooldown = 46;
 
                 const rbX = spawnTarget.x + Math.cos(spawnTarget.angle || 0) * 1020;
 
@@ -17796,7 +17790,7 @@ class LeonidaGame {
                 }
                 this.crimeSceneSearchedTimer = (this.crimeSceneSearchedTimer || 0) + dt;
             }
-            const decayThreshold = this.wantedLevel === 1 ? 16 : (this.wantedLevel === 2 ? 22 : (this.wantedLevel === 3 ? 28 : 35));
+            const decayThreshold = this.wantedLevel === 1 ? 12 : (this.wantedLevel === 2 ? 18 : (this.wantedLevel === 3 ? 25 : 32));
             this.wantedDecayDuration = decayThreshold;
             this.isPoliceSpotted = Boolean(anyCopHasVisual);
 
@@ -18753,7 +18747,7 @@ class LeonidaGame {
 
         let trafficIsMoto = false;
 
-        let nearestSirenDist = this.wantedLevel > 0 ? nearestCopDist : 9999;
+        let nearestSirenDist = 9999;
 
         let nearestSirenType = "POLICE";
 
@@ -18770,7 +18764,7 @@ class LeonidaGame {
 
             const d = Math.hypot(dx, dy);
 
-            if (v.sirenActive && v.driver !== "AI_TOW" && d < nearestSirenDist) {
+            if (v.sirenActive && v.driver && v.driver !== "AI_TOW" && d < nearestSirenDist) {
 
                 nearestSirenDist = d;
 

@@ -26,25 +26,25 @@ class ViceWorldDirector {
 
         // 1. Central Perception & Dispatch Tuning Constants
         this.config = {
-            copSightRange: 460,
-            copFootSightRange: 400,
-            copVisionConeMinCos: -0.20,
-            copBlindSpotNearDist: 105,
-            witnessMeleeSightRange: 380,
-            witnessGunshotSightRange: 420,
-            witnessGunshotAudioRange: 175,
-            witnessExplosionSightRange: 660,
-            witnessExplosionAudioRange: 420,
-            call911DurationSec: 3.8,
-            call911ExplosionSec: 2.5,
-            dispatchRadioDelaySec: 3.2,
-            directSightDispatchSec: 1.1,
-            crimeSceneRadiusPx: 240,
-            crimeSceneSearchClearSec: 4.5,
-            cleanCarDisguiseMinDist: 175,
-            cleanCarMaxCalmSpeed: 155,
-            stationGateMinDist: 1150,
-            stationGateMaxDist: 2400,
+            copSightRange: 330,
+            copFootSightRange: 280,
+            copVisionConeMinCos: 0.25,
+            copBlindSpotNearDist: 62,
+            witnessMeleeSightRange: 285,
+            witnessGunshotSightRange: 335,
+            witnessGunshotAudioRange: 145,
+            witnessExplosionSightRange: 560,
+            witnessExplosionAudioRange: 360,
+            call911DurationSec: 7.5,
+            call911ExplosionSec: 5.0,
+            dispatchRadioDelaySec: 8.5,
+            directSightDispatchSec: 5.5,
+            crimeSceneRadiusPx: 220,
+            crimeSceneSearchClearSec: 3.8,
+            cleanCarDisguiseMinDist: 150,
+            cleanCarMaxCalmSpeed: 170,
+            stationGateMinDist: 1620,
+            stationGateMaxDist: 2900,
             maxFrameTeleportAllowancePx: 220
         };
 
@@ -1889,7 +1889,8 @@ class ViceWorldDirector {
             ped.homeCruiser = obsVeh;
             const boardDist = Math.max(46, (obsVeh.w || 48) * 0.54 + 14);
             if (distToTarget < boardDist) {
-                obsVeh.driver = (obsVeh.isPolice && (g.wantedLevel || 0) > 0) ? "AI_COP" : "AI_TRAFFIC";
+                obsVeh.driver = "AI_TRAFFIC";
+                obsVeh.sirenActive = false;
                 obsVeh.noDeployCooldown = 5.2;
                 obsVeh.wasCriminalCar = false;
                 obsVeh.lastPlayerDriven = false;

@@ -1052,15 +1052,23 @@ class RetroAudioEngine {
             const src = this.ctx.createBufferSource();
             src.buffer = this.buffers[sirenKey];
             src.loop = true;
-            // Distance-aware low-pass: far sirens are muffled by buildings/air absorption, close ones are bright and piercing
+            // Soft anti-harshness EQ notch (-10 dB at 2850 Hz) + warm low-pass ceiling so sirens NEVER pierce the ears!
+            if (!this._sirenNotch) {
+                this._sirenNotch = this.ctx.createBiquadFilter();
+                this._sirenNotch.type = "peaking";
+                this._sirenNotch.frequency.value = 2850;
+                this._sirenNotch.Q.value = 1.35;
+                this._sirenNotch.gain.value = -10.0;
+            }
             if (!this._sirenLP) {
                 this._sirenLP = this.ctx.createBiquadFilter();
                 this._sirenLP.type = "lowpass";
-                this._sirenLP.Q.value = 0.7;
-                this._sirenLP.frequency.value = 2400;
+                this._sirenLP.Q.value = 0.55;
+                this._sirenLP.frequency.value = 1350;
+                this._sirenNotch.connect(this._sirenLP);
                 this._sirenLP.connect(this.sirenGain);
             }
-            src.connect(this._sirenLP);
+            src.connect(this._sirenNotch);
             src.start(this.ctx.currentTime);
             this._sirenNode = src;
             this._activeSirenKey = sirenKey;
@@ -1371,19 +1379,21 @@ class RetroAudioEngine {
             this._prevAbsSpeed = 0;
         }
 
-        // 2. Real Emergency Sirens (Police Cruiser / Ambulance / Fire Truck)
-        const sirenDist = state.nearestSirenDist !== undefined ? state.nearestSirenDist : (state.wantedLevel > 0 ? state.nearestCopDist : 9999);
+        // 2. Real Emergency Sirens (Soft, warm, distance-attenuated — never harsh or ear-piercing!)
+        const sirenDist = state.nearestSirenDist !== undefined ? state.nearestSirenDist : 9999;
         const playerSiren = Boolean(this.inVehicle && state.playerSirenActive);
-        if (playerSiren || (sirenDist !== undefined && sirenDist < 950)) {
+        if (playerSiren || (sirenDist !== undefined && sirenDist < 600)) {
             const sirenType = state.nearestSirenType || "POLICE";
             const sirenKey = sirenType === "MEDIC"
                 ? "siren_medic"
                 : (sirenType === "FIRE" ? "siren_firetruck" : "siren_police");
-            const prox = playerSiren ? 0.95 : Math.max(0, 1 - sirenDist / 950);
+            const rawLin = playerSiren ? 0.75 : Math.max(0, 1 - sirenDist / 600);
+            const prox = playerSiren ? 0.72 : Math.pow(rawLin, 2.15);
+            const maxSirenGain = playerSiren ? 0.030 : (this.inVehicle ? 0.020 : 0.026);
             if (this._ensureSirenLoop(sirenKey) && this._sirenNode) {
-                this._setParamSmooth(this.sirenGain.gain, prox * 0.15, 0.25);
-                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 900 + Math.pow(prox, 1.4) * 9800, 0.3);
-                const doppler = playerSiren ? 1.0 : Math.max(0.88, Math.min(1.14, state.trafficDoppler || 1.0));
+                this._setParamSmooth(this.sirenGain.gain, prox * maxSirenGain, 0.22);
+                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 580 + prox * 1080, 0.25);
+                const doppler = playerSiren ? 1.0 : Math.max(0.91, Math.min(1.09, state.trafficDoppler || 1.0));
                 this._setParamSmooth(this._sirenNode.playbackRate, doppler, 0.25);
             }
         } else if (this.sirenGain) {
@@ -1629,12 +1639,11 @@ class RetroAudioEngine {
     playAnkleMonitorAlert() {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
-        if (this._lastAnkleAlertTime && now - this._lastAnkleAlertTime < 0.45) return;
+        if (this._lastAnkleAlertTime && now - this._lastAnkleAlertTime < 2.2) return;
         this._lastAnkleAlertTime = now;
-        const ok = this.playSample("gta_pager", 0.11, 1.04, 0.55);
+        const ok = this.playSample("gta_pager", 0.048, 0.98, 0.45);
         if (!ok) {
-            this.playBeep(1560, 0.07, "sawtooth", 0.055);
-            setTimeout(() => this.playBeep(1560, 0.07, "sawtooth", 0.055), 110);
+            this.playBeep(980, 0.06, "sine", 0.028);
         }
     }
 
@@ -1645,8 +1654,8 @@ class RetroAudioEngine {
         this._lastHornTime = now;
 
         if (isEmergency) {
-            if (!this.playSample("horn_airhorn", 0.11, 1.08, 0.45)) {
-                this.playBeep(680, 0.18, "sawtooth", 0.085);
+            if (!this.playSample("horn_airhorn", 0.048, 0.98, 0.38)) {
+                this.playBeep(520, 0.15, "triangle", 0.042);
             }
             return;
         }
