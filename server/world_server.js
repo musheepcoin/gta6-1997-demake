@@ -2080,15 +2080,50 @@ const SERVER_STARTER_TRAFFIC = [
     { id: "micromob_10", spec: "BMX_BIKE", c: 214.5, r: 135.5, a: Math.PI * 0.5 }
 ];
 
-function getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive) {
-    if (specKey === "BMX_BIKE") return 54;
-    if (specKey === "E_SCOOTER") return 64;
-    if (sirenActive || drvCode === 2 || drvCode === 3) return 108;
-    if (drvCode === 5) return 114;
-    if (drvCode === 6) return 92;
-    if (specKey === "CITY_BUS" || specKey === "TOUR_COACH" || specKey === "TANKER_RIG" || specKey === "FLATBED_TRUCK" || specKey === "BRINKS_TRUCK") return 72;
-    if (specKey === "SUPERBIKE" || specKey === "BANSHEE_GT" || specKey === "PENETRATOR_GT" || specKey === "VICE_CHEETAH" || specKey === "STINGER_CABRIO" || specKey === "TURISMO_CABRIO") return 92;
-    return 82;
+function getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive, vid = "") {
+    let h = 2166136261;
+    const s = String(vid || specKey || "0");
+    for (let i = 0; i < s.length; i++) {
+        h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+    }
+    const u = h / 4294967295; // [0.0 .. 1.0] per-vehicle driver personality spread
+    if (specKey === "BMX_BIKE") return Math.round(50 + u * 15);
+    if (specKey === "E_SCOOTER") return Math.round(62 + u * 16);
+    if (sirenActive || drvCode === 2 || drvCode === 3) return Math.round(148 + u * 28);
+    if (drvCode === 5) return Math.round(162 + u * 30);
+    if (drvCode === 6 || specKey === "TOW_TRUCK") return Math.round(88 + u * 16);
+    if (specKey === "CITY_BUS" || specKey === "TOUR_COACH" || specKey === "TANKER_RIG" || specKey === "FLATBED_TRUCK") {
+        return Math.round(76 + u * 18);
+    }
+    if (specKey === "BRINKS_TRUCK" || specKey === "BOXVILLE_VAN" || specKey === "HOTDOG_VAN" || specKey === "CAMPER_PICKUP") {
+        return Math.round(86 + u * 20);
+    }
+    if (
+        specKey === "SUPERBIKE" ||
+        specKey === "PENETRATOR_GT" ||
+        specKey === "VICE_CHEETAH" ||
+        specKey === "BANSHEE_GT" ||
+        specKey === "PORKA_TURBO" ||
+        specKey === "STINGER_CABRIO" ||
+        specKey === "TURISMO_CABRIO"
+    ) {
+        return Math.round(148 + u * 38);
+    }
+    if (
+        specKey === "HARLEY_BIKE" ||
+        specKey === "COSSIE_RS" ||
+        specKey === "CHALLENGER_RT" ||
+        specKey === "MINT_STALLION" ||
+        specKey === "FJORD_FASTBACK" ||
+        specKey === "TULIP_MUSCLE" ||
+        specKey === "MONSTER_BUGGY"
+    ) {
+        return Math.round(126 + u * 30);
+    }
+    if (specKey === "VICE_CAB" || specKey === "VCPD_CRUISER" || specKey === "PICKUP_TRUCK" || specKey === "GATOR_4X4" || specKey === "SILVER_ROADSTER") {
+        return Math.round(112 + u * 26);
+    }
+    return Math.round(96 + u * 26);
 }
 
 function ensureRoomAutonomousPopulation(roomCode, room) {
@@ -2128,7 +2163,7 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
         );
         const ang = (isValidCruiseLane && serverMap.getAlignedRoadAngle) ? serverMap.getAlignedRoadAngle(bx, by, st.a, vz) : st.a;
         const drvSt = isValidCruiseLane ? 1 : 0;
-        const spd = drvSt === 1 ? getServerVehicleCruiseSpeed(st.spec, 1, false) : 0;
+        const spd = drvSt === 1 ? getServerVehicleCruiseSpeed(st.spec, 1, false, st.id) : 0;
         room.vehs[st.id] = [
             st.id,
             st.spec,
@@ -2167,7 +2202,7 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
             const spec = SERVER_SPEC_POOL[i % SERVER_SPEC_POOL.length];
             const rawAng = sc.ang !== undefined ? sc.ang : (((sc.rot || 0) / 1024.0) * Math.PI * 2);
             const ang = serverMap.getAlignedRoadAngle ? serverMap.getAlignedRoadAngle(bx, by, rawAng, vz) : rawAng;
-            const spd = getServerVehicleCruiseSpeed(spec, 1, false);
+            const spd = getServerVehicleCruiseSpeed(spec, 1, false, vid);
             room.vehs[vid] = [
                 vid,
                 spec,
@@ -2219,7 +2254,7 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
                 seedIdx++;
                 const vx = (spot.bx + 0.5) * TS;
                 const vy = (spot.by + 0.5) * TS;
-                const spd = getServerVehicleCruiseSpeed(sr.spec, sr.drv, false);
+                const spd = getServerVehicleCruiseSpeed(sr.spec, sr.drv, false, vid);
                 room.vehs[vid] = [
                     vid,
                     sr.spec,
@@ -2893,7 +2928,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         else a += Math.sign(angDiff) * maxTurn;
 
         // Check red traffic light when approaching intersection (unless emergency siren is active)
-        let targetSpd = getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive);
+        let targetSpd = getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive, vid);
         let stoppedAtRedLight = false;
         if (!sirenActive && serverMap.isRedLightForApproach) {
             const hdx = Math.round(Math.cos(a));
@@ -2904,12 +2939,13 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             }
         }
 
-        // Check lead vehicle spacing in spatial hash (never disable bumper collision spacing; instead re-pick route if genuinely stuck > 15s!)
+        // Check lead vehicle spacing in spatial hash (scales lookahead with speed so fast supercars brake smoothly behind slower vehicles!)
         if (targetSpd > 0) {
             const cfx = Math.cos(a);
             const cfy = Math.sin(a);
             const gx = x >> 8;
             const gy = y >> 8;
+            const leadLookAhead = Math.max(88, targetSpd * 0.72);
             let blockedByLead = false;
             for (let dy = -1; dy <= 1 && !blockedByLead; dy++) {
                 for (let dx = -1; dx <= 1 && !blockedByLead; dx++) {
@@ -2923,12 +2959,12 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                         const ody = other[3] - y;
                         const fwd = odx * cfx + ody * cfy;
                         const lat = Math.abs(-odx * cfy + ody * cfx);
-                        if (fwd > 8 && fwd < 88 && lat < 22) {
+                        if (fwd > 8 && fwd < leadLookAhead && lat < 22) {
                             const otherSpd = Math.hypot(other[6] || 0, other[7] || 0);
                             const otherAng = Number.isFinite(other[5]) ? other[5] : a;
                             // Ignore oncoming cars moving in the opposite lane so opposite flows never deadlock
                             if (otherSpd > 5 && Math.cos(otherAng - a) < -0.15) continue;
-                            targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.85);
+                            targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.90);
                             if (targetSpd === 0) blockedByLead = true;
                         }
                     }

@@ -3019,9 +3019,65 @@ function runSimulations() {
         console.log("");
     }
 
+    // =========================================================================
+    // SCENARIO 53: Multi-Tier Vehicle & Driver Cruise Speed Diversity (54..256 px/s) + Progressive Braking
+    // =========================================================================
+    {
+        console.log("--- SCENARIO 53: MULTI-TIER VEHICLE & DRIVER CRUISE SPEED DIVERSITY + PROGRESSIVE BRAKING ---");
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const TS = 64;
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        g.trafficManager.generateTrafficCars = () => {};
+        g.trafficManager.generateTrafficPeds = () => {};
+
+        // 1. Verify wide 5-tier target cruise speed hierarchy & individual per-ID driver spread within the same model
+        const vBmx = sandbox.makeVeh("spd_bmx_1", "BMX_BIKE", 435.5 * TS, 240.5 * TS, Math.PI * 0.5);
+        const vBus = sandbox.makeVeh("spd_bus_1", "CITY_BUS", 435.5 * TS, 240.5 * TS, Math.PI * 0.5);
+        const vSedA = sandbox.makeVeh("spd_sed_alpha", "REGAL_SEDAN", 435.5 * TS, 240.5 * TS, Math.PI * 0.5);
+        const vSedB = sandbox.makeVeh("spd_sed_omega_99", "REGAL_SEDAN", 435.5 * TS, 240.5 * TS, Math.PI * 0.5);
+        const vMus = sandbox.makeVeh("spd_mus_1", "CHALLENGER_RT", 435.5 * TS, 240.5 * TS, Math.PI * 0.5);
+        const vSup = sandbox.makeVeh("spd_sup_1", "PENETRATOR_GT", 435.5 * TS, 240.5 * TS, Math.PI * 0.5);
+        assert(
+            vBmx.aiTargetCruiseSpeed < vBus.aiTargetCruiseSpeed &&
+            vBus.aiTargetCruiseSpeed < vSedA.aiTargetCruiseSpeed &&
+            vSedA.aiTargetCruiseSpeed < vMus.aiTargetCruiseSpeed &&
+            vMus.aiTargetCruiseSpeed < vSup.aiTargetCruiseSpeed &&
+            (vSup.aiTargetCruiseSpeed - vBmx.aiTargetCruiseSpeed) >= 125 &&
+            Math.abs(vSedA.aiTargetCruiseSpeed - vSedB.aiTargetCruiseSpeed) >= 1.5,
+            `5-tier cruise speeds span ${Math.round(vBmx.aiTargetCruiseSpeed)}..${Math.round(vSup.aiTargetCruiseSpeed)} px/s with per-driver variance (${vSedA.aiTargetCruiseSpeed.toFixed(1)} vs ${vSedB.aiTargetCruiseSpeed.toFixed(1)})`
+        );
+
+        // 2. Live 60FPS open-span cruise test on Venetian Causeway (cols 392..418, row 175 Eastbound — long uninterrupted span!)
+        const runBus = sandbox.makeVeh("live_bus_53", "CITY_BUS", 392.5 * TS, 175.5 * TS, 0);
+        const runSed = sandbox.makeVeh("live_sed_53", "REGAL_SEDAN", 399.5 * TS, 175.5 * TS, 0);
+        const runSup = sandbox.makeVeh("live_sup_53", "PENETRATOR_GT", 406.5 * TS, 175.5 * TS, 0);
+        for (const rv of [runBus, runSed, runSup]) {
+            rv.driver = "AI_TRAFFIC";
+            rv.speed = 65;
+            rv.vx = 65;
+            g.vehicles.push(rv);
+        }
+        g.player.x = 400.0 * TS;
+        g.player.y = 173.0 * TS;
+        let peakBus = 0, peakSed = 0, peakSup = 0;
+        for (let st = 0; st < 150; st++) {
+            sandbox.advanceClock(1000 / 60);
+            g.update(1 / 60);
+            peakBus = Math.max(peakBus, runBus.speed || 0);
+            peakSed = Math.max(peakSed, runSed.speed || 0);
+            peakSup = Math.max(peakSup, runSup.speed || 0);
+        }
+        assert(
+            peakSup > peakSed + 32 && peakSed > peakBus + 14 && peakSup >= 195,
+            `Live AI cruise reaches clearly distinct speeds on open road: Bus=${Math.round(peakBus)} px/s, Sedan=${Math.round(peakSed)} px/s, Supercar=${Math.round(peakSup)} px/s`
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 52 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS, CREATION STUDIO & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 53 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

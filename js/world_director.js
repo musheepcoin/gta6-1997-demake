@@ -336,7 +336,7 @@ class ViceWorldDirector {
         const inRecentCombat = activelyFiring || (p.playerCombatTimer || 0) > 0 || (p.weaponDrawnTimer || 0) > 0;
         const inReportedOrPoliceCar = Boolean(p.inVehicle && (p.inVehicle === g.wantedSpottedVehicle || p.inVehicle.isPolice));
         const recklessSpeedingNearCop = Boolean(p.inVehicle && Math.abs(p.inVehicle.speed || 0) >= 160 && d < 240);
-        const pointBlank = d < 78;
+        const pointBlank = d < 78 && distToScene < 340;
 
         return (
             atCrimeScene ||

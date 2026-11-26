@@ -1012,26 +1012,76 @@ class Vehicle {
         this.aiHornCooldown = 0;
         this.aiBailTimer = 0;
 
-        // Archetype-specific driving personality (Sport/Bikes vs Sedans vs Heavy Trucks/Buses)
-        const hashSeed = Math.abs((id || "0").charCodeAt((id || "0").length - 1)) % 5;
-        const isSportOrBike = Boolean(this.isMotorcycle || spec.maxSpeed >= 415);
-        const isHeavyVehicle = Boolean(this.w >= 72 || spec.bodyStyle === "TRUCK");
-        this. isHeavyVehicle = isHeavyVehicle;
-        if (isSportOrBike) {
-            this.aiCruiseFactor = 0.55 + hashSeed * 0.032; // 0.55 .. 0.68 agile cruise
-            this.aiStopDist = 48;
-            this.aiScanDist = 118;
+        // Multi-Tier Vehicle & Driver Cruise Speed Diversity (54 px/s Cruiser Bikes -> 255 px/s Exotic Supercars)
+        // Combines authentic vehicle class physics with continuous per-driver deterministic hash variance so no two cars march in lockstep!
+        const drvHashU32 = (Math.imul(idHash ^ 0x9e3779b9, 2654435761) >>> 0);
+        const drvUnit = drvHashU32 / 4294967295; // [0.0 .. 1.0] individual driver temperament
+        const isPedalOrScooter = (specKey === "BMX_BIKE" || specKey === "E_SCOOTER");
+        const isExoticOrSuperbike = Boolean(
+            specKey === "SUPERBIKE" ||
+            specKey === "PENETRATOR_GT" ||
+            specKey === "VICE_CHEETAH" ||
+            specKey === "BANSHEE_GT" ||
+            specKey === "TURISMO_CABRIO" ||
+            specKey === "STINGER_CABRIO" ||
+            specKey === "PORKA_TURBO"
+        );
+        const isMuscleOrFast = Boolean(
+            specKey === "HARLEY_BIKE" ||
+            specKey === "COSSIE_RS" ||
+            specKey === "CHALLENGER_RT" ||
+            specKey === "MINT_STALLION" ||
+            specKey === "FJORD_FASTBACK" ||
+            specKey === "TULIP_MUSCLE" ||
+            specKey === "MONSTER_BUGGY"
+        );
+        const isBriskUtilityOrCab = Boolean(
+            specKey === "VICE_CAB" ||
+            specKey === "VCPD_CRUISER" ||
+            specKey === "SILVER_ROADSTER" ||
+            specKey === "PICKUP_TRUCK" ||
+            specKey === "GATOR_4X4"
+        );
+        const isHeavyVehicle = Boolean(this.w >= 70 || (spec.bodyStyle === "TRUCK" && !isMuscleOrFast && !isBriskUtilityOrCab));
+        this.isHeavyVehicle = isHeavyVehicle;
+
+        if (specKey === "BMX_BIKE") {
+            this.aiTargetCruiseSpeed = 54 + drvUnit * 15; // 54 .. 69 px/s beach cruiser pedal pace
+            this.aiStopDist = 42;
+            this.aiScanDist = 96;
+        } else if (specKey === "E_SCOOTER") {
+            this.aiTargetCruiseSpeed = 66 + drvUnit * 18; // 66 .. 84 px/s electric scooter
+            this.aiStopDist = 44;
+            this.aiScanDist = 102;
         } else if (isHeavyVehicle) {
-            this.aiCruiseFactor = 0.41 + hashSeed * 0.022; // 0.41 .. 0.50 steady heavy cruise
+            const isBusOrBigRig = (this.w >= 96 || specKey === "CITY_BUS" || specKey === "TOUR_COACH" || specKey === "TANKER_RIG" || specKey === "FLATBED_TRUCK");
+            this.aiTargetCruiseSpeed = isBusOrBigRig
+                ? (92 + drvUnit * 22)   // 92 .. 114 px/s heavy transit bus / semi-tanker
+                : (104 + drvUnit * 24); // 104 .. 128 px/s commercial van / armored / camper / limo
             this.aiStopDist = 68;
+            this.aiScanDist = 136;
+        } else if (isExoticOrSuperbike) {
+            const spiritedBoost = drvUnit > 0.80 ? 12 : 0;
+            this.aiTargetCruiseSpeed = 198 + drvUnit * 46 + spiritedBoost; // 198 .. 256 px/s Miami exotics & superbikes
+            this.aiStopDist = 50;
+            this.aiScanDist = 158;
+        } else if (isMuscleOrFast) {
+            this.aiTargetCruiseSpeed = (specKey === "HARLEY_BIKE" ? 176 : 164) + drvUnit * 40; // 164 .. 216 px/s muscle / rally / chopper
+            this.aiStopDist = 52;
+            this.aiScanDist = 144;
+        } else if (isBriskUtilityOrCab) {
+            this.aiTargetCruiseSpeed = 146 + drvUnit * 36; // 146 .. 182 px/s brisk yellow cabs, patrol cruisers & 4x4s
+            this.aiStopDist = 54;
             this.aiScanDist = 132;
         } else {
-            this.aiCruiseFactor = 0.48 + hashSeed * 0.030; // 0.48 .. 0.60 standard cruise
+            this.aiTargetCruiseSpeed = 122 + drvUnit * 38; // 122 .. 160 px/s calm compacts, family wagons & luxury sedans
             this.aiStopDist = 56;
-            this.aiScanDist = 120;
+            this.aiScanDist = 124;
         }
+        this.aiCruiseFactor = Math.max(0.20, Math.min(0.88, this.aiTargetCruiseSpeed / Math.max(120, this.maxSpeed)));
         this.aiAggressive = Boolean(
-            (this.isMotorcycle && specKey !== "BMX_BIKE" && specKey !== "E_SCOOTER") ||
+            (!isPedalOrScooter && this.isMotorcycle) ||
+            isExoticOrSuperbike && drvUnit > 0.45 ||
             specKey === "TULIP_MUSCLE" ||
             specKey === "CHALLENGER_RT" ||
             specKey === "GATOR_4X4" ||
@@ -2082,7 +2132,8 @@ class Vehicle {
         }
 
         const isPanicked = (this.aiPanicTimer > 0 && !this.isHeavyVehicle) || Boolean(this.sirenActive);
-        let desiredThrottle = isPanicked ? (this.sirenActive ? 0.78 : Math.min(0.66, (this.aiCruiseFactor || 0.5) + 0.14)) : this.aiCruiseFactor;
+        const baseCruiseThrottle = Math.max(0.38, this.aiCruiseFactor || 0.5);
+        let desiredThrottle = isPanicked ? (this.sirenActive ? 0.78 : Math.min(0.76, baseCruiseThrottle + 0.16)) : baseCruiseThrottle;
         this.aiState = isPanicked ? "PANIC" : "CRUISE";
         if (this.aiCurbParkCooldown > 0) {
             this.aiCurbParkCooldown = Math.max(0, this.aiCurbParkCooldown - dt);
@@ -2561,25 +2612,33 @@ class Vehicle {
             if (Math.abs(this.visualSteerYaw) < 0.005 || rollSpd < 4 || isBusOrCoach) this.visualSteerYaw = 0;
         }
 
-        // 2B. Urban Speed Limit & Look-Ahead Turn / Intersection Approach Speed Control (Never uses negative reverse throttle!)
+        // 2B. Progressive Intersection-Approach Speed Staging (Allows full 54..256 px/s diversity on straightaways while guaranteeing 0 red-light runs!)
         const nextLidZ1 = map.getBlockInfo ? map.getBlockInfo(this.aiTargetBlockX, this.aiTargetBlockY, 1).lid : 0;
         const stepDx = this.aiTargetBlockX - bx;
         const stepDy = this.aiTargetBlockY - by;
         const twoAheadLidZ1 = map.getBlockInfo
             ? map.getBlockInfo(this.aiTargetBlockX + stepDx, this.aiTargetBlockY + stepDy, 1).lid
             : 0;
+        const threeAheadLidZ1 = map.getBlockInfo
+            ? map.getBlockInfo(this.aiTargetBlockX + stepDx * 2, this.aiTargetBlockY + stepDy * 2, 1).lid
+            : 0;
         const distToTargetCenter = Math.hypot(tx - this.x, ty - this.y);
         const isStopBlock = (lidZ1 !== 25 && nextLidZ1 === 25 && distToTargetCenter > 31.5);
         const isPreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 === 25);
+        const isThreePreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 !== 25 && threeAheadLidZ1 === 25);
 
         if (!isPanicked && !sirenBehind && this.driver === "AI_TRAFFIC") {
             const onBridgeSpan = Boolean(map.bridgeMask && map.bridgeMask[by * MAP_COLS + bx] > 0);
-            const urbanCruiseCap = (isStopBlock || isPreStopBlock)
+            const personalCruise = (this.aiTargetCruiseSpeed || ((this.maxSpeed || 280) * (this.aiCruiseFactor || 0.50))) * (onBridgeSpan ? 1.08 : 1.0);
+            // Only stage speed down when approaching an intersection (3 -> 2 -> 1 tiles ahead); on open blocks each vehicle runs at its personal cruise speed!
+            const approachCap = isStopBlock
                 ? (this.isHeavyVehicle ? 72 : 84)
-                : (onBridgeSpan ? (this.isHeavyVehicle ? 105 : 132) : (this.isHeavyVehicle ? 94 : (this.aiAggressive ? 122 : 110)));
-            if (this.speed > urbanCruiseCap) {
+                : (isPreStopBlock
+                    ? (this.isHeavyVehicle ? 76 : 94)
+                    : (isThreePreStopBlock ? (this.isHeavyVehicle ? 96 : 138) : personalCruise));
+            if (this.speed > approachCap + 1) {
                 desiredThrottle = 0;
-                const capMult = Math.pow(0.18, dt);
+                const capMult = Math.pow((isStopBlock || isPreStopBlock) ? 0.12 : 0.18, dt);
                 this.vx *= capMult;
                 this.vy *= capMult;
                 this.speed *= capMult;
@@ -2793,8 +2852,8 @@ class Vehicle {
                     if (!other || other === this || other === this.towingVehicle || other === this.towTarget) return;
                     const dx = other.x - this.x;
                     const dy = other.y - this.y;
-                    if (Math.abs(dx) > 320 || Math.abs(dy) > 320) return;
-                    if (dx * dx + dy * dy > 102400) return;
+                    if (Math.abs(dx) > 368 || Math.abs(dy) > 368) return;
+                    if (dx * dx + dy * dy > 135424) return;
                     if (other.z !== undefined && Math.abs(other.z - curZ) > 0.85) return;
 
                 const forwardDist = dx * fx + dy * fy;
@@ -2849,13 +2908,9 @@ class Vehicle {
                         if (this.aiLaneChangeCooldown <= 0) {
                             this.tryAdjacentLaneChange(bx, by, curZ, map, game);
                         } else {
-                            const testRightX = this.x + rx * 14;
-                            const testRightY = this.y + ry * 14;
-                            if (
-                                (!map.isWaterAtPixel || !map.isWaterAtPixel(testRightX, testRightY)) &&
-                                (!map.resolveCircleBuildingCollision || !map.resolveCircleBuildingCollision(testRightX, testRightY, 13, curZ).hit)
-                            ) {
-                                this.aiPullOverOffset = 14;
+                            const safeYieldRight = this.clampSafeInLaneOffset(14, laneBlockX, laneBlockY, this.aiChosenDir ? (this.aiChosenDir.dx || 0) : 0, this.aiChosenDir ? (this.aiChosenDir.dy || 0) : 0, curZ, map);
+                            if (safeYieldRight >= 8) {
+                                this.aiPullOverOffset = safeYieldRight;
                                 this.aiPullOverTimer = 1.1;
                                 this.aiTurnSignal = 1;
                             }
@@ -2897,10 +2952,12 @@ class Vehicle {
                 }
                 };
                 if (gHead && gNext) {
-                    const gx0 = Math.max(0, (this.x >> 8) - 1);
-                    const gx1 = Math.min(127, (this.x >> 8) + 1);
-                    const gy0 = Math.max(0, (this.y >> 8) - 1);
-                    const gy1 = Math.min(127, (this.y >> 8) + 1);
+                    const extraCellX = Math.abs(this.speed || 0) > 150 ? Math.round(fx) : 0;
+                    const extraCellY = Math.abs(this.speed || 0) > 150 ? Math.round(fy) : 0;
+                    const gx0 = Math.max(0, (this.x >> 8) - 1 + Math.min(0, extraCellX));
+                    const gx1 = Math.min(127, (this.x >> 8) + 1 + Math.max(0, extraCellX));
+                    const gy0 = Math.max(0, (this.y >> 8) - 1 + Math.min(0, extraCellY));
+                    const gy1 = Math.min(127, (this.y >> 8) + 1 + Math.max(0, extraCellY));
                     for (let gy = gy0; gy <= gy1; gy++) {
                         const rowOff = gy << 7;
                         for (let gx = gx0; gx <= gx1; gx++) {
@@ -2998,7 +3055,9 @@ class Vehicle {
             Math.hypot(closestEntity.x - closestEntity.towTarget.x, closestEntity.y - closestEntity.towTarget.y) < 220
         );
         const minStopGap = isManeuveringTowAhead ? 92 : (this.isMotorcycle ? 11 : (involvesLongVeh ? 20 : 15));
-        const followHorizon = Math.max(145, minStopGap + Math.max(0, this.speed || 0) * (this.isHeavyVehicle ? 0.88 : 0.70) + 44);
+        const curForwardSpd = Math.max(0, this.speed || 0);
+        const highSpeedStoppingBuffer = Math.max(0, curForwardSpd - 120) * 0.65;
+        const followHorizon = Math.max(145, minStopGap + curForwardSpd * (this.isHeavyVehicle ? 0.88 : 0.72) + highSpeedStoppingBuffer + 44);
         const stoppedAtSignalNow = (this.aiState === "STOPPED_LIGHT" && desiredThrottle === 0);
         if (sirenYield || crossTrafficYield) {
             this.aiState = sirenYield ? "YIELD_SIREN" : (stoppedAtSignalNow ? "STOPPED_LIGHT" : "FOLLOWING");
@@ -3019,14 +3078,15 @@ class Vehicle {
                 isDeadOrAbandonedObstacle ||
                 (obstacleSpeed < 10 && this.aiState !== "STOPPED_LIGHT")
             );
-            const myDesiredCruiseSpd = (this.maxSpeed || 210) * (this.aiCruiseFactor || 0.50);
+            const myDesiredCruiseSpd = this.aiTargetCruiseSpeed || ((this.maxSpeed || 210) * (this.aiCruiseFactor || 0.50));
             const isSlowerMovingCar = Boolean(
                 this.aiState !== "STOPPED_LIGHT" &&
                 obstacleSpeed >= 10 &&
-                obstacleSpeed < myDesiredCruiseSpd * 0.78 &&
-                (this.isMotorcycle || this.aiAggressive || (this.aiCruiseFactor || 0.5) >= 0.50 || closestEntity.isHeavyVehicle)
+                obstacleSpeed < myDesiredCruiseSpd * 0.84 &&
+                (this.isMotorcycle || this.aiAggressive || myDesiredCruiseSpd >= 140 || closestEntity.isHeavyVehicle || obstacleSpeed < 95)
             );
-            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < 112 && this.aiLaneChangeCooldown <= 0) {
+            const overtakeTriggerGap = Math.max(116, Math.min(180, 96 + Math.max(0, curForwardSpd - obstacleSpeed) * 0.85));
+            if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < overtakeTriggerGap && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
             // Motorcycle Lane-Splitting / Queue Filtering at Red Lights & Traffic Queues:
@@ -5609,7 +5669,8 @@ class Vehicle {
 
         let aiMaxCap = 1.0;
         if (this.driver === "AI_TRAFFIC" && this.aiPanicTimer <= 0) {
-            aiMaxCap = this.aiCruiseFactor;
+            const bridgeBoost = (this._gameRef && this._gameRef.map && this._gameRef.map.bridgeMask && this._gameRef.map.bridgeMask[(Math.floor(this.y / TILE_SIZE) * MAP_COLS) + Math.floor(this.x / TILE_SIZE)] > 0) ? 1.08 : 1.0;
+            aiMaxCap = Math.min(0.90, this.aiCruiseFactor * bridgeBoost);
         }
         const effectiveMax = this.maxSpeed * surfaceMult * aiMaxCap * tireMult;
         forwardVel = Math.max(-this.maxSpeed * (isWaterCraft ? 0.52 : 0.45) * tireMult, Math.min(effectiveMax, forwardVel));
