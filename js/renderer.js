@@ -1958,6 +1958,38 @@ class RetroRenderer {
                         ve.remaps = ve.remaps.slice(0, 5);
                     }
 
+                    // Sample dominant factory paint RGB once per vehicle sprite & remap so detached 3D hoods/doors/bumpers match 100%!
+                    const sampleRectPaintRGB = (rc) => {
+                        if (!Array.isArray(rc) || rc.length < 4) return;
+                        const [rx0, ry0, rw, rh] = rc;
+                        let sumR = 0, sumG = 0, sumB = 0, wSum = 0;
+                        const xStart = Math.floor(rw * 0.22), xEnd = Math.ceil(rw * 0.78);
+                        const yStart = Math.floor(rh * 0.18), yEnd = Math.ceil(rh * 0.82);
+                        for (let ly = yStart; ly < yEnd; ly += 2) {
+                            for (let lx = xStart; lx < xEnd; lx += 2) {
+                                const p = ((ry0 + ly) * W + (rx0 + lx)) * 4;
+                                const a = d[p + 3];
+                                if (a < 200) continue;
+                                const pr = d[p], pg = d[p + 1], pb = d[p + 2];
+                                const maxC = Math.max(pr, pg, pb);
+                                const minC = Math.min(pr, pg, pb);
+                                if (maxC < 44 || minC > 240) continue;
+                                const satW = 1.0 + (maxC - minC) * 0.04;
+                                sumR += pr * satW;
+                                sumG += pg * satW;
+                                sumB += pb * satW;
+                                wSum += satW;
+                            }
+                        }
+                        if (wSum > 0) {
+                            rc._bodyRGB = [sumR / (wSum * 255), sumG / (wSum * 255), sumB / (wSum * 255)];
+                        }
+                    };
+                    if (ve.base) sampleRectPaintRGB(ve.base);
+                    if (Array.isArray(ve.remaps)) {
+                        for (const rm of ve.remaps) sampleRectPaintRGB(rm);
+                    }
+
                     // Convert .G24 damage & door sprites (which are baked only in `ve.base` color in the atlas)
                     // into pure color-neutral delta overlays so remapped cars NEVER change paint color on crash/bullet impact!
                     if (ve.base && ve.base.length >= 4) {
@@ -11924,12 +11956,79 @@ class RetroRenderer {
                 vTintG *= 0.45;
                 vTintB *= 0.50;
             }
+            if (rect._bodyRGB) {
+                v._bodyRGB = rect._bodyRGB;
+            }
             this.pushAtlasSprite3D(rect, v.x, v.y, vz + airZ, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             if (dmgRect) {
                 this.pushAtlasSprite3D(dmgRect, v.x, v.y, vz + airZ + 0.0015, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             }
             if (doorRect) {
                 this.pushAtlasSprite3D(doorRect, v.x, v.y, vz + airZ + 0.0025, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
+            }
+            // 3B. Progressive Missing Panels (Exposed Engine Bay when Hood detached, Missing Trunk, Missing Doors & Hanging Crooked Bumpers!)
+            if (!v.destroyed && !mapInfo.isTank && !isWaterCraft && !mapInfo.isMotorcycle && !isMicroTwoWheeler && (v.detachedPartsMask || v.hangingBumperMask)) {
+                const dm = v.detachedPartsMask || 0;
+                const hm = v.hangingBumperMask || 0;
+                const vw = v.w || 60;
+                const vh = v.h || 26;
+                const partZ = vz + airZ + 0.0032;
+                const [bpR, bpG, bpB] = Array.isArray(v._bodyRGB) ? v._bodyRGB : [0.72, 0.75, 0.80];
+
+                // Missing Hood (bit 2 = 4): dark open engine bay + brushed aluminum V8 cylinder block + front radiator core!
+                if (dm & 4) {
+                    const engX = v.x + cosA * (vw * 0.25);
+                    const engY = v.y + sinA * (vw * 0.25);
+                    const bayL = Math.min(14.0, vw * 0.21);
+                    const bayW = Math.min(15.5, vh * 0.56);
+                    this.pushSolidQuad3D(engX, engY, partZ + totalPitchZ * 0.6, bayL, bayW, renderAngle, 0.07, 0.08, 0.10, 0.96, vDrawOrder);
+                    this.pushSolidQuad3D(engX - cosA * 0.8, engY - sinA * 0.8, partZ + totalPitchZ * 0.6 + 0.001, bayL * 0.64, bayW * 0.50, renderAngle, 0.52, 0.56, 0.62, 0.95, vDrawOrder);
+                    this.pushSolidQuad3D(engX + cosA * (bayL * 0.38), engY + sinA * (bayL * 0.38), partZ + totalPitchZ * 0.6 + 0.001, 2.0, bayW * 0.82, renderAngle, 0.26, 0.28, 0.32, 0.95, vDrawOrder);
+                }
+                // Missing Trunk Lid (bit 3 = 8): dark open rear trunk cavity
+                if (dm & 8) {
+                    const trkX = v.x - cosA * (vw * 0.28);
+                    const trkY = v.y - sinA * (vw * 0.28);
+                    this.pushSolidQuad3D(trkX, trkY, partZ - totalPitchZ * 0.6, Math.min(10.5, vw * 0.16), Math.min(14.5, vh * 0.54), renderAngle, 0.07, 0.08, 0.11, 0.94, vDrawOrder);
+                }
+                // Missing Left Door (bit 4 = 16) / Right Door (bit 5 = 32): dark open cabin sill notch along flank
+                if (dm & 16) {
+                    const ldx = v.x - sinA * (-vh * 0.41);
+                    const ldy = v.y + cosA * (-vh * 0.41);
+                    this.pushSolidQuad3D(ldx, ldy, partZ, Math.min(13.0, vw * 0.22), 3.0, renderAngle, 0.06, 0.07, 0.10, 0.92, vDrawOrder);
+                }
+                if (dm & 32) {
+                    const rdx = v.x - sinA * (vh * 0.41);
+                    const rdy = v.y + cosA * (vh * 0.41);
+                    this.pushSolidQuad3D(rdx, rdy, partZ, Math.min(13.0, vw * 0.22), 3.0, renderAngle, 0.06, 0.07, 0.10, 0.92, vDrawOrder);
+                }
+                // Hanging Crooked Front Bumper (hm & 1) or Exposed Front Mount (dm & 1)
+                const bSide = v.hangingBumperSide || 1;
+                const jitter = Math.abs(v.speed || 0) > 20 ? Math.sin(this.time * 32.0 + v.x) * 0.06 : 0;
+                const bSpan = Math.min(18.5, vh * 0.68);
+                if (hm & 1) {
+                    const fbx = v.x + cosA * (vw * 0.48 + 2.2) - sinA * (bSide * 2.4);
+                    const fby = v.y + sinA * (vw * 0.48 + 2.2) + cosA * (bSide * 2.4);
+                    const hangAng = renderAngle + bSide * (0.30 + jitter);
+                    this.pushSolidQuad3D(fbx, fby, partZ + totalPitchZ, 3.6, bSpan, hangAng, bpR * 0.85 + 0.12, bpG * 0.85 + 0.12, bpB * 0.85 + 0.14, 0.98, vDrawOrder);
+                    this.pushSolidQuad3D(fbx + Math.cos(hangAng) * 0.8, fby + Math.sin(hangAng) * 0.8, partZ + totalPitchZ + 0.001, 1.8, bSpan * 0.86, hangAng, 0.78, 0.82, 0.88, 0.92, vDrawOrder);
+                } else if (dm & 1) {
+                    const fbx = v.x + cosA * (vw * 0.46);
+                    const fby = v.y + sinA * (vw * 0.46);
+                    this.pushSolidQuad3D(fbx, fby, partZ + totalPitchZ, 2.6, bSpan * 0.78, renderAngle, 0.10, 0.11, 0.14, 0.94, vDrawOrder);
+                }
+                // Hanging Crooked Rear Bumper (hm & 2) or Exposed Rear Mount (dm & 2)
+                if (hm & 2) {
+                    const rbx = v.x - cosA * (vw * 0.48 + 2.2) - sinA * (bSide * 2.4);
+                    const rby = v.y - sinA * (vw * 0.48 + 2.2) + cosA * (bSide * 2.4);
+                    const hangAng = renderAngle - bSide * (0.30 + jitter);
+                    this.pushSolidQuad3D(rbx, rby, partZ - totalPitchZ, 3.6, bSpan, hangAng, bpR * 0.85 + 0.12, bpG * 0.85 + 0.12, bpB * 0.85 + 0.14, 0.98, vDrawOrder);
+                    this.pushSolidQuad3D(rbx - Math.cos(hangAng) * 0.8, rby - Math.sin(hangAng) * 0.8, partZ - totalPitchZ + 0.001, 1.8, bSpan * 0.86, hangAng, 0.78, 0.82, 0.88, 0.92, vDrawOrder);
+                } else if (dm & 2) {
+                    const rbx = v.x - cosA * (vw * 0.46);
+                    const rby = v.y - sinA * (vw * 0.46);
+                    this.pushSolidQuad3D(rbx, rby, partZ - totalPitchZ, 2.6, bSpan * 0.78, renderAngle, 0.10, 0.11, 0.14, 0.94, vDrawOrder);
+                }
             }
             // GTA VI Key-Art Hero Details: 3D Black Leather Heist Duffel Bag on Crimson Tulip Trunk & Chrome Trim on Dre'Quan's Black SUV!
             if (!v.destroyed && v.heroVariant === "CRIMSON_DUFFEL") {
@@ -11994,10 +12093,12 @@ class RetroRenderer {
                         (turnSig < 0 && lat < 0) ||
                         (turnSig > 0 && lat > 0)
                     );
-                    // 1) Front Headlight Lenses (bright xenon-white when driven at dusk/night or flashing high-beams, crisp silver-blue glass housing by day)
-                    //    If front-dented on VCPD Charger, right headlight (lat > 0) is shattered out!
-                    const rightLampBroken = isVcpdCharger && (v.frontDented || v.heavyDented) && lat > 0;
-                    if (!rightLampBroken) {
+                    // 1) Front Headlight Lenses (shattered out per-side on FL/FR corner impact!)
+                    const dBits = v.damageDeltaBits || 0;
+                    const frontLampBroken = v.heavyDented ||
+                        (lat < 0 && Boolean(dBits & (1 << CAR_DAMAGE_DELTA.FL))) ||
+                        (lat > 0 && (Boolean(dBits & (1 << CAR_DAMAGE_DELTA.FR)) || (isVcpdCharger && v.frontDented)));
+                    if (!frontLampBroken) {
                         const fx = v.x + cosA * frontDist - sinA * lat;
                         const fy = v.y + sinA * frontDist + cosA * lat;
                         if (highBeamFlash) {
@@ -12015,9 +12116,11 @@ class RetroRenderer {
                         }
                     }
 
-                    // 2) Rear Taillight / Brake / Reverse Lenses
-                    const leftTailBroken = isVcpdCharger && (v.rearDented || v.heavyDented) && lat < 0;
-                    if (!leftTailBroken) {
+                    // 2) Rear Taillight / Brake / Reverse Lenses (shattered out per-side on BL/BR corner impact!)
+                    const rearLampBroken = v.heavyDented ||
+                        (lat < 0 && (Boolean(dBits & (1 << CAR_DAMAGE_DELTA.BL)) || (isVcpdCharger && v.rearDented))) ||
+                        (lat > 0 && Boolean(dBits & (1 << CAR_DAMAGE_DELTA.BR)));
+                    if (!rearLampBroken) {
                         const rx = v.x + cosA * rearDist - sinA * lat;
                         const ry = v.y + sinA * rearDist + cosA * lat;
                         if (isReversing) {
@@ -12792,6 +12895,50 @@ class RetroRenderer {
         for (const pt of game.particles) {
             const prog = Math.max(0, Math.min(0.999, 1.0 - pt.life / Math.max(0.01, pt.maxLife)));
             const pz = this.camZBlocks + 0.09;
+            if (pt.kind === "CAR_PART") {
+                const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);
+                const arcZ = pt.isRestingGib ? 0 : (Math.sin(prog * Math.PI) * (pt.peakZ || 0.30));
+                const fadeAlpha = pt.isRestingGib && pt.life < 2.2 ? Math.max(0, pt.life / 2.2) : 1.0;
+                const pOrd = pt.isRestingGib ? SPRITE_DRAW_ORDER.CORPSE : SPRITE_DRAW_ORDER.PROJECTILES;
+                const pAng = pt.rot || 0;
+                const pw = pt.w || 6;
+                const ph = pt.h || 4;
+                const pr = pt.r !== undefined ? pt.r : 0.75;
+                const pg = pt.g !== undefined ? pt.g : 0.78;
+                const pb = pt.b !== undefined ? pt.b : 0.82;
+                const shOff = 1.6 + arcZ * 15.0;
+                if (pt.partType !== "GLASS" && pt.partType !== "TAIL_GLASS") {
+                    this.pushSolidQuad3D(pt.x + sunCos * shOff, pt.y + sunSin * shOff, floorZ + 0.008, pw * 0.94, ph * 0.94, pAng, 0.02, 0.03, 0.06, 0.44 * fadeAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                const zPart = floorZ + 0.024 + arcZ;
+                if (pt.partType === "HOOD" || pt.partType === "TRUNK") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw + 1.2, ph + 1.2, pAng, 0.12, 0.13, 0.16, 0.96 * fadeAlpha, pOrd);
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw, ph, pAng, pr, pg, pb, 0.99 * fadeAlpha, pOrd);
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.002, pw * 0.82, 1.4, pAng, Math.min(1, pr * 1.18), Math.min(1, pg * 1.18), Math.min(1, pb * 1.18), 0.85 * fadeAlpha, pOrd);
+                } else if (pt.partType === "DOOR") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, pr, pg, pb, 0.99 * fadeAlpha, pOrd);
+                    const wOffX = -Math.sin(pAng) * (ph * 0.28);
+                    const wOffY = Math.cos(pAng) * (ph * 0.28);
+                    this.pushSolidQuad3D(pt.x + wOffX, pt.y + wOffY, zPart + 0.001, pw * 0.68, ph * 0.42, pAng, 0.14, 0.20, 0.28, 0.94 * fadeAlpha, pOrd);
+                } else if (pt.partType === "BUMPER") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, pr * 0.85 + 0.12, pg * 0.85 + 0.12, pb * 0.85 + 0.14, 0.98 * fadeAlpha, pOrd);
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw * 0.55, ph * 0.88, pAng, 0.80, 0.84, 0.90, 0.94 * fadeAlpha, pOrd);
+                } else if (pt.partType === "TIRE") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.11, 0.12, 0.14, 0.99 * fadeAlpha, pOrd);
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw * 0.48, ph * 0.48, pAng, 0.82, 0.86, 0.92, 0.96 * fadeAlpha, pOrd);
+                } else if (pt.partType === "HUBCAP" || pt.partType === "MUFFLER") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.82, 0.86, 0.92, 0.96 * fadeAlpha, pOrd);
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw * 0.45, ph * 0.45, pAng, 0.35, 0.38, 0.44, 0.90 * fadeAlpha, pOrd);
+                } else if (pt.partType === "GLASS") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.72, 0.94, 1.0, 0.84 * fadeAlpha, pOrd);
+                } else if (pt.partType === "TAIL_GLASS") {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.98, 0.14, 0.20, 0.88 * fadeAlpha, pOrd);
+                } else {
+                    // MIRROR / TRIM painted shard
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, pr, pg, pb, 0.96 * fadeAlpha, pOrd);
+                }
+                continue;
+            }
             if (pt.kind === "GIB_ARC") {
                 // GTA 2 gibs.cpp (FUN_0048C9C0 / FUN_0048C270): 3D parabolic arc in flight, then settles on the pavement!
                 const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);

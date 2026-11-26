@@ -820,6 +820,18 @@ const CAR_DAMAGE_DELTA = Object.freeze({
     WS: 10 // windshield broken
 });
 
+// Progressive detachable 3D bodywork & trim part bitflags
+const CAR_DETACH_PART = Object.freeze({
+    FRONT_BUMPER: 1 << 0,
+    REAR_BUMPER:  1 << 1,
+    HOOD:         1 << 2,
+    TRUNK:        1 << 3,
+    LEFT_DOOR:    1 << 4,
+    RIGHT_DOOR:   1 << 5,
+    LEFT_MIRROR:  1 << 6,
+    RIGHT_MIRROR: 1 << 7
+});
+
 // Vehicle tire identifiers from Vehicle.h (eCarTire)
 const CAR_TIRE = Object.freeze({
     FRONT: 0,
@@ -976,6 +988,9 @@ class Vehicle {
         this.frontDented = false;
         this.rearDented = false;
         this.heavyDented = false;
+        this.detachedPartsMask = 0;
+        this.hangingBumperMask = 0;
+        this.hangingBumperSide = (Math.abs(idHash) % 2 === 0) ? 1 : -1;
         this.doorOpenTimer = 0;
         this.doorOpenDuration = 0.48;
 
@@ -1246,17 +1261,111 @@ class Vehicle {
         return (this.damageDeltaBits & (1 << deltaBit)) !== 0;
     }
 
+    getBodyPaintRGB() {
+        if (Array.isArray(this._bodyRGB) && this._bodyRGB.length === 3) {
+            return this._bodyRGB;
+        }
+        const hex = String(this.color || "#94a3b8").trim();
+        if (hex.startsWith("#") && (hex.length === 7 || hex.length === 4)) {
+            const r = hex.length === 7 ? parseInt(hex.slice(1, 3), 16) : parseInt(hex[1] + hex[1], 16);
+            const g = hex.length === 7 ? parseInt(hex.slice(3, 5), 16) : parseInt(hex[2] + hex[2], 16);
+            const b = hex.length === 7 ? parseInt(hex.slice(5, 7), 16) : parseInt(hex[3] + hex[3], 16);
+            if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+                return [r / 255, g / 255, b / 255];
+            }
+        }
+        return [0.72, 0.76, 0.82];
+    }
+
+    spawnDetachedCarPart(gameRef, partType, wx, wy, launchAng, speedBase, wPx, hPx, peakZ = 0.28, bounces = 1) {
+        const g = gameRef || this._gameRef || (typeof window !== "undefined" ? window.game : null);
+        if (!g || !Array.isArray(g.particles)) return;
+        if (g.player && this.driver !== "PLAYER" && Math.abs(wx - g.player.x) > 1050 && Math.abs(wy - g.player.y) > 850) {
+            return;
+        }
+        if (g.particles.length >= 650) {
+            g.particles.splice(0, g.particles.length - 600);
+        }
+        const [pr, pg, pb] = this.getBodyPaintRGB();
+        const spd = speedBase * (0.82 + Math.random() * 0.38);
+        const ang = launchAng + (Math.random() - 0.5) * 0.48;
+        const flightDur = 0.34 + Math.random() * 0.22 + peakZ * 0.32;
+        g.particles.push({
+            x: wx,
+            y: wy,
+            vx: Math.cos(ang) * spd + (this.vx || 0) * 0.28,
+            vy: Math.sin(ang) * spd + (this.vy || 0) * 0.28,
+            w: wPx,
+            h: hPx,
+            size: Math.max(wPx, hPx),
+            kind: "CAR_PART",
+            partType,
+            r: pr,
+            g: pg,
+            b: pb,
+            peakZ,
+            rot: (this.angle || 0) + (Math.random() - 0.5) * 0.6,
+            vRot: (Math.random() < 0.5 ? -1 : 1) * (4.5 + Math.random() * 7.5),
+            bouncesLeft: bounces,
+            life: flightDur,
+            maxLife: flightDur,
+            isRestingGib: false
+        });
+    }
+
+    emitExplosionBlowoutParts(gameRef) {
+        if (this.crushesCars || this.isTank || this.waterOnly || this.specKey === "AIRBOAT" || this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") {
+            return;
+        }
+        const cosA = Math.cos(this.angle || 0);
+        const sinA = Math.sin(this.angle || 0);
+        const hl = (this.w || 60) * 0.36;
+        const hw = (this.h || 28) * 0.42;
+        if (!this.isMotorcycle) {
+            if (!(this.detachedPartsMask & CAR_DETACH_PART.HOOD) && this.specKey !== "CITY_BUS" && this.specKey !== "TOUR_COACH") {
+                this.detachedPartsMask |= CAR_DETACH_PART.HOOD;
+                this.spawnDetachedCarPart(gameRef, "HOOD", this.x + cosA * hl, this.y + sinA * hl, (this.angle || 0) + (Math.random() - 0.5) * 0.8, 118, 12.5, 15.5, 0.72, 2);
+            }
+            if (!(this.detachedPartsMask & CAR_DETACH_PART.LEFT_DOOR)) {
+                this.detachedPartsMask |= CAR_DETACH_PART.LEFT_DOOR;
+                this.spawnDetachedCarPart(gameRef, "DOOR", this.x - sinA * (-hw), this.y + cosA * (-hw), (this.angle || 0) - Math.PI * 0.5, 108, 13.5, 5.2, 0.58, 2);
+            }
+            if (!(this.detachedPartsMask & CAR_DETACH_PART.RIGHT_DOOR) && Math.random() < 0.75) {
+                this.detachedPartsMask |= CAR_DETACH_PART.RIGHT_DOOR;
+                this.spawnDetachedCarPart(gameRef, "DOOR", this.x - sinA * hw, this.y + cosA * hw, (this.angle || 0) + Math.PI * 0.5, 108, 13.5, 5.2, 0.58, 2);
+            }
+            if (!(this.detachedPartsMask & CAR_DETACH_PART.FRONT_BUMPER)) {
+                this.detachedPartsMask |= CAR_DETACH_PART.FRONT_BUMPER;
+                this.hangingBumperMask &= ~CAR_DETACH_PART.FRONT_BUMPER;
+                this.spawnDetachedCarPart(gameRef, "BUMPER", this.x + cosA * (hl + 6), this.y + sinA * (hl + 6), this.angle || 0, 125, 4.4, Math.min(18, (this.h || 26) * 0.68), 0.52, 2);
+            }
+        }
+        // Launch 2 bouncing rubber tires with alloy rims!
+        const tireCount = this.isMotorcycle ? 1 : 2;
+        for (let ti = 0; ti < tireCount; ti++) {
+            const side = ti === 0 ? -1 : 1;
+            const tAng = (this.angle || 0) + side * (1.1 + Math.random() * 0.7);
+            this.spawnDetachedCarPart(gameRef, "TIRE", this.x - sinA * (hw * side), this.y + cosA * (hw * side), tAng, 132, 8.6, 8.6, 0.68, 2);
+        }
+    }
+
     /* ========================================================================
-       1997 GTA 1 6-ZONE LOCAL CONTACT POINT DAMAGE (Vehicle::ReceiveImpact, lines 717-748)
-       Transforms hit point into chassis local space and sets FL/FR/ML/MR/BL/BR
-       using fr_bias = maxx / 3.0f.
+       1997 GTA 1 6-ZONE LOCAL CONTACT POINT DAMAGE + PROGRESSIVE DETACHABLE PARTS
+       Transforms hit point into chassis local space, sets FL/FR/ML/MR/BL/BR,
+       and progressively detaches mirrors, hubcaps, hanging/flying bumpers, doors, trunk & hood!
        ======================================================================== */
-    receiveImpactDamage(amount, hitX, hitY, isExplosive = false) {
+    receiveImpactDamage(amount, hitX, hitY, isExplosive = false, gameRef = null) {
         if (this.destroyed || amount <= 0) return;
+        const g = gameRef || this._gameRef || (typeof window !== "undefined" ? window.game : null);
         if (this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") {
             // A pedal bicycle or micro e-scooter has no gasoline fuel tank: normal wall/curb bumps never set it on fire!
             this.burnTimer = 0;
             this.chainExplodeTimer = 0;
+            if (amount >= 5 && g) {
+                const bx = hitX !== undefined ? hitX : this.x;
+                const by = hitY !== undefined ? hitY : this.y;
+                this.spawnDetachedCarPart(g, "TRIM", bx, by, Math.random() * 6.28, 72, 4.2, 2.2, 0.22, 1);
+            }
             if (!isExplosive && amount < 38) {
                 this.hp = Math.max(15, this.hp - amount * 0.35);
                 return;
@@ -1279,17 +1388,23 @@ class Vehicle {
             }
         }
 
-        const shouldDent = isExplosive || amount >= 9 || this.hp < this.maxHp * 0.88;
+        const cosA = Math.cos(this.angle || 0);
+        const sinA = Math.sin(this.angle || 0);
+        const hl = (this.w || 60) * 0.45;
+        const hw = (this.h || 26) * 0.46;
+        let localX = hl * 0.8;
+        let localY = 0;
+        if (hitX !== undefined && hitY !== undefined) {
+            const dx = hitX - this.x;
+            const dy = hitY - this.y;
+            localX = dx * cosA + dy * sinA;
+            localY = -dx * sinA + dy * cosA;
+        }
+        const frBias = (this.w * 0.5) / 3.0; // fr_bias = maxx / 3.0f (Vehicle.cpp:723)
+
+        const shouldDent = isExplosive || amount >= 4.2 || this.hp < this.maxHp * 0.90;
         if (shouldDent) {
             if (hitX !== undefined && hitY !== undefined) {
-                const dx = hitX - this.x;
-                const dy = hitY - this.y;
-                const cosA = Math.cos(this.angle);
-                const sinA = Math.sin(this.angle);
-                const localX = dx * cosA + dy * sinA;
-                const localY = -dx * sinA + dy * cosA;
-                const frBias = (this.w * 0.5) / 3.0; // fr_bias = maxx / 3.0f (Vehicle.cpp:723)
-
                 if (localX > frBias) {
                     if (localY < 0.0) this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FL);
                     else this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.FR);
@@ -1313,6 +1428,153 @@ class Vehicle {
             this.heavyDented = true;
             this.damageDeltaBits |= (1 << CAR_DAMAGE_DELTA.WS);
         }
+
+        // Progressive 3D Detachable Car Parts, Shattered Glass & Trim Debris on Impact!
+        if (!this.crushesCars && !this.isTank && !this.waterOnly && this.specKey !== "AIRBOAT" && (amount >= 3.2 || isExplosive)) {
+            const hpRatio = Math.max(0, this.hp) / Math.max(1, this.maxHp || 200);
+            const cPx = hitX !== undefined ? Math.max(this.x - 42, Math.min(this.x + 42, hitX)) : (this.x + cosA * hl);
+            const cPy = hitY !== undefined ? Math.max(this.y - 42, Math.min(this.y + 42, hitY)) : (this.y + sinA * hl);
+            const outAng = Math.atan2(cPy - this.y, cPx - this.x);
+
+            // 1. Always burst shattered glass & paint/chrome trim chips from the impact point
+            const shardCount = isExplosive ? 4 : (amount >= 12 ? 3 : 2);
+            const glassKind = localX < -frBias ? "TAIL_GLASS" : "GLASS";
+            for (let si = 0; si < shardCount; si++) {
+                this.spawnDetachedCarPart(g, si === 0 ? "TRIM" : glassKind, cPx, cPy, outAng + (si - 1) * 0.5, 68 + amount * 1.6, si === 0 ? 5.0 : 3.2, si === 0 ? 2.5 : 2.6, 0.18 + Math.random() * 0.14, 1);
+            }
+
+            if (this.isMotorcycle) {
+                if (amount >= 6.5 || hpRatio < 0.72) {
+                    this.spawnDetachedCarPart(g, "MUFFLER", this.x - cosA * 12, this.y - sinA * 12, outAng + 0.6, 86, 6.8, 2.4, 0.28, 2);
+                }
+            } else {
+                const isLeft = localY < 0;
+                const sideSign = isLeft ? -1 : 1;
+                const mirrorBit = isLeft ? CAR_DETACH_PART.LEFT_MIRROR : CAR_DETACH_PART.RIGHT_MIRROR;
+                const doorBit = isLeft ? CAR_DETACH_PART.LEFT_DOOR : CAR_DETACH_PART.RIGHT_DOOR;
+                const bumperSpan = Math.min(19, Math.max(12, (this.h || 26) * 0.68));
+
+                // Side mirror & spinning silver hubcap snap off easily on corner or flank hits
+                if ((amount >= 4.2 || hpRatio < 0.85) && !(this.detachedPartsMask & mirrorBit)) {
+                    this.detachedPartsMask |= mirrorBit;
+                    const mx = this.x + cosA * (hl * 0.34) - sinA * (hw * sideSign);
+                    const my = this.y + sinA * (hl * 0.34) + cosA * (hw * sideSign);
+                    this.spawnDetachedCarPart(g, "MIRROR", mx, my, (this.angle || 0) + sideSign * 1.35, 84, 4.6, 3.0, 0.26, 1);
+                    this.spawnDetachedCarPart(g, "HUBCAP", mx - cosA * 6, my - sinA * 6, (this.angle || 0) + sideSign * 1.5, 96, 5.2, 5.2, 0.24, 2);
+                }
+
+                if (localX > frBias) {
+                    // Front Zone: Stage 1 = Hanging crooked front bumper; Stage 2 = Front bumper flies off; Stage 3 = Hood flies off!
+                    const fbBit = CAR_DETACH_PART.FRONT_BUMPER;
+                    if (!(this.detachedPartsMask & fbBit)) {
+                        if ((this.hangingBumperMask & fbBit) || amount >= 10.5 || hpRatio < 0.74 || isExplosive) {
+                            this.detachedPartsMask |= fbBit;
+                            this.hangingBumperMask &= ~fbBit;
+                            this.spawnDetachedCarPart(
+                                g,
+                                "BUMPER",
+                                this.x + cosA * (hl + 3),
+                                this.y + sinA * (hl + 3),
+                                (this.angle || 0) + sideSign * 0.55,
+                                95 + Math.min(45, amount * 1.5),
+                                4.4,
+                                bumperSpan,
+                                0.34,
+                                2
+                            );
+                        } else if (amount >= 4.2) {
+                            this.hangingBumperMask |= fbBit;
+                            this.hangingBumperSide = sideSign;
+                        }
+                    }
+                    if (
+                        !(this.detachedPartsMask & CAR_DETACH_PART.HOOD) &&
+                        this.specKey !== "CITY_BUS" &&
+                        this.specKey !== "TOUR_COACH" &&
+                        (amount >= 14.5 || hpRatio < 0.58 || isExplosive)
+                    ) {
+                        this.detachedPartsMask |= CAR_DETACH_PART.HOOD;
+                        this.spawnDetachedCarPart(
+                            g,
+                            "HOOD",
+                            this.x + cosA * (hl * 0.65),
+                            this.y + sinA * (hl * 0.65),
+                            (this.angle || 0) + Math.PI + (Math.random() - 0.5) * 0.9,
+                            88 + Math.min(55, amount * 1.4),
+                            Math.min(15, (this.w || 60) * 0.22),
+                            Math.min(17, (this.h || 26) * 0.62),
+                            0.48,
+                            2
+                        );
+                    }
+                } else if (localX < -frBias) {
+                    // Rear Zone: Stage 1 = Hanging rear bumper; Stage 2 = Rear bumper + exhaust muffler fly off; Stage 3 = Trunk lid flies off!
+                    const rbBit = CAR_DETACH_PART.REAR_BUMPER;
+                    if (!(this.detachedPartsMask & rbBit)) {
+                        if ((this.hangingBumperMask & rbBit) || amount >= 10.5 || hpRatio < 0.72 || isExplosive) {
+                            this.detachedPartsMask |= rbBit;
+                            this.hangingBumperMask &= ~rbBit;
+                            this.spawnDetachedCarPart(
+                                g,
+                                "BUMPER",
+                                this.x - cosA * (hl + 3),
+                                this.y - sinA * (hl + 3),
+                                (this.angle || 0) + Math.PI + sideSign * 0.55,
+                                92 + Math.min(45, amount * 1.4),
+                                4.4,
+                                bumperSpan,
+                                0.32,
+                                2
+                            );
+                            this.spawnDetachedCarPart(g, "MUFFLER", this.x - cosA * hl, this.y - sinA * hl, (this.angle || 0) + Math.PI - sideSign * 0.4, 82, 7.2, 2.5, 0.25, 2);
+                        } else if (amount >= 4.2) {
+                            this.hangingBumperMask |= rbBit;
+                            this.hangingBumperSide = sideSign;
+                        }
+                    }
+                    if (
+                        !(this.detachedPartsMask & CAR_DETACH_PART.TRUNK) &&
+                        this.bodyStyle !== "TRUCK" &&
+                        (amount >= 15.0 || hpRatio < 0.54 || isExplosive)
+                    ) {
+                        this.detachedPartsMask |= CAR_DETACH_PART.TRUNK;
+                        this.spawnDetachedCarPart(
+                            g,
+                            "TRUNK",
+                            this.x - cosA * (hl * 0.68),
+                            this.y - sinA * (hl * 0.68),
+                            (this.angle || 0) + Math.PI + (Math.random() - 0.5) * 0.8,
+                            86 + Math.min(50, amount * 1.3),
+                            Math.min(11, (this.w || 60) * 0.17),
+                            Math.min(16, (this.h || 26) * 0.58),
+                            0.44,
+                            2
+                        );
+                    }
+                }
+
+                // Flank / T-bone or heavy corner smash detaches Left or Right Car Door!
+                if (
+                    !(this.detachedPartsMask & doorBit) &&
+                    (Math.abs(localX) <= frBias * 1.25 || hpRatio < 0.48 || isExplosive) &&
+                    (amount >= 10.5 || hpRatio < 0.62 || isExplosive)
+                ) {
+                    this.detachedPartsMask |= doorBit;
+                    this.spawnDetachedCarPart(
+                        g,
+                        "DOOR",
+                        this.x - sinA * (hw * sideSign),
+                        this.y + cosA * (hw * sideSign),
+                        (this.angle || 0) + sideSign * (Math.PI * 0.5) + (Math.random() - 0.5) * 0.4,
+                        92 + Math.min(48, amount * 1.4),
+                        Math.min(14.5, (this.w || 60) * 0.24),
+                        5.2,
+                        0.40,
+                        2
+                    );
+                }
+            }
+        }
     }
 
     resetDamage() {
@@ -1326,6 +1588,8 @@ class Vehicle {
         this.frontDented = false;
         this.rearDented = false;
         this.heavyDented = false;
+        this.detachedPartsMask = 0;
+        this.hangingBumperMask = 0;
     }
 
     normalizeAngle(a) {
@@ -4325,6 +4589,7 @@ class Vehicle {
     }
 
     update(dt, input, map, game) {
+        if (game) this._gameRef = game;
         // Fast early-out for healthy stationary parked vehicles (~540 curb-parked & lot-parked cars):
         // Avoids 300+ lines of per-frame timer/damage/AI/physics checks when completely idle!
         if (
@@ -4985,21 +5250,30 @@ class Vehicle {
                     this.aiReverseTimer = 0.85;
                     this.aiReverseSteer = Math.random() < 0.5 ? 0.9 : -0.9;
                 }
-                if (impact > 155 && (this.crashCooldown || 0) <= 0) {
-                    this.crashCooldown = 0.52;
+                if (impact > 92 && (this.crashCooldown || 0) <= 0) {
+                    this.crashCooldown = 0.45;
                     const stuntShield = ((this.stuntAirTimer || 0) > 0 || (this._stuntLandingGrace || 0) > 0) ? 0.25 : 1.0;
                     const dmgScale = (0.35 + 0.65 * headOnRatio) * stuntShield;
-                    this.receiveImpactDamage((impact - 140) * (this.driver === "PLAYER" ? 0.085 : 0.065) * dmgScale, hitX, hitY);
+                    this.receiveImpactDamage(Math.max(4.6, (impact - 80) * (this.driver === "PLAYER" ? 0.095 : 0.068) * dmgScale), hitX, hitY, false, game);
                     if (this.driver === "PLAYER") {
                         if (this.specKey !== "BMX_BIKE") {
                             game.spawnParticle(hitX, hitY, "SPARK");
                         }
                         if (game && game.audio) {
-                            game.audio.playCarCrash(Math.min(1.5, (impact - 135) / 145) * (0.45 + 0.55 * headOnRatio), this.specKey);
+                            game.audio.playCarCrash(Math.min(1.5, Math.max(0.42, (impact - 80) / 145) * (0.45 + 0.55 * headOnRatio)), this.specKey);
                         }
                     }
                 }
             }
+        }
+        // Dragging crooked front/rear bumper emits occasional scraping sparks at high speed!
+        if (this.hangingBumperMask && Math.abs(this.speed || 0) > 95 && game && typeof game.spawnParticle === "function" && Math.random() < 0.20) {
+            const dragFront = Boolean(this.hangingBumperMask & CAR_DETACH_PART.FRONT_BUMPER);
+            const dragSign = dragFront ? 1 : -1;
+            const bSide = this.hangingBumperSide || 1;
+            const sx = this.x + Math.cos(this.angle) * ((this.w || 58) * 0.46 * dragSign) - Math.sin(this.angle) * ((this.h || 26) * 0.40 * bSide);
+            const sy = this.y + Math.sin(this.angle) * ((this.w || 58) * 0.46 * dragSign) + Math.cos(this.angle) * ((this.h || 26) * 0.40 * bSide);
+            game.spawnParticle(sx, sy, "SPARK");
         }
         if (typeof map.getHeightAtPixel === "function") {
             const onWater = Boolean(this.waterOnly || this.specKey === "AIRBOAT" || (this.amphibious && map.isWaterAtPixel && map.isWaterAtPixel(this.x, this.y)));
@@ -6865,6 +7139,7 @@ class TrafficManager {
 TrafficManager._nextFormationId = 1;
 
 window.CAR_DAMAGE_DELTA = CAR_DAMAGE_DELTA;
+window.CAR_DETACH_PART = CAR_DETACH_PART;
 window.CAR_TIRE = CAR_TIRE;
 window.PED_STATE = PED_STATE;
 window.SPRITE_DRAW_ORDER = SPRITE_DRAW_ORDER;

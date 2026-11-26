@@ -10059,6 +10059,10 @@ class LeonidaGame {
             return;
         }
 
+        if (typeof v.emitExplosionBlowoutParts === "function") {
+            v.emitExplosionBlowoutParts(this);
+        }
+
         this.explodeAt(v.x, v.y, 130, 200, playerResponsible, fromNetwork);
 
         if (playerResponsible) {
@@ -14376,13 +14380,13 @@ class LeonidaGame {
 
                     }
 
-                    if (inwardImpact > 88 && canTriggerCrashSfx) {
+                    if (inwardImpact > 62 && canTriggerCrashSfx) {
 
-                        a.crashCooldown = 0.52;
+                        a.crashCooldown = 0.45;
 
-                        b.crashCooldown = 0.52;
+                        b.crashCooldown = 0.45;
 
-                        const dmg = inwardImpact * 0.042;
+                        const dmg = Math.max(4.5, inwardImpact * 0.052);
 
                         if (b.driver === "PLAYER") a.damagedByPlayer = true;
 
@@ -14390,7 +14394,7 @@ class LeonidaGame {
 
                         if (!a.destroyed) {
 
-                            if (typeof a.receiveImpactDamage === "function") a.receiveImpactDamage(dmg, b.x, b.y);
+                            if (typeof a.receiveImpactDamage === "function") a.receiveImpactDamage(dmg, b.x, b.y, false, this);
 
                             else a.hp -= dmg;
 
@@ -14398,7 +14402,7 @@ class LeonidaGame {
 
                         if (!b.destroyed) {
 
-                            if (typeof b.receiveImpactDamage === "function") b.receiveImpactDamage(dmg, a.x, a.y);
+                            if (typeof b.receiveImpactDamage === "function") b.receiveImpactDamage(dmg, a.x, a.y, false, this);
 
                             else b.hp -= dmg;
 
@@ -18911,17 +18915,54 @@ class LeonidaGame {
 
 
 
-        // 9. Particles & Floating Texts Update (with GTA 2 gibs.cpp resting arc settlement! Single-pass O(N) compaction)
+        // 9. Particles & Floating Texts Update (with GTA 2 gibs.cpp + 3D bouncing detached car parts! Single-pass O(N) compaction)
         let pWrite = 0;
         for (let i = 0; i < this.particles.length; i++) {
             const pt = this.particles[i];
             if (!pt.isRestingGib) {
-                pt.x += pt.vx * dt;
-                pt.y += pt.vy * dt;
+                const nextX = pt.x + pt.vx * dt;
+                const nextY = pt.y + pt.vy * dt;
+                if (pt.kind === "CAR_PART" && this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                    const bCol = this.map.resolveCircleBuildingCollision(nextX, nextY, 4.5, 2.0, false);
+                    if (bCol.hit) {
+                        pt.x = bCol.x;
+                        pt.y = bCol.y;
+                        pt.vx *= -0.45;
+                        pt.vy *= -0.45;
+                    } else {
+                        pt.x = nextX;
+                        pt.y = nextY;
+                    }
+                    pt.rot = (pt.rot || 0) + (pt.vRot || 0) * dt;
+                } else {
+                    pt.x = nextX;
+                    pt.y = nextY;
+                }
             }
             pt.life -= dt;
             if (pt.life <= 0) {
-                if (pt.kind === "GIB_ARC" && !pt.isRestingGib) {
+                if (pt.kind === "CAR_PART" && !pt.isRestingGib) {
+                    const inWater = Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(pt.x, pt.y));
+                    if (!inWater && (pt.bouncesLeft || 0) > 0) {
+                        pt.bouncesLeft--;
+                        pt.vx *= 0.48;
+                        pt.vy *= 0.48;
+                        pt.vRot = (pt.vRot || 0) * 0.52;
+                        pt.peakZ = (pt.peakZ || 0.25) * 0.34;
+                        pt.maxLife = 0.26;
+                        pt.life = 0.26;
+                        this.particles[pWrite++] = pt;
+                    } else if (!inWater) {
+                        pt.isRestingGib = true;
+                        pt.vx = 0;
+                        pt.vy = 0;
+                        pt.vRot = 0;
+                        const settleDur = (pt.partType === "GLASS" || pt.partType === "TAIL_GLASS" || pt.partType === "TRIM") ? 8.5 : 15.0;
+                        pt.life = settleDur;
+                        pt.maxLife = settleDur;
+                        this.particles[pWrite++] = pt;
+                    }
+                } else if (pt.kind === "GIB_ARC" && !pt.isRestingGib) {
                     pt.isRestingGib = true;
                     pt.vx = 0;
                     pt.vy = 0;

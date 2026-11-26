@@ -2959,9 +2959,69 @@ function runSimulations() {
         console.log("");
     }
 
+    // =========================================================================
+    // SCENARIO 52: Progressive 2.5D Detachable Car Parts, Hanging Bumpers, Blowout Tires & Pay 'n' Spray Restoration
+    // =========================================================================
+    {
+        console.log("--- SCENARIO 52: PROGRESSIVE 2.5D DETACHABLE CAR PARTS, HANGING BUMPERS, BLOWOUT TIRES & RESTORATION ---");
+        const { g, sandbox, stepSec } = createGameInstance(cmpBuf);
+        g.particles.length = 0;
+        const testCar = sandbox.makeVeh("detach_test_52", "TULIP_MUSCLE", g.player.x + 40, g.player.y, 0);
+        testCar.driver = "PLAYER";
+        g.vehicles.push(testCar);
+        const DP = sandbox.CAR_DETACH_PART;
+
+        // 1. Medium front-right hit -> unhooks front bumper (hangingBumperMask) + snaps off right mirror/hubcap + glass shards
+        testCar.receiveImpactDamage(6.5, testCar.x + 28, testCar.y + 10, false, g);
+        assert(
+            Boolean(testCar.hangingBumperMask & DP.FRONT_BUMPER) &&
+            !(testCar.detachedPartsMask & DP.FRONT_BUMPER) &&
+            Boolean(testCar.detachedPartsMask & DP.RIGHT_MIRROR) &&
+            g.particles.some(p => p.kind === "CAR_PART" && (p.partType === "MIRROR" || p.partType === "HUBCAP")),
+            `Medium front-right impact unhooks hanging front bumper & launches mirror/hubcap debris (hanging=${testCar.hangingBumperMask}, detached=${testCar.detachedPartsMask})`
+        );
+
+        // 2. Heavy front hit -> rips off hanging front bumper AND launches 3D painted HOOD
+        testCar.receiveImpactDamage(18.0, testCar.x + 30, testCar.y - 6, false, g);
+        assert(
+            !(testCar.hangingBumperMask & DP.FRONT_BUMPER) &&
+            Boolean(testCar.detachedPartsMask & DP.FRONT_BUMPER) &&
+            Boolean(testCar.detachedPartsMask & DP.HOOD) &&
+            g.particles.some(p => p.kind === "CAR_PART" && p.partType === "BUMPER") &&
+            g.particles.some(p => p.kind === "CAR_PART" && p.partType === "HOOD"),
+            `Heavy front impact rips off front bumper & launches 3D painted HOOD (detached=${testCar.detachedPartsMask})`
+        );
+
+        // 3. Flank T-bone hit -> rips off LEFT_DOOR, then step 1.2s to verify bounce & ground settlement (isRestingGib)
+        testCar.receiveImpactDamage(14.0, testCar.x, testCar.y - 14, false, g);
+        stepSec(1.4);
+        assert(
+            Boolean(testCar.detachedPartsMask & DP.LEFT_DOOR) &&
+            g.particles.some(p => p.kind === "CAR_PART" && p.partType === "DOOR" && p.isRestingGib === true),
+            `Side T-bone detaches 3D car DOOR which bounces & settles on asphalt (isRestingGib=true)`
+        );
+
+        // 4. resetDamage() (Pay 'n' Spray / Car Meet repair) restores all detached & hanging parts cleanly
+        testCar.resetDamage();
+        assert(
+            testCar.detachedPartsMask === 0 && testCar.hangingBumperMask === 0 && testCar.damageDeltaBits === 0,
+            `resetDamage() restores all detached & hanging car parts cleanly (mask=${testCar.detachedPartsMask})`
+        );
+
+        // 5. Vehicle explosion launches blowout TIRE & HOOD debris while respecting 650-particle cap
+        const blowCar = sandbox.makeVeh("blow_test_52", "BANSHEE_GT", g.player.x + 85, g.player.y, 0);
+        g.vehicles.push(blowCar);
+        g.explodeVehicle(blowCar, false, true);
+        assert(
+            g.particles.some(p => p.kind === "CAR_PART" && p.partType === "TIRE") && g.particles.length <= 650,
+            `explodeVehicle launches bouncing rubber TIRE debris while staying within <=650 particle budget (count=${g.particles.length})`
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 51 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT TORTURE, MMO, 3D INTERIORS, CREATION STUDIO, WEBGL & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 52 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS, CREATION STUDIO & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {
