@@ -1052,19 +1052,19 @@ class RetroAudioEngine {
             const src = this.ctx.createBufferSource();
             src.buffer = this.buffers[sirenKey];
             src.loop = true;
-            // Soft anti-harshness EQ notch (-10 dB at 2850 Hz) + warm low-pass ceiling so sirens NEVER pierce the ears!
+            // Gentle anti-harshness EQ notch (-5.5 dB at 3100 Hz) + clear 1150..3400 Hz low-pass so sirens are clearly audible without piercing the ears!
             if (!this._sirenNotch) {
                 this._sirenNotch = this.ctx.createBiquadFilter();
                 this._sirenNotch.type = "peaking";
-                this._sirenNotch.frequency.value = 2850;
-                this._sirenNotch.Q.value = 1.35;
-                this._sirenNotch.gain.value = -10.0;
+                this._sirenNotch.frequency.value = 3100;
+                this._sirenNotch.Q.value = 1.25;
+                this._sirenNotch.gain.value = -5.5;
             }
             if (!this._sirenLP) {
                 this._sirenLP = this.ctx.createBiquadFilter();
                 this._sirenLP.type = "lowpass";
-                this._sirenLP.Q.value = 0.55;
-                this._sirenLP.frequency.value = 1350;
+                this._sirenLP.Q.value = 0.65;
+                this._sirenLP.frequency.value = 2400;
                 this._sirenNotch.connect(this._sirenLP);
                 this._sirenLP.connect(this.sirenGain);
             }
@@ -1379,21 +1379,21 @@ class RetroAudioEngine {
             this._prevAbsSpeed = 0;
         }
 
-        // 2. Real Emergency Sirens (Soft, warm, distance-attenuated — never harsh or ear-piercing!)
+        // 2. Real Emergency Sirens (Balanced sweet spot: clearly audible from afar, warm & comfortable up close!)
         const sirenDist = state.nearestSirenDist !== undefined ? state.nearestSirenDist : 9999;
         const playerSiren = Boolean(this.inVehicle && state.playerSirenActive);
-        if (playerSiren || (sirenDist !== undefined && sirenDist < 600)) {
+        if (playerSiren || (sirenDist !== undefined && sirenDist < 820)) {
             const sirenType = state.nearestSirenType || "POLICE";
             const sirenKey = sirenType === "MEDIC"
                 ? "siren_medic"
                 : (sirenType === "FIRE" ? "siren_firetruck" : "siren_police");
-            const rawLin = playerSiren ? 0.75 : Math.max(0, 1 - sirenDist / 600);
-            const prox = playerSiren ? 0.72 : Math.pow(rawLin, 2.15);
-            const maxSirenGain = playerSiren ? 0.030 : (this.inVehicle ? 0.020 : 0.026);
+            const rawLin = playerSiren ? 0.85 : Math.max(0, 1 - sirenDist / 820);
+            const prox = playerSiren ? 0.85 : Math.pow(rawLin, 1.30);
+            const maxSirenGain = playerSiren ? 0.072 : (this.inVehicle ? 0.056 : 0.068);
             if (this._ensureSirenLoop(sirenKey) && this._sirenNode) {
-                this._setParamSmooth(this.sirenGain.gain, prox * maxSirenGain, 0.22);
-                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 580 + prox * 1080, 0.25);
-                const doppler = playerSiren ? 1.0 : Math.max(0.91, Math.min(1.09, state.trafficDoppler || 1.0));
+                this._setParamSmooth(this.sirenGain.gain, prox * maxSirenGain, 0.25);
+                if (this._sirenLP) this._setParamSmooth(this._sirenLP.frequency, 1150 + prox * 2250, 0.28);
+                const doppler = playerSiren ? 1.0 : Math.max(0.90, Math.min(1.10, state.trafficDoppler || 1.0));
                 this._setParamSmooth(this._sirenNode.playbackRate, doppler, 0.25);
             }
         } else if (this.sirenGain) {

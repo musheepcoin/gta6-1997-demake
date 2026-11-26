@@ -18751,7 +18751,7 @@ class LeonidaGame {
 
         let nearestSirenType = "POLICE";
 
-        const audioVehList = this._activePairVehicles || this.vehicles;
+        const audioVehList = this.vehicles || [];
         for (let i = 0; i < audioVehList.length; i++) {
 
             const v = audioVehList[i];
@@ -18759,12 +18759,12 @@ class LeonidaGame {
             if (!v || v.destroyed) continue;
 
             const dx = v.x - p.x;
-
             const dy = v.y - p.y;
+            if (Math.abs(dx) > 860 || Math.abs(dy) > 860) continue;
 
             const d = Math.hypot(dx, dy);
 
-            if (v.sirenActive && v.driver && v.driver !== "AI_TOW" && d < nearestSirenDist) {
+            if ((v.sirenActive || (this.wantedLevel > 0 && v.isPolice && v.driver === "AI_COP")) && v.driver && v.driver !== "AI_TOW" && d < nearestSirenDist) {
 
                 nearestSirenDist = d;
 
