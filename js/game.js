@@ -737,7 +737,7 @@ class LeonidaGame {
 
             { spec: "STINGER_CABRIO", c: 172.5, r: 104.5, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
-            { spec: "PENETRATOR_GT", c: 343.5, r: 171.5, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
+            { spec: "PENETRATOR_GT", c: 343.5, r: 169.5, a: Math.PI, z: 2.0, missionTag: "LANDMARK", raw512: true },
 
             { spec: "AIRBOAT", c: 185.5, r: 160.0, a: 0, z: 2.0, missionTag: "LANDMARK" },
 
@@ -868,11 +868,15 @@ class LeonidaGame {
                 }
             }
 
-            // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed vehicle
+            // Ensure parked scooters/bikes/cars never spawn overlapping an already-placed vehicle (and never shift a driverless parked car onto an active road!)
             for (let shiftTry = 0; shiftTry < 8; shiftTry++) {
                 const overlap = this.vehicles.some((other) => Math.hypot(other.x - vx, other.y - vy) < 68);
                 if (!overlap) break;
-                vy += 56;
+                const candY = vy + (p.driver ? 56 : -56);
+                if (!p.driver && this.map && this.map.getGroundTypeAt && this.map.getGroundTypeAt(vx, candY) === GROUND_TYPE.ROAD) {
+                    break;
+                }
+                vy = candY;
             }
 
             const v = new Vehicle(p.id || `parked_${idx}`, p.spec, vx, vy, p.a);
@@ -14024,6 +14028,9 @@ class LeonidaGame {
                         if (!veh.waterOnly && !veh.amphibious && veh.specKey !== "AIRBOAT" && this.map.isWaterAtPixel && this.map.isWaterAtPixel(nx, ny)) {
                             return;
                         }
+                        if (veh.driver === "AI_TRAFFIC" && this.map.getGroundTypeAt && this.map.getGroundTypeAt(veh.x, veh.y) === GROUND_TYPE.ROAD && this.map.getGroundTypeAt(nx, ny) !== GROUND_TYPE.ROAD) {
+                            return;
+                        }
                         const vRad = Math.max(10, Math.min(15, (veh.h || 28) * 0.44));
                         if (typeof this.map.resolveCircleBuildingCollision === "function") {
                             const col = this.map.resolveCircleBuildingCollision(nx, ny, vRad, veh.z || 2.0, Boolean(veh.waterOnly || veh.amphibious || veh.specKey === "AIRBOAT"));
@@ -14142,13 +14149,9 @@ class LeonidaGame {
 
                         if (!a.destroyed && !b.destroyed) {
 
-                            if ((a.gridlockEscapeTimer || 0) > 0 || (b.gridlockEscapeTimer || 0) > 0) {
-                                continue;
-                            }
-
                             // Emergency Corridor Assist: if one vehicle has its siren active (Police, Ambulance, Fire, Tow)
-                            // and touches a civilian traffic vehicle, smoothly shift the civilian vehicle toward its right curb
-                            // so the emergency responder passes through without ever getting stuck or spinning the civilian car!
+                            // and touches a civilian traffic vehicle, smoothly shift the civilian vehicle within its safe lane margin
+                            // so the emergency responder passes through without ever pushing the civilian car onto a sidewalk or oncoming lane!
                             const aPriority = Boolean(a.sirenActive || a.driver === "AI_COP" || a.driver === "AI_EMERGENCY" || a.driver === "AI_TOW");
                             const bPriority = Boolean(b.sirenActive || b.driver === "AI_COP" || b.driver === "AI_EMERGENCY" || b.driver === "AI_TOW");
                             if (aPriority !== bPriority) {
@@ -14157,13 +14160,18 @@ class LeonidaGame {
                                 if (civ.driver === "AI_TRAFFIC") {
                                     const cRx = -Math.sin(civ.angle || 0);
                                     const cRy = Math.cos(civ.angle || 0);
-                                    civ.aiPullOverOffset = 20;
-                                    civ.aiPullOverTimer = 2.0;
-                                    clampShovedVehToWorld(
-                                        civ,
-                                        civ.x + cRx * (bestOverlap * 0.65 + 1.5),
-                                        civ.y + cRy * (bestOverlap * 0.65 + 1.5)
-                                    );
+                                    civ.aiPullOverOffset = 13;
+                                    civ.aiPullOverTimer = 1.8;
+                                    const testCx = civ.x + cRx * (bestOverlap * 0.55 + 1.0);
+                                    const testCy = civ.y + cRy * (bestOverlap * 0.55 + 1.0);
+                                    if (
+                                        this.map &&
+                                        this.map.getGroundTypeAt &&
+                                        this.map.getGroundTypeAt(testCx, testCy) === GROUND_TYPE.ROAD &&
+                                        this.map.getGroundTypeAt(testCx + cRx * 12, testCy + cRy * 12) === GROUND_TYPE.ROAD
+                                    ) {
+                                        clampShovedVehToWorld(civ, testCx, testCy);
+                                    }
                                     emg.angularVelocity = 0;
                                     civ.angularVelocity = 0;
                                     continue;
@@ -14198,24 +14206,52 @@ class LeonidaGame {
 
                             } else {
 
-                                // Crossing or turning AI vehicles: back the impinging vehicle along its own heading and stop it
-                                let imp = null;
-                                if (hitALever > 0 && hitBLever <= 0 && a.driver) imp = a;
-                                else if (hitBLever > 0 && hitALever <= 0 && b.driver) imp = b;
-                                else if (a.driver && !b.driver) imp = a;
-                                else if (b.driver && !a.driver) imp = b;
-                                else imp = (aSpdW >= bSpdW) ? a : b;
+                                // Crossing or turning AI vehicles: match entities.js Section C deterministic right-of-way
+                                // so the YIELDING vehicle backs out of the way while the PRIORITY vehicle keeps rolling!
+                                if (a.driver && !b.driver) {
+                                    clampShovedVehToWorld(a, a.x - bestNx * (bestOverlap + 1.5), a.y - bestNy * (bestOverlap + 1.5));
+                                } else if (b.driver && !a.driver) {
+                                    clampShovedVehToWorld(b, b.x + bestNx * (bestOverlap + 1.5), b.y + bestNy * (bestOverlap + 1.5));
+                                } else {
+                                    const fwdA = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
+                                    const fwdB = (a.x - b.x) * bCos + (a.y - b.y) * bSin;
+                                    const aTurn = Boolean(a.aiChosenDir && a.aiChosenDir.isTurn);
+                                    const bTurn = Boolean(b.aiChosenDir && b.aiChosenDir.isTurn);
+                                    let aWins = false;
+                                    if (Boolean(a.sirenActive) !== Boolean(b.sirenActive)) {
+                                        aWins = Boolean(a.sirenActive);
+                                    } else if (aTurn !== bTurn) {
+                                        aWins = !aTurn;
+                                    } else if (Math.abs(fwdA - fwdB) > 6) {
+                                        aWins = fwdA < fwdB;
+                                    } else {
+                                        aWins = String(a.id) > String(b.id);
+                                    }
+                                    const prioVeh = aWins ? a : b;
+                                    const imp = aWins ? b : a;
+                                    // Never push prioVeh backward against its forward motion! Only glide prioVeh laterally away from imp (<= 2.2px/frame on ROAD) so it clears cleanly!
+                                    const pCos = Math.cos(prioVeh.angle);
+                                    const pSin = Math.sin(prioVeh.angle);
+                                    const pRx = -pSin;
+                                    const pRy = pCos;
+                                    const impSide = ((imp.x - prioVeh.x) * pRx + (imp.y - prioVeh.y) * pRy) >= 0 ? -1 : 1;
+                                    const latStep = Math.min(2.2, bestOverlap * 0.45) * impSide;
+                                    const testPx = prioVeh.x + pRx * latStep;
+                                    const testPy = prioVeh.y + pRy * latStep;
+                                    if (!this.map || !this.map.getGroundTypeAt || this.map.getGroundTypeAt(testPx + pRx * impSide * 11, testPy + pRy * impSide * 11) === GROUND_TYPE.ROAD) {
+                                        clampShovedVehToWorld(prioVeh, testPx, testPy);
+                                    }
 
-                                const iCos = Math.cos(imp.angle);
-                                const iSin = Math.sin(imp.angle);
-                                const sep = bestOverlap + 2.0;
-                                const otherVeh = imp === a ? b : a;
-                                const toOther = (otherVeh.x - imp.x) * iCos + (otherVeh.y - imp.y) * iSin;
-                                const backSign = toOther >= 0 ? -1 : 1;
-                                clampShovedVehToWorld(imp, imp.x + iCos * sep * backSign, imp.y + iSin * sep * backSign);
-                                imp.vx = 0;
-                                imp.vy = 0;
-                                imp.speed = 0;
+                                    const iCos = Math.cos(imp.angle);
+                                    const iSin = Math.sin(imp.angle);
+                                    const sep = bestOverlap + 2.5;
+                                    const toPrio = (prioVeh.x - imp.x) * iCos + (prioVeh.y - imp.y) * iSin;
+                                    const backSign = toPrio >= 0 ? -1 : 1;
+                                    clampShovedVehToWorld(imp, imp.x + iCos * sep * backSign, imp.y + iSin * sep * backSign);
+                                    imp.vx = 0;
+                                    imp.vy = 0;
+                                    imp.speed = 0;
+                                }
 
                             }
 

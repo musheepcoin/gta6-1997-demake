@@ -2116,8 +2116,19 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
         const vx = (bx + 0.5) * TS;
         const vy = (by + 0.5) * TS;
         const vz = serverMap.getHeightAtPixel(vx, vy, 4.0);
-        const ang = serverMap.getAlignedRoadAngle ? serverMap.getAlignedRoadAngle(bx, by, st.a, vz) : st.a;
-        const spd = getServerVehicleCruiseSpeed(st.spec, 1, false);
+        const navSt = serverMap.getNavigationBlock ? serverMap.getNavigationBlock(bx, by, vz) : null;
+        const lidSt = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
+        const isValidCruiseLane = Boolean(
+            navSt &&
+            navSt.groundType === global.GROUND_TYPE.ROAD &&
+            !navSt.isRailway &&
+            !navSt.isParkingBay &&
+            (!serverMap.surfaceGround || serverMap.surfaceGround[by * 512 + bx] === global.GROUND_TYPE.ROAD) &&
+            lidSt !== 25
+        );
+        const ang = (isValidCruiseLane && serverMap.getAlignedRoadAngle) ? serverMap.getAlignedRoadAngle(bx, by, st.a, vz) : st.a;
+        const drvSt = isValidCruiseLane ? 1 : 0;
+        const spd = drvSt === 1 ? getServerVehicleCruiseSpeed(st.spec, 1, false) : 0;
         room.vehs[st.id] = [
             st.id,
             st.spec,
@@ -2127,7 +2138,7 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
             Math.round(ang * 1000) / 1000,
             Math.round(Math.cos(ang) * spd),
             Math.round(Math.sin(ang) * spd),
-            1, // AI_TRAFFIC
+            drvSt,
             100,
             0,
             i % 6,
@@ -2287,7 +2298,8 @@ function snapStationToNearestRoad(wx, wy) {
                 const by = baseBy + dy;
                 if (bx < 2 || bx >= 510 || by < 2 || by >= 510) continue;
                 const nav = serverMap.getNavigationBlock(bx, by, 2.0);
-                if (nav && nav.groundType === global.GROUND_TYPE.ROAD && !nav.isParkingBay) {
+                const surfOk = !serverMap.surfaceGround || serverMap.surfaceGround[by * 512 + bx] === global.GROUND_TYPE.ROAD;
+                if (nav && nav.groundType === global.GROUND_TYPE.ROAD && !nav.isParkingBay && !nav.isRailway && surfOk) {
                     const dirs = serverMap.getAllowedRoadDirections(bx, by, 2.0);
                     const ang = dirs.length > 0 ? dirs[0].angle : 0;
                     const rx = (bx + 0.5) * TS;
@@ -2824,7 +2836,17 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         const bx = Math.max(1, Math.min(510, Math.floor(x / TS)));
         const by = Math.max(1, Math.min(510, Math.floor(y / TS)));
 
+        const onTrueRoad = !serverMap.surfaceGround || serverMap.surfaceGround[by * 512 + bx] === global.GROUND_TYPE.ROAD;
+        const curLid1 = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
+        const curDirsNow = onTrueRoad ? serverMap.getAllowedRoadDirections(bx, by, z) : [];
+        if (onTrueRoad && curLid1 !== 25 && curDirsNow.length === 1 && Math.cos(a - curDirsNow[0].angle) < -0.35) {
+            a = curDirsNow[0].angle;
+            nav.targetBx = null;
+            nav.targetBy = null;
+        }
+
         if (
+            !onTrueRoad ||
             typeof nav.targetBx !== "number" ||
             typeof nav.targetBy !== "number" ||
             !Number.isFinite(nav.targetBx) ||
@@ -2833,31 +2855,30 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) > TS * 2.6
         ) {
             nav.turnSeed = (nav.turnSeed + 0.381966011) % 1.0;
-            const curDirs = serverMap.getAllowedRoadDirections(bx, by, z);
+            const curDirs = onTrueRoad ? curDirsNow : [];
             if (curDirs.length <= 1) {
                 nav.turnedInIntersection = false;
                 nav.entryAngle = a;
             }
-            const nextStep = (nav.role && Number.isFinite(nav.goalX) && Number.isFinite(nav.goalY))
-                ? serverMap.chooseTargetGuidedRoadBlock(bx, by, a, nav.goalX, nav.goalY, z, nav.turnedInIntersection, nav.entryAngle)
-                : serverMap.chooseNextRoadBlock(bx, by, a, z, nav.turnSeed, nav.turnedInIntersection, nav.entryAngle);
+            const nextStep = onTrueRoad
+                ? ((nav.role && Number.isFinite(nav.goalX) && Number.isFinite(nav.goalY))
+                    ? serverMap.chooseTargetGuidedRoadBlock(bx, by, a, nav.goalX, nav.goalY, z, nav.turnedInIntersection, nav.entryAngle)
+                    : serverMap.chooseNextRoadBlock(bx, by, a, z, nav.turnSeed, nav.turnedInIntersection, nav.entryAngle))
+                : null;
             if (nextStep) {
                 nav.targetBx = nextStep.bx;
                 nav.targetBy = nextStep.by;
                 nav.targetAngle = nextStep.angle;
                 if (nextStep.isTurn) nav.turnedInIntersection = true;
-            } else if (bx >= 447) {
-                // Off-road on Vice Beach / Lummus Park: steer West back onto Ocean Drive (bx = 446)!
-                nav.targetBx = bx - 1;
-                nav.targetBy = by;
-                nav.targetAngle = Math.PI;
             } else {
                 const nearestRd = snapStationToNearestRoad(x, y);
                 const rbx = Math.floor(nearestRd.x / TS);
                 const rby = Math.floor(nearestRd.y / TS);
-                nav.targetBx = bx + (rbx !== bx ? Math.sign(rbx - bx) : Math.round(Math.cos(a)));
-                nav.targetBy = by + (rbx === bx && rby !== by ? Math.sign(rby - by) : (rbx === bx ? Math.round(Math.sin(a)) : 0));
-                nav.targetAngle = (nearestRd.x !== x || nearestRd.y !== y) ? Math.atan2(nearestRd.y - y, nearestRd.x - x) : a;
+                nav.targetBx = rbx;
+                nav.targetBy = rby;
+                nav.targetAngle = nearestRd.angle || 0;
+                x += (nearestRd.x - x) * Math.min(1, dt * 3.5);
+                y += (nearestRd.y - y) * Math.min(1, dt * 3.5);
             }
         }
 
@@ -2867,7 +2888,7 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         let angDiff = desiredAng - a;
         while (angDiff > Math.PI) angDiff -= Math.PI * 2;
         while (angDiff < -Math.PI) angDiff += Math.PI * 2;
-        const maxTurn = 4.2 * dt;
+        const maxTurn = 7.8 * dt;
         if (Math.abs(angDiff) <= maxTurn) a = desiredAng;
         else a += Math.sign(angDiff) * maxTurn;
 
@@ -2883,8 +2904,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             }
         }
 
-        // Check lead vehicle spacing in spatial hash (only for same-direction traffic or parked obstacles; bypass after 4.0s if blocked by a stationary car)
-        if (targetSpd > 0 && (nav.stuckTicks || 0) <= 40) {
+        // Check lead vehicle spacing in spatial hash (never disable bumper collision spacing; instead re-pick route if genuinely stuck > 15s!)
+        if (targetSpd > 0) {
             const cfx = Math.cos(a);
             const cfy = Math.sin(a);
             const gx = x >> 8;
@@ -2902,12 +2923,12 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                         const ody = other[3] - y;
                         const fwd = odx * cfx + ody * cfy;
                         const lat = Math.abs(-odx * cfy + ody * cfx);
-                        if (fwd > 8 && fwd < 86 && lat < 22) {
+                        if (fwd > 8 && fwd < 88 && lat < 22) {
                             const otherSpd = Math.hypot(other[6] || 0, other[7] || 0);
                             const otherAng = Number.isFinite(other[5]) ? other[5] : a;
                             // Ignore oncoming cars moving in the opposite lane so opposite flows never deadlock
                             if (otherSpd > 5 && Math.cos(otherAng - a) < -0.15) continue;
-                            targetSpd = fwd < 54 ? 0 : Math.min(targetSpd, otherSpd * 0.85);
+                            targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.85);
                             if (targetSpd === 0) blockedByLead = true;
                         }
                     }
@@ -2916,7 +2937,12 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         }
         if (targetSpd === 0 && !stoppedAtRedLight) {
             nav.stuckTicks = (nav.stuckTicks || 0) + 1;
-            if (nav.stuckTicks > 55) nav.stuckTicks = 0;
+            if (nav.stuckTicks > 150) {
+                nav.stuckTicks = 0;
+                nav.targetBx = null;
+                nav.targetBy = null;
+                nav.turnedInIntersection = false;
+            }
         } else if (targetSpd > 0) {
             nav.stuckTicks = 0;
         }

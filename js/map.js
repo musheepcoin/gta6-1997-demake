@@ -5855,6 +5855,25 @@ class LeonidaMap {
         return Boolean(blk && (blk.lid === 24 || blk.trafficHint === 1));
     }
 
+    isRedLightForApproach(bx, by, hdx, hdy, trafficLightTimer = 0, zBlocks = 2.0) {
+        if (bx < 1 || bx >= MAP_COLS - 1 || by < 1 || by >= MAP_ROWS - 1) return false;
+        const curLid = this.getBlockInfo(bx, by, 1).lid;
+        if (curLid === 25) return false;
+        const nextBx = bx + hdx;
+        const nextBy = by + hdy;
+        const nextLid = this.getBlockInfo(nextBx, nextBy, 1).lid;
+        if (nextLid !== 25 && !this.isStopLineBlock(bx, by)) return false;
+        const px = (bx + 0.5) * TILE_SIZE;
+        const py = (by + 0.5) * TILE_SIZE;
+        if (!this.hasTrafficSignalNear(px, py, 380)) return false;
+        const ph = ((trafficLightTimer % 12.0) + 12.0) % 12.0;
+        const isNS = Math.abs(hdy) >= Math.abs(hdx);
+        const state = isNS
+            ? (ph < 4.6 ? "GREEN" : (ph < 6.0 ? "AMBER" : (ph < 10.6 ? "RED" : "AMBER")))
+            : (ph < 4.6 ? "RED" : (ph < 6.0 ? "AMBER" : (ph < 10.6 ? "GREEN" : "AMBER")));
+        return state !== "GREEN";
+    }
+
     hasTrafficSignalNear(x, y, maxDist = 360) {
         if (!Array.isArray(this.trafficSignals) || this.trafficSignals.length === 0) return false;
         if (maxDist <= 420) {
@@ -5944,7 +5963,10 @@ class LeonidaMap {
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
             if (!startInRestricted && this.isRestrictedNoTrafficZone(nx, ny)) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
-            if (!nb || nb.groundType !== GROUND_TYPE.ROAD || nb.isRailway) {
+            if (!nb || nb.groundType !== GROUND_TYPE.ROAD || nb.isRailway || nb.isParkingBay) {
+                continue;
+            }
+            if (this.surfaceGround && this.surfaceGround[ny * MAP_COLS + nx] !== GROUND_TYPE.ROAD) {
                 continue;
             }
             const nextDirs = this.getAllowedRoadDirections(nx, ny, zBlocks);
@@ -6010,18 +6032,22 @@ class LeonidaMap {
                 const nbx = bx + cdx, nby = by + cdy;
                 if (nbx < 1 || nbx >= MAP_COLS - 1 || nby < 1 || nby >= MAP_ROWS - 1) continue;
                 const nb = this.getNavigationBlock(nbx, nby, zBlocks);
-                if (nb && nb.groundType === GROUND_TYPE.ROAD) {
+                const surfOk = !this.surfaceGround || this.surfaceGround[nby * MAP_COLS + nbx] === GROUND_TYPE.ROAD;
+                if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isParkingBay && !nb.isRailway && surfOk) {
                     return { dx: cdx, dy: cdy, bx: nbx, by: nby, angle: ca, isTurn: Math.abs(this.normalizeAngleDiff(ca, currentAngle)) > 0.45 };
                 }
             }
-            for (const ca of cands) {
-                const cdx = Math.round(Math.cos(ca));
-                const cdy = Math.round(Math.sin(ca));
-                const nbx = bx + cdx, nby = by + cdy;
-                if (nbx < 1 || nbx >= MAP_COLS - 1 || nby < 1 || nby >= MAP_ROWS - 1) continue;
-                const nb = this.getNavigationBlock(nbx, nby, zBlocks);
-                if (nb && nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER && nb.groundType !== GROUND_TYPE.AIR) {
-                    return { dx: cdx, dy: cdy, bx: nbx, by: nby, angle: ca, isTurn: Math.abs(this.normalizeAngleDiff(ca, currentAngle)) > 0.45 };
+            const curSurfRoad = this.surfaceGround ? this.surfaceGround[by * MAP_COLS + bx] === GROUND_TYPE.ROAD : true;
+            if (!curSurfRoad) {
+                for (const ca of cands) {
+                    const cdx = Math.round(Math.cos(ca));
+                    const cdy = Math.round(Math.sin(ca));
+                    const nbx = bx + cdx, nby = by + cdy;
+                    if (nbx < 1 || nbx >= MAP_COLS - 1 || nby < 1 || nby >= MAP_ROWS - 1) continue;
+                    const nb = this.getNavigationBlock(nbx, nby, zBlocks);
+                    if (nb && nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER && nb.groundType !== GROUND_TYPE.AIR) {
+                        return { dx: cdx, dy: cdy, bx: nbx, by: nby, angle: ca, isTurn: Math.abs(this.normalizeAngleDiff(ca, currentAngle)) > 0.45 };
+                    }
                 }
             }
             const dx = Math.round(Math.cos(snapAngle));
@@ -6037,6 +6063,7 @@ class LeonidaMap {
         }
 
         const startInRestricted = this.isRestrictedNoTrafficZone(bx, by);
+        const curOnTrueRoad = !this.surfaceGround || this.surfaceGround[by * MAP_COLS + bx] === GROUND_TYPE.ROAD;
         const roadCandidates = [];
         const anyDrivable = [];
         for (const d of dirs) {
@@ -6045,6 +6072,7 @@ class LeonidaMap {
             if (nx < 1 || nx >= MAP_COLS - 1 || ny < 1 || ny >= MAP_ROWS - 1) continue;
             if (!startInRestricted && this.isRestrictedNoTrafficZone(nx, ny)) continue;
             const nb = this.getNavigationBlock(nx, ny, zBlocks);
+            const nextSurfRoad = !this.surfaceGround || this.surfaceGround[ny * MAP_COLS + nx] === GROUND_TYPE.ROAD;
             const absDiff = Math.abs(this.normalizeAngleDiff(d.angle, currentAngle));
             const isTurn = absDiff > 0.45;
             const isEntryUturn = typeof entryAngle === "number" && Math.abs(this.normalizeAngleDiff(d.angle, entryAngle)) > 2.4;
@@ -6055,9 +6083,9 @@ class LeonidaMap {
                 : false;
             const congestionScore = this.getLaneCongestionScore(bx, by, d.dx, d.dy, 6);
             const entry = { ...d, bx: nx, by: ny, absDiff, isTurn, isUturn, exitsIntersection, straightValid, congestionScore };
-            if (nb.groundType === GROUND_TYPE.ROAD) {
+            if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isParkingBay && !nb.isRailway && nextSurfRoad) {
                 roadCandidates.push(entry);
-            } else if (nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER) {
+            } else if (!curOnTrueRoad && nb && nb.groundType !== GROUND_TYPE.BUILDING && nb.groundType !== GROUND_TYPE.WATER) {
                 anyDrivable.push(entry);
             }
         }
@@ -6078,7 +6106,7 @@ class LeonidaMap {
         if (nonUturn.length > 0) pool = nonUturn;
 
         // Filter out:
-        // 1) straight steps inside an intersection that only lead to a wall/dead-end or force a U-turn,
+        // 1) straight steps inside an intersection that only lead to a wall/dead-end/oncoming lane,
         // 2) turns after the car already turned once inside this intersection, OR
         // 3) turns into an oncoming lane or dead-end stub
         const validFiltered = pool.filter((c) => {
@@ -6088,6 +6116,12 @@ class LeonidaMap {
         });
         if (validFiltered.length > 0) {
             pool = validFiltered;
+        } else {
+            // If car was nudged laterally inside a multi-lane box after turning, allow a corrective legal exit rather than entering a wrong-way lane!
+            const legalExitFallback = pool.filter((c) => c.isTurn ? Boolean(c.exitsIntersection) : Boolean(c.straightValid));
+            if (legalExitFallback.length > 0) {
+                pool = legalExitFallback;
+            }
         }
 
         if (pool.length === 1) {

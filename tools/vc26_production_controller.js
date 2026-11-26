@@ -2859,9 +2859,109 @@ function runSimulations() {
         console.log("");
     }
 
+    // =========================================================================
+    // SCENARIO 51: Car AI Zero-Defect Torture Audit (Stop Lines, In-Lane Clamps, Intersection Priority & Server Red-Light Parity)
+    // =========================================================================
+    {
+        console.log("--- SCENARIO 51: CAR AI ZERO-DEFECT TORTURE AUDIT (VENETIAN CAUSEWAY, COLLINS AVE & OCEAN DRIVE) ---");
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const map = g.map;
+        const TS = 64;
+        g.trafficManager.generateTrafficPeds = () => {};
+        g.seedCityCurbsideParkedVehicles();
+        const localParked = g.vehicles.filter(v => !v.driver && Math.abs(v.x - 438.5 * TS) < 850 && Math.abs(v.y - 173.5 * TS) < 850);
+        g.vehicles = localParked.slice();
+        g.peds.length = 0;
+        g.setWantedLevel(0);
+        g.player.x = 437.2 * TS;
+        g.player.y = 172.2 * TS;
+        g.renderer.camX = 438.5 * TS;
+        g.renderer.camY = 173.5 * TS;
+
+        // 1. Verify LeonidaMap.isRedLightForApproach server helper parity
+        assert(
+            typeof map.isRedLightForApproach === "function" &&
+            map.isRedLightForApproach(435, 172, 0, 1, 8.0, 2.0) === true &&
+            map.isRedLightForApproach(435, 172, 0, 1, 2.0, 2.0) === false,
+            `LeonidaMap.isRedLightForApproach stops North-South traffic at RED (t=8.0s) and releases at GREEN (t=2.0s)`
+        );
+
+        // 2. Verify clampSafeInLaneOffset never pushes a vehicle onto a PAWEMENT sidewalk or opposing lane
+        const testSed = sandbox.makeVeh("clamp_test_51", "REGAL_SEDAN", 445.5 * TS, 260.5 * TS, Math.PI * 0.5);
+        const clampedRight = testSed.clampSafeInLaneOffset(28, 445, 260, 0, 1, 2.0, map);
+        const clampedLeft = testSed.clampSafeInLaneOffset(-28, 445, 260, 0, 1, 2.0, map);
+        assert(
+            Math.abs(clampedRight) <= 14 && Math.abs(clampedLeft) <= 13,
+            `clampSafeInLaneOffset bounds lateral offsets strictly inside active road lane (right=${clampedRight}, left=${clampedLeft})`
+        );
+
+        // 3. Run 24s @ 60FPS dense intersection simulation at Venetian Causeway x Collins Ave x Ocean Drive (with heavy CITY_BUS + SUPERBIKE + Sedans)
+        const specs51 = ["REGAL_SEDAN", "CITY_BUS", "BANSHEE_GT", "SUPERBIKE", "VICE_CAB", "PICKUP_TRUCK", "TULIP_MUSCLE", "STRETCH_LIMO"];
+        let sp = 0;
+        for (let r = 164; r <= 182 && sp < 26; r += 2) {
+            for (let c = 428; c <= 446 && sp < 26; c++) {
+                if (map.surfaceGround[r * 512 + c] !== 2) continue;
+                const nav = map.getNavigationBlock(c, r, 2.0);
+                const lid1 = map.getBlockInfo(c, r, 1).lid;
+                if (!nav || nav.groundType !== 2 || nav.isParkingBay || nav.isRailway || lid1 === 25) continue;
+                const dirs = map.getAllowedRoadDirections(c, r, 2.0);
+                if (dirs.length !== 1) continue;
+                if (map.getBlockInfo(c + dirs[0].dx, r + dirs[0].dy, 1).lid === 25) continue;
+                const vx = (c + 0.5) * TS, vy = (r + 0.5) * TS;
+                if (g.vehicles.some(ov => Math.hypot(ov.x - vx, ov.y - vy) < 92)) continue;
+                const car = sandbox.makeVeh(`s51_${sp}`, specs51[sp % specs51.length], vx, vy, dirs[0].angle);
+                car.driver = "AI_TRAFFIC";
+                car.speed = 76;
+                g.vehicles.push(car);
+                sp++;
+            }
+        }
+
+        let s51WrongWay = 0, s51Sidewalk = 0, s51RedViol = 0, s51Overlap = 0;
+        const prevT51 = new Map();
+        for (let step = 0; step < 24 * 60; step++) {
+            sandbox.advanceClock(1000 / 60);
+            g.update(1 / 60);
+            if (step % 6 !== 0) continue;
+            const act = g.vehicles.filter(v => v && !v.destroyed && v.driver === "AI_TRAFFIC" && !v.aiCurbParkingBay && !(v._mergingFromCurbTimer > 0));
+            for (let i = 0; i < act.length; i++) {
+                const v = act[i];
+                const bx = Math.floor(v.x / TS), by = Math.floor(v.y / TS);
+                const gt = map.surfaceGround[by * 512 + bx];
+                const lid1 = map.getBlockInfo(bx, by, 1).lid;
+                if (gt === 3 || gt === 4) s51Sidewalk++;
+                if (gt === 2 && lid1 !== 25 && (v.gridlockReverseTimer || 0) <= 0) {
+                    const dirs = map.getAllowedRoadDirections(bx, by, v.z || 2.0);
+                    if (dirs.length === 1 && Math.cos(v.angle - dirs[0].angle) < -0.35) s51WrongWay++;
+                }
+                const pt = prevT51.get(v.id);
+                if (pt && pt.lid1 !== 25 && lid1 === 25 && v.aiState !== "PULL_OVER_SIREN" && (v.aiPanicTimer || 0) <= 0 && (g.signalPreemptionTimer || 0) <= 0 && map.hasTrafficSignalNear((bx + 0.5) * TS, (by + 0.5) * TS, 360)) {
+                    const mdx = bx - pt.bx, mdy = by - pt.by;
+                    const entNS = Math.abs(mdy) > 0 && mdx === 0;
+                    const entEW = Math.abs(mdx) > 0 && mdy === 0;
+                    const tlPh = (((g.trafficLightTimer || 0) % 12.0) + 12.0) % 12.0;
+                    const nsS = g.getNSTrafficLightState(), ewS = g.getEWTrafficLightState();
+                    if ((entNS && (nsS === "RED" || (nsS === "AMBER" && (tlPh >= 10.6 || tlPh > 5.15)))) ||
+                        (entEW && (ewS === "RED" || (ewS === "AMBER" && (tlPh < 6.0 || tlPh > 11.15))))) {
+                        s51RedViol++;
+                    }
+                }
+                prevT51.set(v.id, { bx, by, lid1 });
+                for (let j = i + 1; j < act.length; j++) {
+                    if (Math.hypot(act[j].x - v.x, act[j].y - v.y) < 16) s51Overlap++;
+                }
+            }
+        }
+        assert(
+            s51WrongWay === 0 && s51Sidewalk === 0 && s51RedViol === 0 && s51Overlap === 0,
+            `24s dense Venetian x Collins x Ocean Drive traffic runs with zero gross AI defects (wrongWay=${s51WrongWay}, sidewalk=${s51Sidewalk}, redViol=${s51RedViol}, overlap=${s51Overlap})`
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 50 FULL-GAME 200-LOOP AUDIT, PRODUCTION CONTROLLER, MMO, 3D INTERIORS, CREATION STUDIO, WEBGL & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 51 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT TORTURE, MMO, 3D INTERIORS, CREATION STUDIO, WEBGL & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

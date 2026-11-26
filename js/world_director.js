@@ -1534,23 +1534,13 @@ class ViceWorldDirector {
             });
         }
 
-        // Apply 3M Opticom Emergency Preemption or SCATS Adaptive Queue Demand to city traffic signals
+        // Apply 3M Opticom Emergency Preemption ONLY for genuine life-safety sirens (never flip city lights abruptly on routine queue counts!)
         if (opticomAxis) {
             if (g.signalPreemptionAxis !== opticomAxis || (g.signalPreemptionTimer || 0) <= 0.4) {
                 lt.totalSignalPreemptions = (lt.totalSignalPreemptions || 0) + 1;
             }
             g.signalPreemptionAxis = opticomAxis;
             g.signalPreemptionTimer = 2.6;
-        } else if ((g.signalPreemptionTimer || 0) <= 0) {
-            if (nsQueueDemand >= ewQueueDemand + 4 && !g.isNSGreen()) {
-                g.signalPreemptionAxis = "NS";
-                g.signalPreemptionTimer = 2.2;
-                lt.totalSignalPreemptions = (lt.totalSignalPreemptions || 0) + 1;
-            } else if (ewQueueDemand >= nsQueueDemand + 4 && !g.isEWGreen()) {
-                g.signalPreemptionAxis = "EW";
-                g.signalPreemptionTimer = 2.2;
-                lt.totalSignalPreemptions = (lt.totalSignalPreemptions || 0) + 1;
-            }
         }
 
         lt.congestedTilesCount = congMap.size;
@@ -1822,8 +1812,8 @@ class ViceWorldDirector {
         const distToTarget = Math.hypot(targetX - ped.x, targetY - ped.y);
         const clearSide = (bn && bn.clearSide) ? bn.clearSide : 1;
 
-        // 1. When within 175px of the jam, wave the glowing orange traffic baton & issue physical steering/reverse/alternating-hold directives!
-        if (distToTarget < 175 && Array.isArray(g.vehicles)) {
+        // 1. When within 340px of the jam (visual whistle/wand range down the block), wave the glowing orange traffic baton & issue physical steering/alternating-hold directives!
+        if (distToTarget < 340 && Array.isArray(g.vehicles)) {
             ped.isDirectingTraffic = true;
             ped.wandWaveTimer = 0.85;
             const flowAng = (bn && typeof bn.flowAng === "number") ? bn.flowAng : (obsVeh ? (obsVeh.angle || 0) : (ped.angle || 0));
@@ -1840,21 +1830,22 @@ class ViceWorldDirector {
 
                 if (dirCos >= -0.35) {
                     bypassingSameDirCount++;
-                    // Early Cone-Taper Guidance: channel approaching or stalled vehicles smoothly along the diagonal cone taper onto the open lane
-                    const targetOff = clearSide * 27;
-                    if (Math.abs((v.aiPullOverOffset || 0) - targetOff) > 4 || (v.aiPullOverTimer || 0) < 1.2) {
+                    // Early Cone-Taper Guidance: channel approaching vehicles within safe in-lane bounds (±13px max) or via same-direction lane change!
+                    const vbx = Math.floor(v.x / 64);
+                    const vby = Math.floor(v.y / 64);
+                    if ((v.aiLaneChangeCooldown || 0) <= 0 && typeof v.tryAdjacentLaneChange === "function") {
+                        v.tryAdjacentLaneChange(vbx, vby, v.z || 2.0, g.map, g);
+                    }
+                    const rawOff = clearSide * 13;
+                    const targetOff = typeof v.clampSafeInLaneOffset === "function"
+                        ? v.clampSafeInLaneOffset(rawOff, vbx, vby, Math.round(fCos), Math.round(fSin), v.z || 2.0, g.map)
+                        : rawOff;
+                    if (Math.abs((v.aiPullOverOffset || 0) - targetOff) > 2 || (v.aiPullOverTimer || 0) < 1.2) {
                         v.aiPullOverOffset = targetOff;
-                        v.aiPullOverTimer = Math.max(v.aiPullOverTimer || 0, 3.4);
+                        v.aiPullOverTimer = Math.max(v.aiPullOverTimer || 0, 2.6);
                         v.aiTurnSignal = clearSide;
                         this.laneTracker.totalWardenDirectives++;
                         this.blackboard.totalTrafficWardenDirectives = this.laneTracker.totalWardenDirectives;
-                    }
-                    // If the vehicle is wedged behind an obstacle with gridlockTimer > 0.8, command a physical reverse-and-steer maneuver
-                    if (Math.abs(v.speed || 0) < 8 && (v.wardenHoldTimer || 0) <= 0 && ((v.gridlockTimer || 0) > 0.8 || (v.yieldTimer || 0) > 1.4)) {
-                        v.gridlockReverseTimer = Math.max(v.gridlockReverseTimer || 0, 1.35);
-                        v.gridlockEscapeDir = clearSide;
-                        v.gridlockEscapeTimer = Math.max(v.gridlockEscapeTimer || 0, 2.8);
-                        v.yieldTimer = 0;
                     }
                 }
             }
@@ -1898,8 +1889,8 @@ class ViceWorldDirector {
                 obsVeh.lastPlayerDriven = false;
                 obsVeh.abandonedTimer = 0;
                 obsVeh.doorOpenTimer = 0.44;
-                obsVeh.aiPullOverOffset = clearSide * 24;
-                obsVeh.aiPullOverTimer = 2.6;
+                obsVeh.aiPullOverOffset = 0;
+                obsVeh.aiPullOverTimer = 0;
                 ped._boardedVehicle = true;
                 ped.dead = true;
                 this.laneTracker.totalWardenDirectives++;
