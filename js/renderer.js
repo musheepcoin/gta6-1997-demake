@@ -5703,6 +5703,223 @@ class RetroRenderer {
                     ctx.restore();
                 }
 
+                // 6N. Authentic 1997 GTA Pixel-Art Crumpled Car Parts, Round Tires & Recessed Engine/Trunk Cavities
+                //     Painted pixel-by-pixel at x = 1280..1535, y = 3995 (max h = 20px, clear of y = 4032) so detached
+                //     panels & on-car damage have irregular torn/crumpled silhouettes instead of flat rectangular blocks!
+                {
+                    const partPal = {
+                        K: [20, 23, 30, 245],
+                        D: [74, 80, 92, 252],
+                        S: [142, 148, 160, 255],
+                        B: [198, 204, 214, 255],
+                        P: [232, 236, 244, 255],
+                        H: [255, 255, 255, 255],
+                        M: [38, 42, 52, 252],
+                        C: [204, 214, 228, 255],
+                        R: [138, 84, 52, 252],
+                        G: [32, 48, 64, 215],
+                        W: [192, 236, 255, 235]
+                    };
+                    const bayPal = {
+                        K: [14, 16, 22, 165],
+                        M: [18, 21, 28, 236],
+                        C: [92, 100, 114, 246],
+                        R: [112, 70, 46, 242]
+                    };
+                    const bakePartPixels = (key, ax, ay, rows, pal) => {
+                        const ph = rows.length;
+                        const pw = rows[0].length;
+                        const img = ctx.createImageData(pw, ph);
+                        const id = img.data;
+                        for (let ry = 0; ry < ph; ry++) {
+                            const row = rows[ry];
+                            for (let rx = 0; rx < pw; rx++) {
+                                const c = pal[row[rx]];
+                                if (!c) continue;
+                                const o = (ry * pw + rx) * 4;
+                                id[o] = c[0];
+                                id[o + 1] = c[1];
+                                id[o + 2] = c[2];
+                                id[o + 3] = c[3];
+                            }
+                        }
+                        ctx.putImageData(img, ax, ay);
+                        meta.sprites.objects[key] = [ax, ay, pw, ph];
+                    };
+
+                    // 1) Crumpled tapered hood (18x16) — folded front corner, cowl notch + 2 hinges, diagonal dent crease
+                    bakePartPixels("car_part_hood", 1280, 3995, [
+                        "....KKKKKKKK......",
+                        "..KKBBBBPPPPKK....",
+                        ".KMBBPPPDDPPPK....",
+                        "KMBPPPPPDDHPPPK...",
+                        ".KBPPPSDDDHHPPBK..",
+                        "..KPPPSDDHHPPPPK..",
+                        "..KPPPPSDHHPPPPK..",
+                        "..KPPPPPSDHPPPPK..",
+                        "..KPPPPPSDHPPPPK..",
+                        "..KPPPPSDDHPPPPK..",
+                        "..KPPPSDDHHPPPK...",
+                        ".KBPPDDDHPPPPK....",
+                        "KMBPPDDPPPPBK.....",
+                        ".KMBBPPPPBBK......",
+                        "..KKBBBBKK........",
+                        "....KKKK.........."
+                    ], partPal);
+
+                    // 2) Dented rear trunk lid (13x14) — rounded rear lip, plate recess & bent corner
+                    bakePartPixels("car_part_trunk", 1304, 3995, [
+                        "...KKKKKKK...",
+                        ".KKBBPPPBBKK.",
+                        "KMBPPPSDHPPBK",
+                        ".KBPPPSDHPPPK",
+                        ".KPPPPSDHHPPK",
+                        ".KPPPPPSDHPMK",
+                        ".KPPPPPSDHPMK",
+                        ".KPPPPPSDHPMK",
+                        ".KPPPPSDHHPPK",
+                        ".KBPPPSDHPPPK",
+                        "KMBPPDDPPPPBK",
+                        ".KKBBDPPPBKK.",
+                        "...KKBBBBK...",
+                        ".....KKKK...."
+                    ], partPal);
+
+                    // 3) Torn car door (16x9) — angled window frame w/ broken glass teeth + dented lower panel
+                    bakePartPixels("car_part_door", 1324, 3995, [
+                        "...KKKKKKKKK....",
+                        "..KPK..W..WKK...",
+                        ".KPK..W...G.KK..",
+                        "KPKKKKKKKKKKKKK.",
+                        "KPPPPPPDDHPPPPPK",
+                        "KPPMPPSDDHHPPPPK",
+                        "KBBBBBSDDHBBBBBK",
+                        ".KKKKKKDDKKKKK..",
+                        "......KKKK......"
+                    ], partPal);
+
+                    // 4) Kinked wrap-around bumper (9x20) — swept tips, V-bend in middle, rubber strip & brackets
+                    bakePartPixels("car_part_bumper", 1346, 3995, [
+                        "..KKKK...",
+                        ".KBPBBK..",
+                        ".KPPPMK..",
+                        "..KPPPMK.",
+                        "..KMPPHK.",
+                        ".KMKPPHK.",
+                        "..KDPPPHK",
+                        "...KDPPMK",
+                        "...KDDPMK",
+                        "..KMKDPHK",
+                        "..KMKDPHK",
+                        "...KDDPMK",
+                        "...KDPPMK",
+                        "..KDPPPHK",
+                        ".KMKPPHK.",
+                        "..KMPPHK.",
+                        "..KPPPMK.",
+                        ".KPPPMK..",
+                        ".KBPBBK..",
+                        "..KKKK..."
+                    ], partPal);
+
+                    // 5) True circular rubber tire w/ 5-spoke alloy rim (12x12)
+                    bakePartPixels("car_part_tire", 1362, 3995, [
+                        "....KKKK....",
+                        "..KKMMMMKK..",
+                        ".KMMKKKKMMK.",
+                        ".KMKCCCCHMK.",
+                        "KMKCHMMHCMKK",
+                        "KMKCMKKMCMMK",
+                        "KMKCMKKMCMMK",
+                        "KMKCHMMHCMKK",
+                        ".KMKCCCCHMK.",
+                        ".KMMKKKKMMK.",
+                        "..KKMMMMKK..",
+                        "....KKKK...."
+                    ], partPal);
+
+                    // 6) Round spoked hubcap disc (9x9)
+                    bakePartPixels("car_part_hubcap", 1380, 3995, [
+                        "..KKKKK..",
+                        ".KCCCCCK.",
+                        "KCHMKMHCK",
+                        "KCMCCCMCK",
+                        "KKMCKCMKK",
+                        "KCMCCCMCK",
+                        "KCHMKMHCK",
+                        ".KCCCCCK.",
+                        "..KKKKK.."
+                    ], partPal);
+
+                    // 7) Exhaust muffler & S-bent tailpipe (15x7)
+                    bakePartPixels("car_part_muffler", 1395, 3995, [
+                        ".....KKKKKKK...",
+                        "...KKCCCCCCCK..",
+                        "KKKMRCCCCCRMCK.",
+                        "KMMMRCCCCCRMMKK",
+                        ".KKKMRRRRRMCKKK",
+                        "....KKKKKKKK..K",
+                        "..............."
+                    ], partPal);
+
+                    // 8) Teardrop side mirror (7x6)
+                    bakePartPixels("car_part_mirror", 1416, 3995, [
+                        "..KKKK.",
+                        ".KPPPBK",
+                        "KMKPPWK",
+                        ".KBBBWK",
+                        "..KKKK.",
+                        "......."
+                    ], partPal);
+
+                    // 9) Irregular jagged glass / torn metal splinter (7x7)
+                    bakePartPixels("car_part_shard", 1428, 3995, [
+                        "...KK..",
+                        "..KPHK.",
+                        ".KPPPK.",
+                        "KPPDK..",
+                        ".KDK...",
+                        "..K....",
+                        "......."
+                    ], partPal);
+
+                    // 10) Feathered recessed open engine bay w/ dark V8 valve covers (14x15)
+                    bakePartPixels("car_bay_exposed", 1440, 3995, [
+                        "...KKKKKKKK...",
+                        ".KKMMMMMMMMKK.",
+                        ".KMMKCCCCKMMK.",
+                        "KMMKCCCCCCKMMK",
+                        "KMKMRKCCKRMKMK",
+                        "KMKMMKKKKMMKMK",
+                        "KMKCCCCCCCCKMK",
+                        "KMKCMMMMMMCMKK",
+                        "KMKCCCCCCCCKMK",
+                        "KMKMMKKKKMMKMK",
+                        "KMKMRKCCKRMKMK",
+                        "KMMKCCCCCCKMMK",
+                        ".KMMKCCCCKMMK.",
+                        ".KKMMMMMMMMKK.",
+                        "...KKKKKKKK..."
+                    ], bayPal);
+
+                    // 11) Feathered dark open rear trunk cavity w/ spare wheel silhouette (10x13)
+                    bakePartPixels("car_trunk_exposed", 1460, 3995, [
+                        "..KKKKKK..",
+                        ".KMMMMMMK.",
+                        "KMMKKKKMMK",
+                        "KMKMMMMKMK",
+                        "KMKMCCKMMK",
+                        "KMKMCCKMMK",
+                        "KMKMMMMKMK",
+                        "KMMKKKKMMK",
+                        "KMMMMMMMMK",
+                        "KMMMMMMMMK",
+                        "KMMMMMMMMK",
+                        ".KMMMMMMK.",
+                        "..KKKKKK.."
+                    ], bayPal);
+                }
+
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 240)
                 // Ensures all custom props & procedural vehicles have seamless 3D edge filtering without dark alpha halos
                 {
@@ -11966,7 +12183,7 @@ class RetroRenderer {
             if (doorRect) {
                 this.pushAtlasSprite3D(doorRect, v.x, v.y, vz + airZ + 0.0025, rot, vScale, vDrawOrder, vTintR, vTintG, vTintB, 1, totalPitchZ);
             }
-            // 3B. Progressive Missing Panels (Exposed Engine Bay when Hood detached, Missing Trunk, Missing Doors & Hanging Crooked Bumpers!)
+            // 3B. Progressive Missing Panels (Feathered Pixel-Art Exposed Engine Bay, Open Trunk, Door Sill Notch & Bent Hanging Bumpers!)
             if (!v.destroyed && !mapInfo.isTank && !isWaterCraft && !mapInfo.isMotorcycle && !isMicroTwoWheeler && (v.detachedPartsMask || v.hangingBumperMask)) {
                 const dm = v.detachedPartsMask || 0;
                 const hm = v.hangingBumperMask || 0;
@@ -11974,60 +12191,60 @@ class RetroRenderer {
                 const vh = v.h || 26;
                 const partZ = vz + airZ + 0.0032;
                 const [bpR, bpG, bpB] = Array.isArray(v._bodyRGB) ? v._bodyRGB : [0.72, 0.75, 0.80];
+                const objSprites = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                const isCabOverBody = Boolean(
+                    v.specKey === "CITY_BUS" || v.specKey === "TOUR_COACH" || v.specKey === "FIRE_TRUCK" ||
+                    v.specKey === "MEDIC_AMBULANCE" || v.specKey === "BOXVILLE_VAN" || v.specKey === "HOTDOG_VAN" ||
+                    v.specKey === "TANKER_RIG" || v.specKey === "FLATBED_TRUCK" || v.specKey === "BRINKS_TRUCK" || v.specKey === "SWAT_ENFORCER"
+                );
 
-                // Missing Hood (bit 2 = 4): dark open engine bay + brushed aluminum V8 cylinder block + front radiator core!
-                if (dm & 4) {
-                    const engX = v.x + cosA * (vw * 0.25);
-                    const engY = v.y + sinA * (vw * 0.25);
-                    const bayL = Math.min(14.0, vw * 0.21);
-                    const bayW = Math.min(15.5, vh * 0.56);
-                    this.pushSolidQuad3D(engX, engY, partZ + totalPitchZ * 0.6, bayL, bayW, renderAngle, 0.07, 0.08, 0.10, 0.96, vDrawOrder);
-                    this.pushSolidQuad3D(engX - cosA * 0.8, engY - sinA * 0.8, partZ + totalPitchZ * 0.6 + 0.001, bayL * 0.64, bayW * 0.50, renderAngle, 0.52, 0.56, 0.62, 0.95, vDrawOrder);
-                    this.pushSolidQuad3D(engX + cosA * (bayL * 0.38), engY + sinA * (bayL * 0.38), partZ + totalPitchZ * 0.6 + 0.001, 2.0, bayW * 0.82, renderAngle, 0.26, 0.28, 0.32, 0.95, vDrawOrder);
+                // Missing Hood (bit 2 = 4): feathered dark open engine bay w/ dark steel V8 valve covers (only on front-hooded cars!)
+                if ((dm & 4) && !isCabOverBody) {
+                    const engX = v.x + cosA * (vw * 0.27);
+                    const engY = v.y + sinA * (vw * 0.27);
+                    const bayRect = objSprites["car_bay_exposed"];
+                    if (bayRect) {
+                        this.pushAtlasSprite3D(bayRect, engX, engY, partZ + totalPitchZ * 0.6, renderAngle, vScale * 0.86, vDrawOrder, vTintR, vTintG, vTintB, 0.92, totalPitchZ);
+                    }
                 }
-                // Missing Trunk Lid (bit 3 = 8): dark open rear trunk cavity
-                if (dm & 8) {
-                    const trkX = v.x - cosA * (vw * 0.28);
-                    const trkY = v.y - sinA * (vw * 0.28);
-                    this.pushSolidQuad3D(trkX, trkY, partZ - totalPitchZ * 0.6, Math.min(10.5, vw * 0.16), Math.min(14.5, vh * 0.54), renderAngle, 0.07, 0.08, 0.11, 0.94, vDrawOrder);
+                // Missing Trunk Lid (bit 3 = 8): feathered dark open rear trunk cavity w/ spare wheel silhouette
+                if ((dm & 8) && !isCabOverBody) {
+                    const trkX = v.x - cosA * (vw * 0.29);
+                    const trkY = v.y - sinA * (vw * 0.29);
+                    const trkRect = objSprites["car_trunk_exposed"];
+                    if (trkRect) {
+                        this.pushAtlasSprite3D(trkRect, trkX, trkY, partZ - totalPitchZ * 0.6, renderAngle, vScale * 0.86, vDrawOrder, vTintR, vTintG, vTintB, 0.90, totalPitchZ);
+                    }
                 }
-                // Missing Left Door (bit 4 = 16) / Right Door (bit 5 = 32): dark open cabin sill notch along flank
+                // Missing Left Door (bit 4 = 16) / Right Door (bit 5 = 32): subtle dark recessed cabin sill shadow
                 if (dm & 16) {
-                    const ldx = v.x - sinA * (-vh * 0.41);
-                    const ldy = v.y + cosA * (-vh * 0.41);
-                    this.pushSolidQuad3D(ldx, ldy, partZ, Math.min(13.0, vw * 0.22), 3.0, renderAngle, 0.06, 0.07, 0.10, 0.92, vDrawOrder);
+                    const ldx = v.x - sinA * (-vh * 0.38);
+                    const ldy = v.y + cosA * (-vh * 0.38);
+                    this.pushSolidQuad3D(ldx, ldy, partZ, Math.min(10.5, vw * 0.18), 2.1, renderAngle, 0.05, 0.06, 0.09, 0.84, vDrawOrder);
                 }
                 if (dm & 32) {
-                    const rdx = v.x - sinA * (vh * 0.41);
-                    const rdy = v.y + cosA * (vh * 0.41);
-                    this.pushSolidQuad3D(rdx, rdy, partZ, Math.min(13.0, vw * 0.22), 3.0, renderAngle, 0.06, 0.07, 0.10, 0.92, vDrawOrder);
+                    const rdx = v.x - sinA * (vh * 0.38);
+                    const rdy = v.y + cosA * (vh * 0.38);
+                    this.pushSolidQuad3D(rdx, rdy, partZ, Math.min(10.5, vw * 0.18), 2.1, renderAngle, 0.05, 0.06, 0.09, 0.84, vDrawOrder);
                 }
-                // Hanging Crooked Front Bumper (hm & 1) or Exposed Front Mount (dm & 1)
+                // Hanging Crooked Front/Rear Bumper (pixel-art kinked wrap-around bumper sprite, scuffed & lit with car tint!)
                 const bSide = v.hangingBumperSide || 1;
                 const jitter = Math.abs(v.speed || 0) > 20 ? Math.sin(this.time * 32.0 + v.x) * 0.06 : 0;
-                const bSpan = Math.min(18.5, vh * 0.68);
-                if (hm & 1) {
-                    const fbx = v.x + cosA * (vw * 0.48 + 2.2) - sinA * (bSide * 2.4);
-                    const fby = v.y + sinA * (vw * 0.48 + 2.2) + cosA * (bSide * 2.4);
-                    const hangAng = renderAngle + bSide * (0.30 + jitter);
-                    this.pushSolidQuad3D(fbx, fby, partZ + totalPitchZ, 3.6, bSpan, hangAng, bpR * 0.85 + 0.12, bpG * 0.85 + 0.12, bpB * 0.85 + 0.14, 0.98, vDrawOrder);
-                    this.pushSolidQuad3D(fbx + Math.cos(hangAng) * 0.8, fby + Math.sin(hangAng) * 0.8, partZ + totalPitchZ + 0.001, 1.8, bSpan * 0.86, hangAng, 0.78, 0.82, 0.88, 0.92, vDrawOrder);
-                } else if (dm & 1) {
-                    const fbx = v.x + cosA * (vw * 0.46);
-                    const fby = v.y + sinA * (vw * 0.46);
-                    this.pushSolidQuad3D(fbx, fby, partZ + totalPitchZ, 2.6, bSpan * 0.78, renderAngle, 0.10, 0.11, 0.14, 0.94, vDrawOrder);
+                const bmpRect = objSprites["car_part_bumper"];
+                const bmpTintR = Math.min(1, (bpR * 0.82 + 0.08) * vTintR);
+                const bmpTintG = Math.min(1, (bpG * 0.82 + 0.08) * vTintG);
+                const bmpTintB = Math.min(1, (bpB * 0.82 + 0.10) * vTintB);
+                if ((hm & 1) && bmpRect) {
+                    const fbx = v.x + cosA * (vw * 0.45 + 1.5) - sinA * (bSide * 2.0);
+                    const fby = v.y + sinA * (vw * 0.45 + 1.5) + cosA * (bSide * 2.0);
+                    const hangAng = renderAngle + bSide * (0.28 + jitter);
+                    this.pushAtlasSprite3D(bmpRect, fbx, fby, partZ + totalPitchZ, hangAng, vScale * 0.82, vDrawOrder, bmpTintR, bmpTintG, bmpTintB, 0.96, totalPitchZ);
                 }
-                // Hanging Crooked Rear Bumper (hm & 2) or Exposed Rear Mount (dm & 2)
-                if (hm & 2) {
-                    const rbx = v.x - cosA * (vw * 0.48 + 2.2) - sinA * (bSide * 2.4);
-                    const rby = v.y - sinA * (vw * 0.48 + 2.2) + cosA * (bSide * 2.4);
-                    const hangAng = renderAngle - bSide * (0.30 + jitter);
-                    this.pushSolidQuad3D(rbx, rby, partZ - totalPitchZ, 3.6, bSpan, hangAng, bpR * 0.85 + 0.12, bpG * 0.85 + 0.12, bpB * 0.85 + 0.14, 0.98, vDrawOrder);
-                    this.pushSolidQuad3D(rbx - Math.cos(hangAng) * 0.8, rby - Math.sin(hangAng) * 0.8, partZ - totalPitchZ + 0.001, 1.8, bSpan * 0.86, hangAng, 0.78, 0.82, 0.88, 0.92, vDrawOrder);
-                } else if (dm & 2) {
-                    const rbx = v.x - cosA * (vw * 0.46);
-                    const rby = v.y - sinA * (vw * 0.46);
-                    this.pushSolidQuad3D(rbx, rby, partZ - totalPitchZ, 2.6, bSpan * 0.78, renderAngle, 0.10, 0.11, 0.14, 0.94, vDrawOrder);
+                if ((hm & 2) && bmpRect) {
+                    const rbx = v.x - cosA * (vw * 0.45 + 1.5) - sinA * (bSide * 2.0);
+                    const rby = v.y - sinA * (vw * 0.45 + 1.5) + cosA * (bSide * 2.0);
+                    const hangAng = renderAngle + Math.PI - bSide * (0.28 + jitter);
+                    this.pushAtlasSprite3D(bmpRect, rbx, rby, partZ - totalPitchZ, hangAng, vScale * 0.82, vDrawOrder, bmpTintR, bmpTintG, bmpTintB, 0.96, totalPitchZ);
                 }
             }
             // GTA VI Key-Art Hero Details: 3D Black Leather Heist Duffel Bag on Crimson Tulip Trunk & Chrome Trim on Dre'Quan's Black SUV!
@@ -12903,39 +13120,68 @@ class RetroRenderer {
                 const pAng = pt.rot || 0;
                 const pw = pt.w || 6;
                 const ph = pt.h || 4;
-                const pr = pt.r !== undefined ? pt.r : 0.75;
-                const pg = pt.g !== undefined ? pt.g : 0.78;
-                const pb = pt.b !== undefined ? pt.b : 0.82;
-                const shOff = 1.6 + arcZ * 15.0;
-                if (pt.partType !== "GLASS" && pt.partType !== "TAIL_GLASS") {
-                    this.pushSolidQuad3D(pt.x + sunCos * shOff, pt.y + sunSin * shOff, floorZ + 0.008, pw * 0.94, ph * 0.94, pAng, 0.02, 0.03, 0.06, 0.44 * fadeAlpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
-                }
-                const zPart = floorZ + 0.024 + arcZ;
-                if (pt.partType === "HOOD" || pt.partType === "TRUNK") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw + 1.2, ph + 1.2, pAng, 0.12, 0.13, 0.16, 0.96 * fadeAlpha, pOrd);
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw, ph, pAng, pr, pg, pb, 0.99 * fadeAlpha, pOrd);
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.002, pw * 0.82, 1.4, pAng, Math.min(1, pr * 1.18), Math.min(1, pg * 1.18), Math.min(1, pb * 1.18), 0.85 * fadeAlpha, pOrd);
+                // Scuffed/weathered paint tone so detached wreckage looks crashed & metallic rather than bright plastic LEGO!
+                const pr = (pt.r !== undefined ? pt.r : 0.72) * 0.82 + 0.05;
+                const pg = (pt.g !== undefined ? pt.g : 0.75) * 0.82 + 0.05;
+                const pb = (pt.b !== undefined ? pt.b : 0.80) * 0.82 + 0.06;
+                const zPart = floorZ + 0.018 + arcZ;
+                const shOff = 1.3 + arcZ * 13.0;
+                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+
+                let sprKey = "car_part_shard";
+                let pScale = 0.72;
+                let tr = pr, tg = pg, tb = pb;
+                let alphaMult = 0.96;
+                if (pt.partType === "HOOD") {
+                    sprKey = "car_part_hood";
+                    pScale = 0.70;
+                } else if (pt.partType === "TRUNK") {
+                    sprKey = "car_part_trunk";
+                    pScale = 0.72;
                 } else if (pt.partType === "DOOR") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, pr, pg, pb, 0.99 * fadeAlpha, pOrd);
-                    const wOffX = -Math.sin(pAng) * (ph * 0.28);
-                    const wOffY = Math.cos(pAng) * (ph * 0.28);
-                    this.pushSolidQuad3D(pt.x + wOffX, pt.y + wOffY, zPart + 0.001, pw * 0.68, ph * 0.42, pAng, 0.14, 0.20, 0.28, 0.94 * fadeAlpha, pOrd);
+                    sprKey = "car_part_door";
+                    pScale = 0.74;
                 } else if (pt.partType === "BUMPER") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, pr * 0.85 + 0.12, pg * 0.85 + 0.12, pb * 0.85 + 0.14, 0.98 * fadeAlpha, pOrd);
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw * 0.55, ph * 0.88, pAng, 0.80, 0.84, 0.90, 0.94 * fadeAlpha, pOrd);
+                    sprKey = "car_part_bumper";
+                    pScale = 0.74;
                 } else if (pt.partType === "TIRE") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.11, 0.12, 0.14, 0.99 * fadeAlpha, pOrd);
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw * 0.48, ph * 0.48, pAng, 0.82, 0.86, 0.92, 0.96 * fadeAlpha, pOrd);
-                } else if (pt.partType === "HUBCAP" || pt.partType === "MUFFLER") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.82, 0.86, 0.92, 0.96 * fadeAlpha, pOrd);
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart + 0.001, pw * 0.45, ph * 0.45, pAng, 0.35, 0.38, 0.44, 0.90 * fadeAlpha, pOrd);
+                    sprKey = "car_part_tire";
+                    pScale = 0.74;
+                    tr = 0.92; tg = 0.93; tb = 0.95;
+                } else if (pt.partType === "HUBCAP") {
+                    sprKey = "car_part_hubcap";
+                    pScale = 0.66;
+                    tr = 0.90; tg = 0.93; tb = 0.98;
+                } else if (pt.partType === "MUFFLER") {
+                    sprKey = "car_part_muffler";
+                    pScale = 0.70;
+                    tr = 0.88; tg = 0.88; tb = 0.90;
+                } else if (pt.partType === "MIRROR") {
+                    sprKey = "car_part_mirror";
+                    pScale = 0.72;
                 } else if (pt.partType === "GLASS") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.72, 0.94, 1.0, 0.84 * fadeAlpha, pOrd);
+                    sprKey = "car_part_shard";
+                    pScale = 0.56;
+                    tr = 0.68; tg = 0.90; tb = 0.98;
+                    alphaMult = 0.78;
                 } else if (pt.partType === "TAIL_GLASS") {
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, 0.98, 0.14, 0.20, 0.88 * fadeAlpha, pOrd);
+                    sprKey = "car_part_shard";
+                    pScale = 0.56;
+                    tr = 0.92; tg = 0.16; tb = 0.20;
+                    alphaMult = 0.82;
                 } else {
-                    // MIRROR / TRIM painted shard
-                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw, ph, pAng, pr, pg, pb, 0.96 * fadeAlpha, pOrd);
+                    sprKey = "car_part_shard";
+                    pScale = 0.62;
+                }
+
+                const pRect = objSprs[sprKey];
+                if (pRect) {
+                    if (pt.partType !== "GLASS" && pt.partType !== "TAIL_GLASS") {
+                        this.pushAtlasSprite3D(pRect, pt.x + sunCos * shOff, pt.y + sunSin * shOff, floorZ + 0.008, pAng, pScale, SPRITE_DRAW_ORDER.TIRE_MARKS, 0.02, 0.03, 0.06, 0.40 * fadeAlpha);
+                    }
+                    this.pushAtlasSprite3D(pRect, pt.x, pt.y, zPart, pAng, pScale, pOrd, tr, tg, tb, alphaMult * fadeAlpha);
+                } else {
+                    this.pushSolidQuad3D(pt.x, pt.y, zPart, pw * 0.7, ph * 0.7, pAng, tr, tg, tb, alphaMult * fadeAlpha, pOrd);
                 }
                 continue;
             }

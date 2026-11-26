@@ -3012,9 +3012,14 @@ function runSimulations() {
         const blowCar = sandbox.makeVeh("blow_test_52", "BANSHEE_GT", g.player.x + 85, g.player.y, 0);
         g.vehicles.push(blowCar);
         g.explodeVehicle(blowCar, false, true);
+        const rendSrc52 = fs.readFileSync(path.join(ROOT, "js", "renderer.js"), "utf8");
         assert(
-            g.particles.some(p => p.kind === "CAR_PART" && p.partType === "TIRE") && g.particles.length <= 650,
-            `explodeVehicle launches bouncing rubber TIRE debris while staying within <=650 particle budget (count=${g.particles.length})`
+            g.particles.some(p => p.kind === "CAR_PART" && p.partType === "TIRE") &&
+            g.particles.length <= 650 &&
+            rendSrc52.includes('"car_part_hood"') &&
+            rendSrc52.includes('"car_part_tire"') &&
+            rendSrc52.includes('"car_bay_exposed"'),
+            `explodeVehicle launches pixel-art crumpled wreckage sprites (car_part_hood, car_part_tire, car_bay_exposed) within <=650 particle budget (count=${g.particles.length})`
         );
         console.log("");
     }

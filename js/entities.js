@@ -1372,9 +1372,14 @@ class Vehicle {
         const hl = (this.w || 60) * 0.36;
         const hw = (this.h || 28) * 0.42;
         if (!this.isMotorcycle) {
-            if (!(this.detachedPartsMask & CAR_DETACH_PART.HOOD) && this.specKey !== "CITY_BUS" && this.specKey !== "TOUR_COACH") {
+            const isCabOverBody = Boolean(
+                this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH" || this.specKey === "FIRE_TRUCK" ||
+                this.specKey === "MEDIC_AMBULANCE" || this.specKey === "BOXVILLE_VAN" || this.specKey === "HOTDOG_VAN" ||
+                this.specKey === "TANKER_RIG" || this.specKey === "FLATBED_TRUCK" || this.specKey === "BRINKS_TRUCK" || this.specKey === "SWAT_ENFORCER"
+            );
+            if (!(this.detachedPartsMask & CAR_DETACH_PART.HOOD) && !isCabOverBody) {
                 this.detachedPartsMask |= CAR_DETACH_PART.HOOD;
-                this.spawnDetachedCarPart(gameRef, "HOOD", this.x + cosA * hl, this.y + sinA * hl, (this.angle || 0) + (Math.random() - 0.5) * 0.8, 118, 12.5, 15.5, 0.72, 2);
+                this.spawnDetachedCarPart(gameRef, "HOOD", this.x + cosA * hl, this.y + sinA * hl, (this.angle || 0) + (Math.random() - 0.5) * 0.8, 118, 12.0, 13.5, 0.66, 2);
             }
             if (!(this.detachedPartsMask & CAR_DETACH_PART.LEFT_DOOR)) {
                 this.detachedPartsMask |= CAR_DETACH_PART.LEFT_DOOR;
@@ -1486,11 +1491,11 @@ class Vehicle {
             const cPy = hitY !== undefined ? Math.max(this.y - 42, Math.min(this.y + 42, hitY)) : (this.y + sinA * hl);
             const outAng = Math.atan2(cPy - this.y, cPx - this.x);
 
-            // 1. Always burst shattered glass & paint/chrome trim chips from the impact point
-            const shardCount = isExplosive ? 4 : (amount >= 12 ? 3 : 2);
+            // 1. Subtle shattered glass & torn metal splinters on meaningful hits (never confetti spam on tiny grazes)
+            const shardCount = isExplosive ? 3 : (amount >= 14 ? 2 : (amount >= 6.0 ? 1 : 0));
             const glassKind = localX < -frBias ? "TAIL_GLASS" : "GLASS";
             for (let si = 0; si < shardCount; si++) {
-                this.spawnDetachedCarPart(g, si === 0 ? "TRIM" : glassKind, cPx, cPy, outAng + (si - 1) * 0.5, 68 + amount * 1.6, si === 0 ? 5.0 : 3.2, si === 0 ? 2.5 : 2.6, 0.18 + Math.random() * 0.14, 1);
+                this.spawnDetachedCarPart(g, si === 1 ? "TRIM" : glassKind, cPx, cPy, outAng + (si - 0.5) * 0.55, 64 + amount * 1.4, 3.5, 3.5, 0.16 + Math.random() * 0.12, 1);
             }
 
             if (this.isMotorcycle) {
@@ -1537,10 +1542,14 @@ class Vehicle {
                             this.hangingBumperSide = sideSign;
                         }
                     }
+                    const isCabOverBody = Boolean(
+                        this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH" || this.specKey === "FIRE_TRUCK" ||
+                        this.specKey === "MEDIC_AMBULANCE" || this.specKey === "BOXVILLE_VAN" || this.specKey === "HOTDOG_VAN" ||
+                        this.specKey === "TANKER_RIG" || this.specKey === "FLATBED_TRUCK" || this.specKey === "BRINKS_TRUCK" || this.specKey === "SWAT_ENFORCER"
+                    );
                     if (
                         !(this.detachedPartsMask & CAR_DETACH_PART.HOOD) &&
-                        this.specKey !== "CITY_BUS" &&
-                        this.specKey !== "TOUR_COACH" &&
+                        !isCabOverBody &&
                         (amount >= 14.5 || hpRatio < 0.58 || isExplosive)
                     ) {
                         this.detachedPartsMask |= CAR_DETACH_PART.HOOD;

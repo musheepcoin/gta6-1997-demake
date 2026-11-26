@@ -18957,7 +18957,7 @@ class LeonidaGame {
                         pt.vx = 0;
                         pt.vy = 0;
                         pt.vRot = 0;
-                        const settleDur = (pt.partType === "GLASS" || pt.partType === "TAIL_GLASS" || pt.partType === "TRIM") ? 8.5 : 15.0;
+                        const settleDur = (pt.partType === "GLASS" || pt.partType === "TAIL_GLASS" || pt.partType === "TRIM") ? 4.5 : 10.5;
                         pt.life = settleDur;
                         pt.maxLife = settleDur;
                         this.particles[pWrite++] = pt;
