@@ -1864,6 +1864,13 @@ class Vehicle {
             const rearX = this.x - rCos * ((this.w || 48) * 0.5 + 24);
             const rearY = this.y - rSin * ((this.w || 48) * 0.5 + 24);
             if (map.resolveCircleBuildingCollision && map.resolveCircleBuildingCollision(rearX, rearY, 12, curZ).hit) rearBlocked = true;
+            if (!rearBlocked && map.surfaceGround) {
+                const rrBx = Math.floor(rearX / TILE_SIZE);
+                const rrBy = Math.floor(rearY / TILE_SIZE);
+                if (rrBx < 2 || rrBx >= MAP_COLS - 2 || rrBy < 2 || rrBy >= MAP_ROWS - 2 || map.surfaceGround[rrBy * MAP_COLS + rrBx] !== GROUND_TYPE.ROAD) {
+                    rearBlocked = true;
+                }
+            }
             if (!rearBlocked && game && Array.isArray(game.vehicles)) {
                 const checkRearVeh = (o) => {
                     if (!o || o === this || o === this.towingVehicle) return false;
@@ -2817,7 +2824,7 @@ class Vehicle {
                         desiredThrottle = Math.min(desiredThrottle, 0.22);
                     }
                 } else if ((isStopBlock || stopsInPreBlock) && !committedOnAmber) {
-                    this.aiState = (nsStop || ewStop) ? "STOPPED_LIGHT" : "YIELD_BOX";
+                    this.aiState = "STOPPED_LIGHT";
                     if (distToStopRef > stopDist + 3) {
                         const rollSpd = Math.max(0, Math.min(54, (distToStopRef - stopDist) * 1.65));
                         if (this.speed > rollSpd) {
@@ -4887,7 +4894,16 @@ class Vehicle {
                 if (this.gridlockTimer > threshold) {
                     // Only back up if there is free road behind us; if another AI car is bumper-to-bumper behind us, signal it to ripple-reverse first!
                     const bCos = Math.cos(this.angle), bSin = Math.sin(this.angle);
-                    let rearClear = true;
+                    const rearProbeX = this.x - bCos * ((this.w || 48) * 0.5 + 22);
+                    const rearProbeY = this.y - bSin * ((this.w || 48) * 0.5 + 22);
+                    const rpbx = Math.floor(rearProbeX / TILE_SIZE);
+                    const rpby = Math.floor(rearProbeY / TILE_SIZE);
+                    let rearClear = !(
+                        map && map.surfaceGround && (
+                            rpbx < 2 || rpbx >= MAP_COLS - 2 || rpby < 2 || rpby >= MAP_ROWS - 2 ||
+                            map.surfaceGround[rpby * MAP_COLS + rpbx] !== GROUND_TYPE.ROAD
+                        )
+                    );
                     let blockingRearVeh = null;
                     if (game && Array.isArray(game.vehicles)) {
                         const vHead = game._vehGridHead;
