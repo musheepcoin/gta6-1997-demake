@@ -3200,6 +3200,7 @@ class Vehicle {
                 }
             }
             const leadStoppedAtLight = Boolean(
+                !inIntersectionBox &&
                 closestEntity &&
                 (closestEntity.aiState === "STOPPED_LIGHT" || closestEntity.aiState === "STOPPED_QUEUE") &&
                 obstacleSpeed < 10
