@@ -1927,6 +1927,12 @@ class Vehicle {
                 this.aiBlockX = -1;
                 this.aiBlockY = -1;
                 this.aiChosenDir = null;
+                if (rLid !== 25 && map.getAllowedRoadDirections) {
+                    const rDirs = map.getAllowedRoadDirections(rbx, rby, curZ);
+                    if (rDirs.length === 1 && Math.cos(this.angle - rDirs[0].angle) < -0.35) {
+                        this.angle = rDirs[0].angle;
+                    }
+                }
             } else {
                 this.aiState = "REVERSING";
                 return { throttle: this.speed < -42 ? 0 : -0.55, steer: 0, handbrake: false };
@@ -2935,9 +2941,13 @@ class Vehicle {
                     forwardDist > 2 &&
                     lateralDist < (myHalfWid + projOtherHalfWid + 2)
                 ) {
-                    // OBB Cross-Hull Guard: never drive our front bumper into the flank or overhang of a perpendicular/diagonal car or bus!
+                    // OBB Cross-Hull Guard: ONLY brake when `other`'s hull is ALREADY straddling our lane centerline (`theirFwd < 6`),
+                    // so the right-of-way winner in Section C never mutually stops for a yielding car waiting to its side!
+                    const otherFx0 = Math.cos(other.angle || 0);
+                    const otherFy0 = Math.sin(other.angle || 0);
+                    const theirFwd0 = (-dx) * otherFx0 + (-dy) * otherFy0;
                     const obbGap = forwardDist - (myHalfLen + projOtherHalfLen);
-                    if (obbGap < 26 && (otherSpd < 12 || obbGap < 16) && obbGap < closestBumperGap) {
+                    if (theirFwd0 < 6 && theirFwd0 > -(otherHalfLen + myHalfWid + 8) && obbGap < 22 && obbGap < closestBumperGap) {
                         closestBumperGap = obbGap;
                         closestEntity = other;
                         isPlayerBlocking = other.driver === "PLAYER";
