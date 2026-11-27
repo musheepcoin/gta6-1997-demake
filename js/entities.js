@@ -2739,13 +2739,16 @@ class Vehicle {
                 const lat = Math.abs(dx * rx + dy * ry);
                 const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
                 const ovCos = Math.cos((ov.angle || 0) - this.angle);
+                const ovAbsCos = Math.abs(ovCos);
                 const ovLid = map.getBlockInfo ? map.getBlockInfo(ov.x >> 6, ov.y >> 6, 1).lid : 0;
-                // 0. Never enter an intersection box if ANY vehicle (at ANY angle 0..360°) is stopped or deployed inside our path in the box!
-                if (ovLid === 25 && fwd > 4 && fwd < 190 && lat < 46 && (ovSpd < 9 || ov.driver === null || ov.deployedMedic || ov._parkedAtFireScene)) return true;
-                // 1. Hold at stop line if ANY non-parallel cross/diagonal/opposing vehicle (moving OR stopped) is clearing the intersection box ahead!
-                if (ovLid === 25 && ovCos < 0.68 && fwd > 4 && fwd < 175 && lat < 68) return true;
+                // 0. Never enter an intersection box if ANY vehicle stopped/deployed inside the box physically occupies our lane corridor
+                //    (lat < 46 for cross/diagonal |cos| <= 0.78; lat < 26 for parallel/oncoming so opposite-lane traffic at lat=64px is never blocked!)
+                const stopCorridorLat = ovAbsCos <= 0.78 ? 46 : 26;
+                if (ovLid === 25 && fwd > 4 && fwd < 180 && lat < stopCorridorLat && (ovSpd < 9 || ov.driver === null || ov.deployedMedic || ov._parkedAtFireScene)) return true;
+                // 1. Hold at stop line if ANY cross or diagonal vehicle (|cos| <= 0.78, ~38°..142°) is clearing the intersection box ahead!
+                if (ovLid === 25 && ovAbsCos <= 0.78 && fwd > 4 && fwd < 170 && lat < 62) return true;
                 // 2. Unsignalized intersection yield: yield at stop line if cross-traffic is actively entering the box!
-                if (!hasSignal && Math.abs(ovCos) < 0.55 && ovSpd > 10 && fwd > 6 && fwd < 155 && lat < 92) return true;
+                if (!hasSignal && ovAbsCos <= 0.65 && ovSpd > 10 && fwd > 6 && fwd < 155 && lat < 92) return true;
                 // 3. "Don't Block the Box": hold at stop line if a same-direction vehicle is stopped inside the box or right in the exit throat!
                 if (ovCos >= 0.65 && lat < 24 && ovSpd < 7 && fwd > 22 && (ovLid === 25 ? fwd < 225 : fwd < 155)) return true;
                 return false;
@@ -2814,7 +2817,7 @@ class Vehicle {
                         desiredThrottle = Math.min(desiredThrottle, 0.22);
                     }
                 } else if ((isStopBlock || stopsInPreBlock) && !committedOnAmber) {
-                    this.aiState = "STOPPED_LIGHT";
+                    this.aiState = (nsStop || ewStop) ? "STOPPED_LIGHT" : "YIELD_BOX";
                     if (distToStopRef > stopDist + 3) {
                         const rollSpd = Math.max(0, Math.min(54, (distToStopRef - stopDist) * 1.65));
                         if (this.speed > rollSpd) {
