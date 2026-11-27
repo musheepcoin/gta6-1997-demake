@@ -2962,8 +2962,10 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                         if (fwd > 8 && fwd < leadLookAhead && lat < 22) {
                             const otherSpd = Math.hypot(other[6] || 0, other[7] || 0);
                             const otherAng = Number.isFinite(other[5]) ? other[5] : a;
-                            // Ignore oncoming cars moving in the opposite lane so opposite flows never deadlock
-                            if (otherSpd > 5 && Math.cos(otherAng - a) < -0.15) continue;
+                            const cosOther = Math.cos(otherAng - a);
+                            // Ignore oncoming cars in adjacent opposite lanes, and break mutual crossing standoffs deterministically
+                            if ((otherSpd > 5 && cosOther < -0.15) || (cosOther < -0.55 && lat > 13)) continue;
+                            if (Math.abs(cosOther) <= 0.55 && otherSpd < 4 && (sirenActive || String(vid) > String(other[0])) && fwd > 38) continue;
                             targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.90);
                             if (targetSpd === 0) blockedByLead = true;
                         }

@@ -9621,6 +9621,57 @@ class LeonidaGame {
 
 
 
+    emitPressurizedWaterJet(nozX, nozY, aimAngle, targetDist, isDeckGun = false, targetEntity = null) {
+        if (!Array.isArray(this.particles)) return;
+        if (this.particles.length >= 640) {
+            this.particles.splice(0, this.particles.length - 575);
+        }
+        // Compute exact travel distance so the pressurized stream reaches 100% of the way onto the target (or stops cleanly against a solid 3D wall!)
+        let reachPx = Math.max(22, Math.min(isDeckGun ? 325 : 265, targetDist));
+        if (!targetEntity && this.map && typeof this.map.traceSegment2D === "function") {
+            const endX = nozX + Math.cos(aimAngle) * reachPx;
+            const endY = nozY + Math.sin(aimAngle) * reachPx;
+            const hit = this.map.traceSegment2D(nozX, nozY, endX, endY, 2.0);
+            if (hit && hit.hit && typeof hit.x === "number" && typeof hit.y === "number") {
+                reachPx = Math.max(16, Math.hypot(hit.x - nozX, hit.y - nozY) - 4);
+            }
+        }
+        const baseSpeed = isDeckGun ? 440 : 385;
+        const slugCount = isDeckGun ? 2 : 2;
+        for (let k = 0; k < slugCount; k++) {
+            const spread = (Math.random() - 0.5) * (isDeckGun ? 0.085 : 0.070);
+            const sAng = aimAngle + spread;
+            const spd = baseSpeed * (0.94 + Math.random() * 0.12);
+            const jitterDist = reachPx + (Math.random() - 0.5) * 14;
+            const flightDur = Math.max(0.08, Math.min(0.88, jitterDist / spd));
+            const leadOffset = k * 7.5;
+            this.particles.push({
+                x: nozX + Math.cos(sAng) * leadOffset,
+                y: nozY + Math.sin(sAng) * leadOffset,
+                vx: Math.cos(sAng) * spd,
+                vy: Math.sin(sAng) * spd,
+                ang: sAng,
+                baseScale: isDeckGun ? 0.88 : 0.72,
+                peakZ: isDeckGun ? 0.20 : 0.10,
+                kind: "WATER_JET",
+                color: "#38bdf8",
+                spawnSplash: k === 0,
+                life: Math.max(0.05, flightDur - leadOffset / spd),
+                maxLife: flightDur
+            });
+        }
+        // Subtle pressurized water-rush sound when spraying near the player
+        if (this.audio && this.player && Math.hypot(nozX - this.player.x, nozY - this.player.y) < 520) {
+            const nowMs = performance.now();
+            if (nowMs - (this._lastWaterJetSfxAt || 0) > 85) {
+                this._lastWaterJetSfxAt = nowMs;
+                const d = Math.hypot(nozX - this.player.x, nozY - this.player.y);
+                const prox = Math.max(0.15, 1 - d / 520);
+                this.audio.playBandNoise(0.095, isDeckGun ? 1250 : 1550, 0.95, 0.015 * prox);
+            }
+        }
+    }
+
     spawnParticle(x, y, kind = "SPARK") {
         if (this.particles.length > 650) {
             this.particles.splice(0, this.particles.length - 600);
@@ -13357,38 +13408,32 @@ class LeonidaGame {
 
                 if (v && v.specKey === "FIRE_TRUCK" && mySeat === 0) {
                     // Rooftop High-Pressure Water Cannon when driving a Fire Truck!
-                    p.shootCooldown = 0.045;
+                    p.shootCooldown = 0.042;
                     const cannonAng = shotAngle;
-                    const nozX = v.x + Math.cos(cannonAng) * 26;
-                    const nozY = v.y + Math.sin(cannonAng) * 26;
-                    for (let k = 0; k < 3; k++) {
-                        const spread = (Math.random() - 0.5) * 0.16;
-                        const spd = 250 + Math.random() * 75;
-                        this.particles.push({
-                            x: nozX,
-                            y: nozY,
-                            vx: Math.cos(cannonAng + spread) * spd,
-                            vy: Math.sin(cannonAng + spread) * spd,
-                            size: 3.8 + Math.random() * 2.2,
-                            color: Math.random() < 0.38 ? "#bae6fd" : "#38bdf8",
-                            life: 0.44,
-                            maxLife: 0.44
-                        });
-                    }
-                    // Extinguish burning vehicles / wrecks & knock back pedestrians in the water stream cone
+                    v._cannonAngle = cannonAng;
+                    v._sprayingCannonTimer = 0.16;
+                    const nozX = v.x + Math.cos(v.angle || 0) * 8 + Math.cos(cannonAng) * 16;
+                    const nozY = v.y + Math.sin(v.angle || 0) * 8 + Math.sin(cannonAng) * 16;
+                    let closestTargetDist = 255;
+                    let hitVehTarget = null;
+                    // Extinguish burning vehicles / wrecks & knock back pedestrians in the water stream cone (up to 265px!)
                     for (const ov of this.vehicles) {
                         if (ov === v) continue;
                         const dx = ov.x - v.x;
                         const dy = ov.y - v.y;
                         const dist = Math.hypot(dx, dy);
-                        if (dist > 195) continue;
+                        if (dist > 265) continue;
                         const aDiff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - cannonAng), Math.cos(Math.atan2(dy, dx) - cannonAng)));
-                        if (aDiff > 0.36) continue;
+                        if (aDiff > 0.34) continue;
+                        if (dist < closestTargetDist) {
+                            closestTargetDist = Math.max(28, dist - 18);
+                            hitVehTarget = ov;
+                        }
                         const wasBurning = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
                         if (wasBurning) {
-                            ov.extinguishProgress = (ov.extinguishProgress || 0) + 0.09;
-                            if (Math.random() < 0.55) {
-                                this.spawnParticle(ov.x + (Math.random() - 0.5) * 20, ov.y + (Math.random() - 0.5) * 20, "WHITE_SMOKE");
+                            ov.extinguishProgress = (ov.extinguishProgress || 0) + 0.10;
+                            if (Math.random() < 0.65) {
+                                this.spawnParticle(ov.x + (Math.random() - 0.5) * 22, ov.y + (Math.random() - 0.5) * 22, "WHITE_SMOKE");
                             }
                             if (!ov.destroyed) {
                                 ov.hp = Math.min(ov.maxHp, Math.max(ov.hp + 6.5, 60));
@@ -13409,6 +13454,7 @@ class LeonidaGame {
                             }
                         }
                     }
+                    this.emitPressurizedWaterJet(nozX, nozY, cannonAng, closestTargetDist, true, hitVehTarget);
                     for (const ped of this.peds) {
                         if (ped.dead) continue;
                         const dx = ped.x - v.x;
@@ -14155,36 +14201,40 @@ class LeonidaGame {
 
                         if (!a.destroyed && !b.destroyed) {
 
-                            // Emergency Corridor Assist: if one vehicle has its siren active (Police, Ambulance, Fire, Tow)
-                            // and touches a civilian traffic vehicle, smoothly shift the civilian vehicle within its safe lane margin
-                            // so the emergency responder passes through without ever pushing the civilian car onto a sidewalk or oncoming lane!
-                            const aPriority = Boolean(a.sirenActive || a.driver === "AI_COP" || a.driver === "AI_EMERGENCY" || a.driver === "AI_TOW");
-                            const bPriority = Boolean(b.sirenActive || b.driver === "AI_COP" || b.driver === "AI_EMERGENCY" || b.driver === "AI_TOW");
-                            if (aPriority !== bPriority) {
+                            // Emergency Corridor Assist: ONLY when a MOVING emergency responder overtakes a SAME-DIRECTION civilian car,
+                            // smoothly nudge the civilian car away within its safe lane margin (while still running separation below so hulls NEVER overlap!).
+                            const aStationary = Boolean(!a.driver || a.deployedMedic || a._parkedAtFireScene);
+                            const bStationary = Boolean(!b.driver || b.deployedMedic || b._parkedAtFireScene);
+                            const aPriority = Boolean(!aStationary && (a.sirenActive || a.driver === "AI_COP" || a.driver === "AI_EMERGENCY" || a.driver === "AI_TOW"));
+                            const bPriority = Boolean(!bStationary && (b.sirenActive || b.driver === "AI_COP" || b.driver === "AI_EMERGENCY" || b.driver === "AI_TOW"));
+                            if (aPriority !== bPriority && Math.cos((a.angle || 0) - (b.angle || 0)) > 0.68) {
                                 const civ = aPriority ? b : a;
                                 const emg = aPriority ? a : b;
-                                if (civ.driver === "AI_TRAFFIC") {
+                                const emgSpd = Math.hypot(emg.vx || 0, emg.vy || 0);
+                                if (civ.driver === "AI_TRAFFIC" && emgSpd > 16) {
                                     const cRx = -Math.sin(civ.angle || 0);
                                     const cRy = Math.cos(civ.angle || 0);
-                                    civ.aiPullOverOffset = 13;
+                                    const awaySign = ((civ.x - emg.x) * cRx + (civ.y - emg.y) * cRy) >= -2 ? 1 : -1;
+                                    civ.aiPullOverOffset = 13 * awaySign;
                                     civ.aiPullOverTimer = 1.8;
-                                    const testCx = civ.x + cRx * (bestOverlap * 0.55 + 1.0);
-                                    const testCy = civ.y + cRy * (bestOverlap * 0.55 + 1.0);
+                                    const shiftStep = (bestOverlap * 0.55 + 1.0) * awaySign;
+                                    const testCx = civ.x + cRx * shiftStep;
+                                    const testCy = civ.y + cRy * shiftStep;
                                     if (
                                         this.map &&
                                         this.map.getGroundTypeAt &&
                                         this.map.getGroundTypeAt(testCx, testCy) === GROUND_TYPE.ROAD &&
-                                        this.map.getGroundTypeAt(testCx + cRx * 12, testCy + cRy * 12) === GROUND_TYPE.ROAD
+                                        this.map.getGroundTypeAt(testCx + cRx * 12 * awaySign, testCy + cRy * 12 * awaySign) === GROUND_TYPE.ROAD
                                     ) {
                                         clampShovedVehToWorld(civ, testCx, testCy);
+                                        emg.angularVelocity = 0;
+                                        civ.angularVelocity = 0;
+                                        continue;
                                     }
-                                    emg.angularVelocity = 0;
-                                    civ.angularVelocity = 0;
-                                    continue;
                                 }
                             }
 
-                            if (Math.cos(a.angle - b.angle) > 0.45) {
+                            if (Math.cos(a.angle - b.angle) > 0.45 && aStationary === bStationary) {
 
                                 const proj = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
 
@@ -14212,12 +14262,20 @@ class LeonidaGame {
 
                             } else {
 
-                                // Crossing or turning AI vehicles: match entities.js Section C deterministic right-of-way
-                                // so the YIELDING vehicle backs out of the way while the PRIORITY vehicle keeps rolling!
-                                if (a.driver && !b.driver) {
-                                    clampShovedVehToWorld(a, a.x - bestNx * (bestOverlap + 1.5), a.y - bestNy * (bestOverlap + 1.5));
-                                } else if (b.driver && !a.driver) {
-                                    clampShovedVehToWorld(b, b.x + bestNx * (bestOverlap + 1.5), b.y + bestNy * (bestOverlap + 1.5));
+                                // Crossing, turning, or stationary-responder AI pairs:
+                                // Never shove a parked/deployed Ambulance or Fire Truck — back the moving AI vehicle cleanly along its own lane axis!
+                                if (!aStationary && bStationary) {
+                                    const sep = bestOverlap + 2.0;
+                                    const toB = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
+                                    const backSign = toB >= 0 ? -1 : 1;
+                                    clampShovedVehToWorld(a, a.x + aCos * sep * backSign, a.y + aSin * sep * backSign);
+                                    a.vx = 0; a.vy = 0; a.speed = 0;
+                                } else if (!bStationary && aStationary) {
+                                    const sep = bestOverlap + 2.0;
+                                    const toA = (a.x - b.x) * bCos + (a.y - b.y) * bSin;
+                                    const backSign = toA >= 0 ? -1 : 1;
+                                    clampShovedVehToWorld(b, b.x + bCos * sep * backSign, b.y + bSin * sep * backSign);
+                                    b.vx = 0; b.vy = 0; b.speed = 0;
                                 } else {
                                     const fwdA = (b.x - a.x) * aCos + (b.y - a.y) * aSin;
                                     const fwdB = (a.x - b.x) * bCos + (a.y - b.y) * bSin;
@@ -16418,7 +16476,7 @@ class LeonidaGame {
                 if (targetFire && ped.firemanOutTimer < 38.0) {
 
                     const hasFireLOS = !this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, targetFire.x, targetFire.y, ped.z || 2.0).hit;
-                    const maxHoseReach = (ped.firemanStuckTimer || 0) > 0.8 ? 265 : 225;
+                    const maxHoseReach = (ped.firemanStuckTimer || 0) > 0.8 ? 255 : 185;
 
                     if (bestDist < maxHoseReach && hasFireLOS) {
 
@@ -16430,49 +16488,21 @@ class LeonidaGame {
 
                         ped.firemanStuckTimer = 0;
 
-                        const nozX = ped.x + Math.cos(ped.angle) * 11;
+                        const nozX = ped.x + Math.cos(ped.angle) * 12;
 
-                        const nozY = ped.y + Math.sin(ped.angle) * 11;
+                        const nozY = ped.y + Math.sin(ped.angle) * 12;
 
-                        const jetSpeed = Math.max(150, Math.min(255, bestDist * 2.5));
+                        const distFromNozzle = Math.max(18, Math.hypot(targetFire.x - nozX, targetFire.y - nozY) - (isPedTarget ? 4 : 10));
 
-                        for (let k = 0; k < 2; k++) {
+                        this.emitPressurizedWaterJet(nozX, nozY, ped.angle, distFromNozzle, false, targetFire);
 
-                            if (Math.random() < 0.88) {
-
-                                const spread = (Math.random() - 0.5) * 0.18;
-
-                                this.particles.push({
-
-                                    x: nozX,
-
-                                    y: nozY,
-
-                                    vx: Math.cos(ped.angle + spread) * jetSpeed,
-
-                                    vy: Math.sin(ped.angle + spread) * jetSpeed,
-
-                                    size: 3.2 + Math.random() * 1.8,
-
-                                    color: Math.random() < 0.40 ? "#bae6fd" : "#38bdf8",
-
-                                    life: 0.34,
-
-                                    maxLife: 0.34
-
-                                });
-
-                            }
-
-                        }
-
-                        if (Math.random() < 0.45) {
+                        if (Math.random() < 0.55) {
 
                             this.spawnParticle(
 
-                                targetFire.x + (Math.random() - 0.5) * 20,
+                                targetFire.x + (Math.random() - 0.5) * 22,
 
-                                targetFire.y + (Math.random() - 0.5) * 20,
+                                targetFire.y + (Math.random() - 0.5) * 22,
 
                                 "WHITE_SMOKE"
 
@@ -18995,6 +19025,55 @@ class LeonidaGame {
                         pt.life = settleDur;
                         pt.maxLife = settleDur;
                         this.particles[pWrite++] = pt;
+                    }
+                } else if (pt.kind === "WATER_JET") {
+                    if (pt.spawnSplash) {
+                        // Convert arriving water slug in-place into a foaming splash ring RIGHT ON THE TARGET + radial spray droplets + wet runoff puddle!
+                        const hitX = pt.x;
+                        const hitY = pt.y;
+                        pt.kind = "WATER_SPLASH";
+                        pt.vx = 0;
+                        pt.vy = 0;
+                        pt.baseScale = 0.58;
+                        pt.rot = Math.random() * 6.28;
+                        pt.life = 0.26;
+                        pt.maxLife = 0.26;
+                        this.particles[pWrite++] = pt;
+                        if (this.particles.length < 635) {
+                            for (let di = 0; di < 2; di++) {
+                                const dAng = Math.random() * 6.283;
+                                const dSpd = 42 + Math.random() * 62;
+                                this.particles.push({
+                                    x: hitX,
+                                    y: hitY,
+                                    vx: Math.cos(dAng) * dSpd,
+                                    vy: Math.sin(dAng) * dSpd,
+                                    rot: dAng,
+                                    size: 2.8 + Math.random() * 1.6,
+                                    foam: di === 0,
+                                    kind: "WATER_DROP",
+                                    color: di === 0 ? "#bae6fd" : "#38bdf8",
+                                    life: 0.22,
+                                    maxLife: 0.22
+                                });
+                            }
+                        }
+                        this._waterPuddleTick = ((this._waterPuddleTick || 0) + 1) & 3;
+                        if (this._waterPuddleTick === 0 && (!this.map || !this.map.isWaterAtPixel || !this.map.isWaterAtPixel(hitX, hitY))) {
+                            this.addSkidmark(hitX + (Math.random() - 0.5) * 10, hitY + (Math.random() - 0.5) * 10, {
+                                z: 2.0,
+                                angle: Math.random() * 6.28,
+                                w: 11.5 + Math.random() * 5.5,
+                                h: 11.5,
+                                r: 0.08,
+                                g: 0.24,
+                                b: 0.36,
+                                alpha: 0.34,
+                                life: 6.5,
+                                maxLife: 6.5,
+                                surface: "WATER_PUDDLE"
+                            });
+                        }
                     }
                 } else if (pt.kind === "GIB_ARC" && !pt.isRestingGib) {
                     pt.isRestingGib = true;

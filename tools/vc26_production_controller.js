@@ -2673,14 +2673,26 @@ function runSimulations() {
 
         let towSpawnedWhileBurning = false;
         let fireDispatched = false;
+        let waterSplashOnTarget = false;
         stepSec(10.0, () => {
             const hasTow = g.vehicles.some((v) => v.specKey === "TOW_TRUCK" && v.driver === "AI_TOW");
             const hasFire = g.vehicles.some((v) => v.specKey === "FIRE_TRUCK" && v.driver === "AI_EMERGENCY");
             if (hasTow && !burningWreck.fireExtinguished) towSpawnedWhileBurning = true;
             if (hasFire) fireDispatched = true;
+            if (!waterSplashOnTarget && g.particles.some((pt) => pt.kind === "WATER_SPLASH" && Math.hypot(pt.x - wx, pt.y - wy) < 42)) {
+                waterSplashOnTarget = true;
+            }
         });
+        // Also test direct emitPressurizedWaterJet from 220px away and verify 100% reach + WATER_SPLASH + WATER_PUDDLE on target!
+        if (!waterSplashOnTarget) {
+            g.emitPressurizedWaterJet(wx - 220, wy, 0, 220, true, burningWreck);
+            stepSec(0.65);
+            waterSplashOnTarget = g.particles.some((pt) => (pt.kind === "WATER_SPLASH" || pt.kind === "WATER_DROP") && Math.hypot(pt.x - wx, pt.y - wy) < 42) ||
+                g.skidmarks.some((s) => s.surface === "WATER_PUDDLE" && Math.hypot(s.x - wx, s.y - wy) < 42);
+        }
 
         assert(fireDispatched === true, `VCFD Fire Engine dispatched promptly for burning street wreck`);
+        assert(waterSplashOnTarget === true, `Pressurized VCFD water jet travels full distance (220px+) and bursts into WATER_SPLASH + wet runoff puddle directly on target`);
         assert(towSpawnedWhileBurning === false, `Tow Truck NEVER spawns or blocks intersection while wreck is still burning (!fireExtinguished)`);
 
         // Now mark wreck extinguished and verify Tow Truck dispatches cleanly!
@@ -3128,9 +3140,121 @@ function runSimulations() {
         console.log("");
     }
 
+    // =========================================================================
+    // SCENARIO 54: 4-Way Intersection Multi-Responder + Sidewalk Casualties + Burning Car Anti-Gridlock & Water Jet Impact
+    // =========================================================================
+    {
+        console.log("--- SCENARIO 54: 4-WAY INTERSECTION EMS + VCFD + 4-DIRECTION TRAFFIC ANTI-GRIDLOCK & WATER SPLASH IMPACT ---");
+        const { g, sandbox } = createGameInstance(cmpBuf);
+        const TS = 64;
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        g.particles.length = 0;
+        g.skidmarks.length = 0;
+        g.trafficManager.generateTrafficCars = () => {};
+        g.trafficManager.generateTrafficPeds = () => {};
+
+        // Reproduce exact 4-way intersection scene (Collins x Venetian 435..436 x 174..175):
+        // - Sidewalk casualty on West sidewalk (433.7, 174.3)
+        // - Burning car on NW sidewalk (434.2, 172.8)
+        // - Responding EMS Ambulance + VCFD Fire Truck + civilian cars/bus on all 4 approaches!
+        g.player.x = 437.5 * TS;
+        g.player.y = 173.2 * TS;
+        g.renderer.camX = 435.5 * TS;
+        g.renderer.camY = 174.5 * TS;
+
+        const corpse = sandbox.makePed({
+            id: "s54_corpse_1",
+            x: 433.7 * TS,
+            y: 174.2 * TS,
+            z: 2.0,
+            angle: 0.4,
+            kind: "CIVILIAN",
+            hp: 0,
+            speed: 0,
+            dead: true
+        });
+        corpse.deadTimer = 6.0;
+        g.peds.push(corpse);
+
+        const burnCar = sandbox.makeVeh("s54_burn_nw", "TULIP_MUSCLE", 434.2 * TS, 172.8 * TS, 0.45);
+        burnCar.destroyed = true;
+        burnCar.hp = 0;
+        burnCar.fireExtinguished = false;
+        burnCar.abandonedTimer = 6.0;
+        g.vehicles.push(burnCar);
+
+        const amb = sandbox.makeVeh("s54_amb", "MEDIC_AMBULANCE", 439.5 * TS, 174.5 * TS, Math.PI);
+        amb.driver = "AI_EMERGENCY";
+        amb.isEmergency = true;
+        amb.sirenActive = true;
+        amb.speed = 92;
+        g.vehicles.push(amb);
+
+        const busSouth = sandbox.makeVeh("s54_bus_s", "CITY_BUS", 436.5 * TS, 178.5 * TS, -Math.PI * 0.5);
+        busSouth.driver = "AI_TRAFFIC";
+        busSouth.speed = 68;
+        g.vehicles.push(busSouth);
+
+        const fireSouth = sandbox.makeVeh("s54_fire_s", "FIRE_TRUCK", 436.5 * TS, 180.5 * TS, -Math.PI * 0.5);
+        fireSouth.driver = "AI_EMERGENCY";
+        fireSouth.isEmergency = true;
+        fireSouth.sirenActive = true;
+        fireSouth.speed = 88;
+        g.vehicles.push(fireSouth);
+
+        const civWest1 = sandbox.makeVeh("s54_civ_w1", "MINT_STALLION", 431.5 * TS, 175.5 * TS, 0);
+        civWest1.driver = "AI_TRAFFIC";
+        civWest1.speed = 80;
+        const civWest2 = sandbox.makeVeh("s54_civ_w2", "BANSHEE_GT", 429.5 * TS, 175.5 * TS, 0);
+        civWest2.driver = "AI_TRAFFIC";
+        civWest2.speed = 85;
+        const civNorth = sandbox.makeVeh("s54_civ_n", "BOXVILLE_VAN", 435.5 * TS, 170.5 * TS, Math.PI * 0.5);
+        civNorth.driver = "AI_TRAFFIC";
+        civNorth.speed = 74;
+        g.vehicles.push(civWest1, civWest2, civNorth);
+
+        let ambParkedInBoxFrames = 0;
+        let fireParkedInBoxFrames = 0;
+        let severeOverlaps54 = 0;
+        let waterJetSeen = false;
+        let waterSplashSeen = false;
+        let waterPuddleSeen = false;
+
+        for (let st = 0; st < 28 * 60; st++) {
+            sandbox.advanceClock(1000 / 60);
+            g.update(1 / 60);
+            if (amb.deployedMedic && amb.isOccupyingIntersectionBox(g.map)) ambParkedInBoxFrames++;
+            if (fireSouth._parkedAtFireScene && fireSouth.isOccupyingIntersectionBox(g.map)) fireParkedInBoxFrames++;
+            if (!waterJetSeen && g.particles.some(pt => pt.kind === "WATER_JET")) waterJetSeen = true;
+            if (!waterSplashSeen && g.particles.some(pt => pt.kind === "WATER_SPLASH")) waterSplashSeen = true;
+            if (!waterPuddleSeen && g.skidmarks.some(sk => sk.surface === "WATER_PUDDLE")) waterPuddleSeen = true;
+            if (st % 6 === 0) {
+                const live = g.vehicles.filter(v => v && !v.destroyed);
+                for (let i = 0; i < live.length; i++) {
+                    for (let j = i + 1; j < live.length; j++) {
+                        if (Math.hypot(live[i].x - live[j].x, live[i].y - live[j].y) < 16) severeOverlaps54++;
+                    }
+                }
+            }
+        }
+
+        assert(
+            ambParkedInBoxFrames === 0 &&
+            fireParkedInBoxFrames === 0 &&
+            severeOverlaps54 === 0 &&
+            waterJetSeen &&
+            waterSplashSeen &&
+            waterPuddleSeen &&
+            burnCar.fireExtinguished === true,
+            `4-way EMS + VCFD + 4-direction traffic resolves with 0 intersection-box parking (amb=${ambParkedInBoxFrames}, fire=${fireParkedInBoxFrames}), 0 hull overlaps (${severeOverlaps54}), full-reach WATER_JET + WATER_SPLASH + WATER_PUDDLE, & fire extinguished (${burnCar.fireExtinguished})`
+        );
+        console.log("");
+    }
+
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 53 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 54 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

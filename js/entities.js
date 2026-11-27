@@ -2726,7 +2726,7 @@ class Vehicle {
         const runFullRadarNow = !isFarOffScreenTraffic || ((this._farRadarTick = (this._farRadarTick === undefined ? 0 : ((this._farRadarTick + 1) & 3))) === 0);
 
         let boxExitBlocked = false;
-        if (!isPanicked && !sirenBehind && isStopBlock && runFullRadarNow && game && Array.isArray(game.vehicles)) {
+        if (!isPanicked && isStopBlock && runFullRadarNow && game && Array.isArray(game.vehicles)) {
             const gHead = game._vehGridHead;
             const gNext = game._vehGridNext;
             const checkBoxVeh = (ov) => {
@@ -2740,12 +2740,14 @@ class Vehicle {
                 const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
                 const ovCos = Math.cos((ov.angle || 0) - this.angle);
                 const ovLid = map.getBlockInfo ? map.getBlockInfo(ov.x >> 6, ov.y >> 6, 1).lid : 0;
-                // 1. Hold at stop line if ANY perpendicular cross-traffic vehicle (moving OR stopped) is still clearing the intersection box ahead!
-                if (ovLid === 25 && Math.abs(ovCos) < 0.55 && fwd > 6 && fwd < 168 && lat < 68) return true;
+                // 0. Never enter an intersection box if ANY vehicle (at ANY angle 0..360°) is stopped or deployed inside our path in the box!
+                if (ovLid === 25 && fwd > 4 && fwd < 190 && lat < 46 && (ovSpd < 9 || ov.driver === null || ov.deployedMedic || ov._parkedAtFireScene)) return true;
+                // 1. Hold at stop line if ANY non-parallel cross/diagonal/opposing vehicle (moving OR stopped) is clearing the intersection box ahead!
+                if (ovLid === 25 && ovCos < 0.68 && fwd > 4 && fwd < 175 && lat < 68) return true;
                 // 2. Unsignalized intersection yield: yield at stop line if cross-traffic is actively entering the box!
                 if (!hasSignal && Math.abs(ovCos) < 0.55 && ovSpd > 10 && fwd > 6 && fwd < 155 && lat < 92) return true;
                 // 3. "Don't Block the Box": hold at stop line if a same-direction vehicle is stopped inside the box or right in the exit throat!
-                if (ovCos > 0.65 && lat < 22 && ovSpd < 6 && fwd > 24 && (ovLid === 25 ? fwd < 225 : fwd < 145)) return true;
+                if (ovCos >= 0.65 && lat < 24 && ovSpd < 7 && fwd > 22 && (ovLid === 25 ? fwd < 225 : fwd < 155)) return true;
                 return false;
             };
             if (gHead && gNext) {
@@ -2780,7 +2782,7 @@ class Vehicle {
             this._cachedBoxBlocked = false;
         }
 
-        if (!isPanicked && !sirenBehind && curBlk && (isStopBlock || isPreStopBlock) && (hasSignal || boxExitBlocked) && game) {
+        if (!isPanicked && curBlk && (isStopBlock || isPreStopBlock) && ((hasSignal && !sirenBehind) || boxExitBlocked) && game) {
             const isNSLane = stepDy !== 0 ? true : (Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right);
             const isEWLane = stepDx !== 0 ? true : (Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down);
             const nsState = hasSignal && isNSLane && typeof game.getNSTrafficLightState === "function"
@@ -2789,8 +2791,8 @@ class Vehicle {
             const ewState = hasSignal && isEWLane && typeof game.getEWTrafficLightState === "function"
                 ? game.getEWTrafficLightState()
                 : (hasSignal && isEWLane && typeof game.isEWGreen === "function" ? (game.isEWGreen() ? "GREEN" : "RED") : "GREEN");
-            const nsStop = isNSLane && nsState !== "GREEN";
-            const ewStop = isEWLane && ewState !== "GREEN";
+            const nsStop = !sirenBehind && isNSLane && nsState !== "GREEN";
+            const ewStop = !sirenBehind && isEWLane && ewState !== "GREEN";
             const tlPh = (((game.trafficLightTimer || 0) % 12.0) + 12.0) % 12.0;
             const isEarlyYellow = (isNSLane && nsState === "AMBER" && tlPh < 5.05) || (isEWLane && ewState === "AMBER" && tlPh >= 10.6 && tlPh < 11.05);
             if (nsStop || ewStop || boxExitBlocked) {
@@ -2873,7 +2875,7 @@ class Vehicle {
                 // Strictly maintain true sprite-length bumper-to-bumper gap (half of our rendered length + half of lead car's rendered length)
                 // Recessed curb-parked / driveway cars (`isCurbParked`, `aiCurbParkingBay`, `isEstateCar`) sit outside active travel lanes, so use tight 17px clearance!
                 const isRecessedParked = Boolean(other.isCurbParked || other.aiCurbParkingBay || other.isEstateCar);
-                const isStationaryObstacle = !isRecessedParked && Boolean(other.destroyed || other.driver === null);
+                const isStationaryObstacle = !isRecessedParked && Boolean(other.destroyed || other.driver === null || other.deployedMedic || other._parkedAtFireScene);
                 const filteringPastThis = Boolean(
                     this.isMotorcycle &&
                     this.aiFilteringTimer > 0 &&
@@ -2886,14 +2888,38 @@ class Vehicle {
                     (other.aiChosenDir && other.aiChosenDir.isTurn) ||
                     other.aiLaneShiftTimer > 0
                 );
+                const myHalfLen = (this.w || 62) * 0.50;
+                const myHalfWid = (this.h || 26) * 0.48;
+                const otherHalfLen = (other.w || 62) * 0.50;
+                const otherHalfWid = (other.h || 28) * 0.48;
+                const absCos = Math.abs(cosDiff);
+                const absSin = Math.sqrt(Math.max(0, 1 - Math.min(1, cosDiff * cosDiff)));
+                const projOtherHalfLen = absCos * otherHalfLen + absSin * otherHalfWid;
+                const projOtherHalfWid = absCos * otherHalfWid + absSin * otherHalfLen;
+                const otherSpd = Math.abs(other.speed || Math.hypot(other.vx || 0, other.vy || 0));
+
                 const halfWidthSum = filteringPastThis
                     ? 10
                     : (isRecessedParked ? 17 : Math.min(inTurnOrShift ? 32 : 30, (this.h + (other.h || 28)) * 0.48 + 3));
-                const halfLengthSum = ((this.w || 62) + (other.w || 62)) * 0.50;
+                const halfLengthSum = myHalfLen + otherHalfLen;
                 if ((cosDiff > 0.42 || isStationaryObstacle) && forwardDist > 0 && lateralDist < halfWidthSum) {
-                    const bumperGap = forwardDist - halfLengthSum;
+                    const effHalfLenSum = cosDiff > 0.42 ? halfLengthSum : (myHalfLen + projOtherHalfLen);
+                    const bumperGap = forwardDist - effHalfLenSum;
                     if (bumperGap < closestBumperGap) {
                         closestBumperGap = bumperGap;
+                        closestEntity = other;
+                        isPlayerBlocking = other.driver === "PLAYER";
+                    }
+                } else if (
+                    !isRecessedParked &&
+                    cosDiff <= 0.42 &&
+                    forwardDist > 2 &&
+                    lateralDist < (myHalfWid + projOtherHalfWid + 2)
+                ) {
+                    // OBB Cross-Hull Guard: never drive our front bumper into the flank or overhang of a perpendicular/diagonal car or bus!
+                    const obbGap = forwardDist - (myHalfLen + projOtherHalfLen);
+                    if (obbGap < 26 && (otherSpd < 12 || obbGap < 16) && obbGap < closestBumperGap) {
+                        closestBumperGap = obbGap;
                         closestEntity = other;
                         isPlayerBlocking = other.driver === "PLAYER";
                     }
@@ -2902,7 +2928,6 @@ class Vehicle {
                 // B2. Rear-View Mirror Tailgater Detection:
                 // If a fast-moving vehicle (player or speeding car) is closing in directly behind us in our lane,
                 // cautious drivers yield the lane or pull slightly right, while aggressive drivers honk!
-                const otherSpd = Math.abs(other.speed || Math.hypot(other.vx || 0, other.vy || 0));
                 if (
                     !isPanicked &&
                     this.driver === "AI_TRAFFIC" &&
@@ -2941,8 +2966,9 @@ class Vehicle {
                     const myTurning = Boolean(this.aiChosenDir && this.aiChosenDir.isTurn);
                     const otherTurning = Boolean(other.aiChosenDir && other.aiChosenDir.isTurn);
                     const otherInBox = map.getBlockInfo ? (map.getBlockInfo(other.x >> 6, other.y >> 6, 1).lid === 25) : false;
+                    const rearHullTail = -(otherHalfLen + 18);
 
-                    if ((inIntersectionBox || otherInBox) && cosDiff <= 0.55 && forwardDist > -8 && forwardDist < 88 && lateralDist < 44 && theirForwardDist > -18 && theirForwardDist < 94) {
+                    if ((inIntersectionBox || otherInBox) && cosDiff <= 0.55 && forwardDist > -8 && forwardDist < 92 && lateralDist < 46 && theirForwardDist > rearHullTail && theirForwardDist < 96) {
                         const playerDirectlyInPath = other.driver === "PLAYER" && (otherSpd > 10 || (lateralDist < 22 && forwardDist < 52));
                         const emgBeatsMe = Boolean(other.sirenActive && !this.sirenActive);
                         const straightBeatsTurn = myTurning && !otherTurning && otherInBox;
@@ -2950,11 +2976,15 @@ class Vehicle {
                             theirForwardDist < forwardDist - 6 ||
                             (Math.abs(theirForwardDist - forwardDist) <= 6 && String(this.id) < String(other.id))
                         );
-                        if (playerDirectlyInPath || emgBeatsMe || straightBeatsTurn || closerBeatsFurther) {
+                        // Break 3-way circular yields: if `other` is stalled (>1.35s) and not physically in front of our bumper, roll clear of the box!
+                        const otherStalledCycle = !playerDirectlyInPath && !emgBeatsMe && otherSpd < 3 && (other.gridlockTimer || 0) > 1.35 &&
+                            (this.gridlockTimer || 0) <= (other.gridlockTimer || 0) &&
+                            (lateralDist >= (myHalfWid + projOtherHalfWid - 2) || forwardDist > (myHalfLen + projOtherHalfLen + 14));
+                        if (!otherStalledCycle && (playerDirectlyInPath || emgBeatsMe || straightBeatsTurn || closerBeatsFurther)) {
                             crossTrafficYield = true;
                         }
                     } else if (myTurning && !otherTurning && otherSpd > 16 && cosDiff < 0.35) {
-                        if (forwardDist > -8 && forwardDist < 108 && lateralDist < 48 && theirForwardDist > -12 && theirForwardDist < 112) {
+                        if (forwardDist > -8 && forwardDist < 108 && lateralDist < 48 && theirForwardDist > rearHullTail && theirForwardDist < 112) {
                             crossTrafficYield = true;
                         }
                     }
@@ -3533,9 +3563,29 @@ class Vehicle {
         return { throttle, steer, handbrake: false };
     }
 
+    isOccupyingIntersectionBox(map) {
+        if (!map || typeof map.getBlockInfo !== "function") return false;
+        const bx = Math.floor(this.x / TILE_SIZE);
+        const by = Math.floor(this.y / TILE_SIZE);
+        if (map.getBlockInfo(bx, by, 1).lid === 25) return true;
+        const hl = (this.w || 62) * 0.45;
+        const c = Math.cos(this.angle || 0);
+        const s = Math.sin(this.angle || 0);
+        const fbx = Math.floor((this.x + c * hl) / TILE_SIZE);
+        const fby = Math.floor((this.y + s * hl) / TILE_SIZE);
+        if (map.getBlockInfo(fbx, fby, 1).lid === 25) return true;
+        const rbx = Math.floor((this.x - c * hl) / TILE_SIZE);
+        const rby = Math.floor((this.y - s * hl) / TILE_SIZE);
+        return map.getBlockInfo(rbx, rby, 1).lid === 25;
+    }
+
     // Helper: checks spacing against other stopped emergency/police units so responders never stack on top of each other
-    // or seal off an entire 2-lane street with 4-5 abandoned patrol cars at the exact same spot!
-    alignCurbsideAndCheckSpacing(map, game, minSpacing = 68, tacticalTarget = null) {
+    // or seal off an entire 2-lane street or 4-way intersection with diagonal abandoned emergency rigs!
+    alignCurbsideAndCheckSpacing(map, game, minSpacing = 68, tacticalTarget = null, forceAllowInBox = false) {
+        const onRoad = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
+        if (onRoad && !forceAllowInBox && this.isOccupyingIntersectionBox(map)) {
+            return false;
+        }
         let nearbyStoppedResponders = 0;
         if (game && Array.isArray(game.vehicles)) {
             for (const ov of game.vehicles) {
@@ -3556,10 +3606,27 @@ class Vehicle {
         if (nearbyStoppedResponders >= 2) {
             return false;
         }
-        const onRoad = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
-        if (onRoad && this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
-            this.angle = this.aiChosenDir.angle;
-            // Pull slightly toward the right-hand curb (+12px) when parking to deploy officers so the center lane remains passable
+        if (onRoad) {
+            // Always snap parked road responders strictly parallel to the cardinal lane (even if aiChosenDir was null!)
+            let laneAng = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") ? this.aiChosenDir.angle : null;
+            if (laneAng === null && map && typeof map.getAllowedRoadDirections === "function") {
+                const bx = Math.floor(this.x / TILE_SIZE);
+                const by = Math.floor(this.y / TILE_SIZE);
+                const dirs = map.getAllowedRoadDirections(bx, by, this.z || 2.0);
+                let bestCos = -2;
+                for (let di = 0; di < dirs.length; di++) {
+                    const cs = Math.cos((this.angle || 0) - dirs[di].angle);
+                    if (cs > bestCos) {
+                        bestCos = cs;
+                        laneAng = dirs[di].angle;
+                    }
+                }
+            }
+            if (laneAng === null) {
+                laneAng = Math.round((this.angle || 0) / (Math.PI * 0.5)) * (Math.PI * 0.5);
+            }
+            this.angle = laneAng;
+            // Pull slightly toward the right-hand curb (+12px) when parking to deploy crew so the adjacent lane remains passable
             const rCos = -Math.sin(this.angle);
             const rSin = Math.cos(this.angle);
             const curbX = this.x + rCos * 12;
@@ -3568,7 +3635,7 @@ class Vehicle {
                 this.x = curbX;
                 this.y = curbY;
             }
-        } else if (!onRoad && tacticalTarget) {
+        } else if (tacticalTarget) {
             const toTarg = Math.atan2(tacticalTarget.y - this.y, tacticalTarget.x - this.x);
             const sideSign = ((String(this.id).charCodeAt(String(this.id).length - 1) || 0) % 2 === 0) ? 1 : -1;
             this.angle = toTarg + sideSign * 0.35;
@@ -3656,7 +3723,7 @@ class Vehicle {
         const blockedByWallNear = !frontQueuedBehindVehicle && (!wantedTarget.inVehicle || Math.abs(wantedTarget.speed || 0) < 85) && distToPlayer < blockedMaxDist && noProgress > 1.35;
 
         if ((this.noDeployCooldown || 0) <= 0 && (playerOnFootAtScene || playerBoxedNear || blockedByWallNear)) {
-            const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68, wantedTarget);
+            const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68, wantedTarget, noProgress > 3.0);
             if (!spacingOk) {
                 this.aiBailTimer = 0;
                 const offRoadHere = map && map.isRoadAtPixel ? !map.isRoadAtPixel(this.x, this.y) : false;
@@ -3685,7 +3752,9 @@ class Vehicle {
         // Leave the asphalt road (`forceDirect = true`) ONLY when:
         // - The suspect is on Vice Beach / North Beach / Lummus Park and the cruiser has reached the coastal road (coastalRoadMinX)
         //   and is aligned in Y within 440px (or already off-road in the park/beach this.x >= coastalOffRoadMinX), OR
-        // - The suspect is off-road on a city sidewalk/plaza (`!targetOnRoad`) with clear line-of-sight within 240px!
+        // - The cruiser is ALREADY off-road (`!onRoadSelf`) in a plaza/park with clear line-of-sight!
+        // On normal city streets (`onRoadSelf`), cruisers stay strictly in cardinal lanes so they never cut diagonally across intersections!
+        const onRoadSelf = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
         const clearOfBuildings = map.traceSegment2D
             ? !map.traceSegment2D(this.x, this.y, wantedTarget.x, wantedTarget.y, curZ).hit
             : (distToPlayer < 240);
@@ -3694,7 +3763,7 @@ class Vehicle {
             (this.x >= coastalOffRoadMinX || Math.abs(wantedTarget.y - this.y) <= 440 || distToPlayer < 520);
         const forceDirect =
             (targetInBeachOrParkExpanse && readyToCutOntoBeach && distToPlayer < 2500) ||
-            (!targetOnRoad && clearOfBuildings && distToPlayer < 240);
+            (!onRoadSelf && !targetOnRoad && clearOfBuildings && distToPlayer < 240);
 
         // When pursuing a visually spotted target (or ambient AI_CRIMINAL getaway vehicle) with clear line-of-sight, the police passenger / tank turret fires!
         const isTankUnit = Boolean(this.isTank || this.specKey === "PANZER_TANK");
@@ -4020,6 +4089,8 @@ class Vehicle {
                 }
 
                 const noProgress = this.updateApproachProgress(dt, rawDist);
+                const onRoadAmb = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
+                const inJctBoxAmb = onRoadAmb && this.isOccupyingIntersectionBox(map);
                 const corpseOnRoad = map.isRoadAtPixel ? map.isRoadAtPixel(nearestCorpse.x, nearestCorpse.y) : false;
                 const corpseInBeachOrPark = Boolean(
                     !corpseOnRoad && (
@@ -4028,13 +4099,12 @@ class Vehicle {
                     )
                 );
 
-                // Stop right next to the victim (< 130px on beach/road, or if blocked by a solid wall within 460px for > 1.5s) and deploy Paramedic!
-                if (rawDist < 130 || (rawDist < 460 && noProgress > 1.50)) {
-                    const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68, nearestCorpse);
+                // Stop parallel at the curb beside the victim (< 145px on beach/road, never voluntarily inside an intersection box!) and deploy Paramedic!
+                if ((!inJctBoxAmb || noProgress > 3.2) && (rawDist < 145 || (rawDist < 460 && noProgress > 1.50))) {
+                    const spacingOk = this.alignCurbsideAndCheckSpacing(map, game, 68, nearestCorpse, noProgress > 3.2);
                     if (!spacingOk && this.aiBailTimer < 0.7) {
                         this.aiBailTimer += dt * 0.4;
-                        const offRoadHere = map && map.isRoadAtPixel ? !map.isRoadAtPixel(this.x, this.y) : false;
-                        return this.computeTargetRoadOrFeelerControls(dt, map, game, nearestCorpse.x, nearestCorpse.y, 0, 0, 0.36, false, offRoadHere);
+                        return this.computeTargetRoadOrFeelerControls(dt, map, game, nearestCorpse.x, nearestCorpse.y, 0, 0, 0.44, false, !onRoadAmb);
                     }
                     this.aiBailTimer += dt;
                     const brakeMult = Math.pow(0.002, dt);
@@ -4055,9 +4125,10 @@ class Vehicle {
                 const clearOfBuildings = map.traceSegment2D
                     ? !map.traceSegment2D(this.x, this.y, nearestCorpse.x, nearestCorpse.y, curZ).hit
                     : (rawDist < 240);
+                // Stay strictly in cardinal road lanes on city streets so Ambulances never cut diagonally across 4-way intersections!
                 const forceDirect =
                     (corpseInBeachOrPark && this.x >= 444.0 * TILE_SIZE && rawDist < 2400) ||
-                    (!corpseOnRoad && clearOfBuildings && rawDist < 240);
+                    (!onRoadAmb && !corpseOnRoad && clearOfBuildings && rawDist < 240);
                 return this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -4118,19 +4189,21 @@ class Vehicle {
                 }
 
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
-                const blockedNearFire = bestDist < 380 && (
+                const onRoadFire = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
+                const inJctBoxFire = onRoadFire && this.isOccupyingIntersectionBox(map);
+                const blockedNearFire = bestDist < 380 && (!inJctBoxFire || (this.approachNoProgress || 0) > 2.8) && (
                     (this.approachNoProgress || 0) > 1.15 ||
                     (this.aiStuckTimer || 0) > 0.28 ||
                     (this.aiReverseTimer || 0) > 0
                 );
                 const shouldParkAndDeploy =
-                    bestDist < 260 ||
+                    (bestDist < 285 && !inJctBoxFire) ||
                     blockedNearFire ||
                     Boolean(this.deployedFireman) ||
                     Boolean(this._parkedAtFireScene && bestDist < 420);
 
                 if (shouldParkAndDeploy) {
-                    this.alignCurbsideAndCheckSpacing(map, game, 82);
+                    this.alignCurbsideAndCheckSpacing(map, game, 82, burningCar, true);
                     this._parkedAtFireScene = true;
                     // Never reverse back-and-forth once at the fire scene: lock brakes and deploy!
                     this.aiReverseTimer = 0;
@@ -4150,25 +4223,17 @@ class Vehicle {
                         }
                     }
 
-                    // If within rooftop deck-gun range (< 320px), also fire the truck's rooftop water cannon over any obstacles!
+                    // If within rooftop deck-gun range (< 320px), also fire the truck's rooftop water cannon all the way onto the burning target!
                     if (bestDist < 320) {
-                        const jetSpeed = Math.max(180, Math.min(310, bestDist * 2.4));
-                        for (let k = 0; k < 2; k++) {
-                            if (Math.random() < 0.85) {
-                                const spread = (Math.random() - 0.5) * 0.16;
-                                game.particles.push({
-                                    x: this.x + Math.cos(ang) * 26,
-                                    y: this.y + Math.sin(ang) * 26,
-                                    vx: Math.cos(ang + spread) * jetSpeed,
-                                    vy: Math.sin(ang + spread) * jetSpeed,
-                                    size: 3.5 + Math.random() * 2.0,
-                                    color: Math.random() < 0.35 ? "#bae6fd" : "#38bdf8",
-                                    life: 0.42,
-                                    maxLife: 0.42
-                                });
-                            }
+                        this._cannonAngle = ang;
+                        this._sprayingCannonTimer = 0.16;
+                        const nozX = this.x + Math.cos(this.angle || 0) * 8 + Math.cos(ang) * 16;
+                        const nozY = this.y + Math.sin(this.angle || 0) * 8 + Math.sin(ang) * 16;
+                        const reachToTarget = Math.max(22, Math.hypot(burningCar.x - nozX, burningCar.y - nozY) - 10);
+                        if (typeof game.emitPressurizedWaterJet === "function") {
+                            game.emitPressurizedWaterJet(nozX, nozY, ang, reachToTarget, true, burningCar);
                         }
-                        if (Math.random() < 0.45 && typeof game.spawnParticle === "function") {
+                        if (Math.random() < 0.55 && typeof game.spawnParticle === "function") {
                             game.spawnParticle(
                                 burningCar.x + (Math.random() - 0.5) * 22,
                                 burningCar.y + (Math.random() - 0.5) * 22,
@@ -4227,7 +4292,7 @@ class Vehicle {
                     : (bestDist < 240);
                 const fireForceDirect =
                     (fireInBeachOrPark && this.x >= 444.0 * TILE_SIZE && bestDist < 2400) ||
-                    (!fireOnRoad && fireClearOfBuildings && bestDist < 240);
+                    (!onRoadFire && !fireOnRoad && fireClearOfBuildings && bestDist < 240);
                 const fireCtrl = this.computeTargetRoadOrFeelerControls(
                     dt,
                     map,
@@ -4777,6 +4842,9 @@ class Vehicle {
         }
 
         this.sirenPhase += dt * 10;
+        if ((this._sprayingCannonTimer || 0) > 0) {
+            this._sprayingCannonTimer = Math.max(0, this._sprayingCannonTimer - dt);
+        }
 
         // Gridlock resolution (no cheating, everything stays solid): an AI vehicle frozen for a long time
         // (not at a red light / not parked on purpose) BACKS UP out of the jam like a real driver and re-picks its route,
@@ -4812,11 +4880,12 @@ class Vehicle {
                 this.gridlockTimer = (this.gridlockTimer || 0) + dt;
                 const idNum = parseInt(String(this.id).replace(/\D/g, ""), 10) || 0;
                 const inBox = Boolean(map && map.getBlockInfo && map.getBlockInfo(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE), 1).lid === 25);
-                const threshold = (inBox ? 3.8 : 13.5) + (idNum % 5) * 1.1;
+                const threshold = (inBox ? 2.0 : 10.5) + (idNum % 4) * 0.55;
                 if (this.gridlockTimer > threshold) {
-                    // Only back up if there is free road behind us
+                    // Only back up if there is free road behind us; if another AI car is bumper-to-bumper behind us, signal it to ripple-reverse first!
                     const bCos = Math.cos(this.angle), bSin = Math.sin(this.angle);
                     let rearClear = true;
+                    let blockingRearVeh = null;
                     if (game && Array.isArray(game.vehicles)) {
                         const vHead = game._vehGridHead;
                         const vNext = game._vehGridNext;
@@ -4828,7 +4897,11 @@ class Vehicle {
                             const along = ox * bCos + oy * bSin;
                             const lat = Math.abs(-ox * bSin + oy * bCos);
                             const need = ((this.w || 48) + (o.w || 48)) * 0.5 + 8;
-                            return (along < 0 && along > -(need + (inBox ? 10 : 24)) && lat < ((this.h || 24) + (o.h || 24)) * 0.5 + 4);
+                            if (along < 0 && along > -(need + (inBox ? 10 : 24)) && lat < ((this.h || 24) + (o.h || 24)) * 0.5 + 4) {
+                                blockingRearVeh = o;
+                                return true;
+                            }
+                            return false;
                         };
                         if (vHead && vNext) {
                             const gcx = this.x >> 8;
@@ -4861,7 +4934,7 @@ class Vehicle {
                         }
                     }
                     if (rearClear) {
-                        this.gridlockReverseTimer = inBox ? 2.4 : 3.5;
+                        this.gridlockReverseTimer = inBox ? 2.2 : 3.2;
                         this.gridlockStartedInBox = inBox;
                         this.gridlockAvoidAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number" ? this.aiChosenDir.angle : this.angle;
                         this.gridlockAvoidTimer = 14.0;
@@ -4875,7 +4948,19 @@ class Vehicle {
                             this.aiReverseSteer = Math.random() < 0.5 ? 0.8 : -0.8;
                         }
                     } else {
-                        // Boxed in from behind: re-pick an unblocked outgoing intersection branch or change to a legal parallel lane (NEVER shove onto sidewalks or oncoming lanes!)
+                        // Cooperative Ripple Back-Up: ask the queued AI car behind us to reverse ~25px so we can back out of the jam cleanly!
+                        if (
+                            blockingRearVeh &&
+                            blockingRearVeh.driver === "AI_TRAFFIC" &&
+                            !blockingRearVeh.destroyed &&
+                            !(blockingRearVeh.gridlockReverseTimer > 0)
+                        ) {
+                            blockingRearVeh.gridlockReverseTimer = 1.65;
+                            blockingRearVeh.gridlockStartedInBox = false;
+                            this.gridlockTimer = Math.max(0, threshold - 0.95);
+                        } else {
+                            this.gridlockTimer = 0;
+                        }
                         const gbx = Math.floor(this.x / TILE_SIZE);
                         const gby = Math.floor(this.y / TILE_SIZE);
                         const gz = this.z !== undefined ? this.z : 2.0;
@@ -4889,7 +4974,6 @@ class Vehicle {
                             this.aiBlockY = -1;
                             this.aiChosenDir = null;
                         }
-                        this.gridlockTimer = 0;
                         this.aiLaneChangeCooldown = 0;
                     }
                 }

@@ -5943,6 +5943,37 @@ class RetroRenderer {
                         ".DMMD.",
                         "...D.."
                     ], bloodMaskPal);
+
+                    // 13) Pressurized VCFD Water Cannon / Hose Jet Slug & Target Foaming Splash Ring
+                    const waterPal = {
+                        E: [36, 152, 235, 145],  // Fine outer mist
+                        C: [68, 198, 252, 228],  // Pressurized cyan stream
+                        F: [186, 236, 255, 248], // Aerated white-blue foam
+                        W: [248, 253, 255, 255]  // High-velocity white water core
+                    };
+                    bakePartPixels("water_jet_slug", 1504, 3995, [
+                        "..EECCCCEE....",
+                        ".ECCFFFFCCCE..",
+                        "ECFFWWWWWWFCE.",
+                        "ECFFWWWWWWFCE.",
+                        ".ECCFFFFCCCE..",
+                        "..EECCCCEE...."
+                    ], waterPal);
+
+                    bakePartPixels("water_splash_ring", 1522, 3995, [
+                        "....EEEE....",
+                        "..EECFFCEE..",
+                        ".ECFFWWFFCE.",
+                        ".EFWCCCCWFE.",
+                        "ECFCE..ECFCE",
+                        "EFWC....CWFE",
+                        "EFWC....CWFE",
+                        "ECFCE..ECFCE",
+                        ".EFWCCCCWFE.",
+                        ".ECFFWWFFCE.",
+                        "..EECFFCEE..",
+                        "....EEEE...."
+                    ], waterPal);
                 }
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 240)
@@ -10793,6 +10824,14 @@ class RetroRenderer {
             const sr = typeof s.r === "number" ? s.r : 0.08;
             const sg = typeof s.g === "number" ? s.g : 0.08;
             const sb = typeof s.b === "number" ? s.b : 0.10;
+            if (s.surface === "WATER_PUDDLE") {
+                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                const wRect = objSprs["water_splash_ring"] || objSprs["blood_splat_drop"];
+                if (wRect) {
+                    this.pushAtlasSprite3D(wRect, s.x, s.y, sz, sang, Math.max(0.75, sw / 10.5), SPRITE_DRAW_ORDER.TIRE_MARKS, sr, sg, sb, alpha);
+                    continue;
+                }
+            }
             if (s.surface === "BLOOD" || s.surface === "BLOOD_FOOT") {
                 const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
                 const bRect = (s.variant === 1 || s.surface === "BLOOD_FOOT")
@@ -11560,9 +11599,16 @@ class RetroRenderer {
                     }
                 }
                 if (ped.sprayingHose) {
-                    const nozX = ped.x + Math.cos(ped.angle) * 9.5;
-                    const nozY = ped.y + Math.sin(ped.angle) * 9.5;
-                    this.pushSolidQuad3D(nozX, nozY, pz + 0.018, 5.5, 2.6, ped.angle, 0.96, 0.80, 0.18, 0.98, pedDrawOrder);
+                    const cAng = Math.cos(ped.angle), sAng = Math.sin(ped.angle);
+                    const nozX = ped.x + cAng * 9.5;
+                    const nozY = ped.y + sAng * 9.5;
+                    this.pushSolidQuad3D(nozX, nozY, pz + 0.018, 5.8, 2.8, ped.angle, 0.96, 0.80, 0.18, 0.98, pedDrawOrder);
+                    // Pressurized white-water cone erupting directly from the brass nozzle tip
+                    const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                    const jRect = objSprs["water_jet_slug"];
+                    if (jRect) {
+                        this.pushAtlasSprite3D(jRect, nozX + cAng * 7.5, nozY + sAng * 7.5, pz + 0.022, ped.angle, 0.78, SPRITE_DRAW_ORDER.PROJECTILES, 0.96, 0.99, 1.0, 0.92);
+                    }
                 }
             }
 
@@ -12297,6 +12343,19 @@ class RetroRenderer {
                 this.pushSolidQuad3D(bagX - Math.cos(bagAng) * 2.4, bagY - Math.sin(bagAng) * 2.4, bagZ + 0.002, 1.5, 7.2, bagAng, 0.22, 0.24, 0.30, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
                 this.pushSolidQuad3D(bagX + Math.cos(bagAng) * 2.4, bagY + Math.sin(bagAng) * 2.4, bagZ + 0.002, 1.5, 7.2, bagAng, 0.22, 0.24, 0.30, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
                 this.pushSolidQuad3D(bagX, bagY, bagZ + 0.003, 7.8, 1.1, bagAng, 0.88, 0.92, 0.97, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+            } else if (v.specKey === "FIRE_TRUCK" && (v._sprayingCannonTimer || 0) > 0) {
+                // Rooftop high-pressure water monitor turret + pressurized white-water muzzle cone on VCFD Fire Engine!
+                const cAng = typeof v._cannonAngle === "number" ? v._cannonAngle : renderAngle;
+                const cc = Math.cos(cAng), cs = Math.sin(cAng);
+                const turX = v.x + cosA * 8.0;
+                const turY = v.y + sinA * 8.0;
+                const turZ = vz + airZ + 0.018;
+                this.pushSolidQuad3D(turX + cc * 4.5, turY + cs * 4.5, turZ, 9.5, 3.2, cAng, 0.86, 0.88, 0.94, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
+                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                const jRect = objSprs["water_jet_slug"];
+                if (jRect) {
+                    this.pushAtlasSprite3D(jRect, turX + cc * 14.5, turY + cs * 14.5, turZ + 0.004, cAng, 0.95, SPRITE_DRAW_ORDER.PROJECTILES, 0.96, 0.99, 1.0, 0.95);
+                }
             } else if (!v.destroyed && v.heroVariant === "ONLYRAW_SUV") {
                 // Gleaming Chrome Luxury Bullbar / Grille & Brushed Silver Roof Rails on Dre'Quan's Black 4x4 SUV
                 const noseX = v.x + cosA * 27.5;
@@ -13249,9 +13308,37 @@ class RetroRenderer {
             } else if (pt.kind === "FIRE") {
                 const frameId = 234 + Math.min(7, Math.floor(prog * 8));
                 this.batchObjectSprite3D(String(frameId), pt.x, pt.y, pz + 0.01, 0, 0.75, SPRITE_DRAW_ORDER.EXPLOSION);
-            } else if (pt.color === "#38bdf8") {
-                // Fire truck water cannon droplets
-                this.pushSolidQuad3D(pt.x, pt.y, pz, 3, 3, 0, 0.22, 0.74, 0.97, 1.0 - prog * 0.5, SPRITE_DRAW_ORDER.PROJECTILES);
+            } else if (pt.kind === "WATER_JET") {
+                const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);
+                const arcZ = Math.sin(prog * Math.PI) * (pt.peakZ || 0.12);
+                const jAng = typeof pt.ang === "number" ? pt.ang : Math.atan2(pt.vy || 0, pt.vx || 1);
+                const jScale = (pt.baseScale || 0.78) * (0.85 + prog * 0.55);
+                const jAlpha = Math.min(0.96, (1.0 - prog * 0.22));
+                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                const jRect = objSprs["water_jet_slug"];
+                // Subtle shadow under arched pressurized water stream
+                this.pushSolidQuad3D(pt.x + sunCos * (2.0 + arcZ * 12), pt.y + sunSin * (2.0 + arcZ * 12), floorZ + 0.009, 8.5 * jScale, 3.2 * jScale, jAng, 0.02, 0.05, 0.10, 0.22 * (1 - prog * 0.4), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                if (jRect) {
+                    this.pushAtlasSprite3D(jRect, pt.x, pt.y, floorZ + 0.045 + arcZ, jAng, jScale, SPRITE_DRAW_ORDER.EXPLOSION, 0.94, 0.99, 1.0, jAlpha);
+                } else {
+                    this.pushSolidQuad3D(pt.x, pt.y, floorZ + 0.045 + arcZ, 11 * jScale, 4.2 * jScale, jAng, 0.55, 0.88, 1.0, jAlpha, SPRITE_DRAW_ORDER.EXPLOSION);
+                }
+            } else if (pt.kind === "WATER_SPLASH") {
+                const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);
+                const sScale = (pt.baseScale || 0.65) + prog * 0.95;
+                const sAlpha = (1.0 - prog) * 0.92;
+                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                const sRect = objSprs["water_splash_ring"];
+                if (sRect) {
+                    this.pushAtlasSprite3D(sRect, pt.x, pt.y, floorZ + 0.055, prog * 1.8 + (pt.rot || 0), sScale, SPRITE_DRAW_ORDER.EXPLOSION, 0.92, 0.98, 1.0, sAlpha);
+                } else {
+                    this.pushSolidQuad3D(pt.x, pt.y, floorZ + 0.055, 10 * sScale, 10 * sScale, prog, 0.72, 0.93, 1.0, sAlpha, SPRITE_DRAW_ORDER.EXPLOSION);
+                }
+            } else if (pt.kind === "WATER_DROP" || pt.color === "#38bdf8" || pt.color === "#bae6fd") {
+                // Rebounding water spray droplets & mist (never falls through to yellow bullet sparks!)
+                const dSz = (pt.size || 3.2) * (1.0 - prog * 0.35);
+                const isFoam = pt.color === "#bae6fd" || pt.foam;
+                this.pushSolidQuad3D(pt.x, pt.y, pz + 0.01, dSz * 1.35, dSz * 0.95, pt.rot || 0, isFoam ? 0.82 : 0.32, isFoam ? 0.96 : 0.80, 1.0, (1.0 - prog * 0.65) * 0.90, SPRITE_DRAW_ORDER.EXPLOSION);
             } else if (pt.kind === "SPRAY") {
                 // Black spray-paint aerosol mist from the graffiti can (expands & fades)
                 const sz = (pt.size || 3) * (1.0 + prog * 1.4);
