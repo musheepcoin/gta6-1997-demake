@@ -10346,18 +10346,9 @@ class LeonidaGame {
 
         if (!p || p.dead) return;
 
-        if (targetType === "POLICE") {
-
-            const maxHp = p.maxHp || 100;
-
-            if (p.inVehicle || p.hp >= maxHp * 0.25) {
-
-                return;
-
-            }
-
-        }
-
+        p._copArrestTimer = 0;
+        p._copDoorPullTimer = 0;
+        p._batonSlowTimer = 0;
         p.dead = true;
         p.deathType = targetType;
         p.respawnGraceUntil = performance.now() + 4500;
@@ -12933,12 +12924,21 @@ class LeonidaGame {
                 p.swimPhase = (p.swimPhase || 0) + dt * (this.input.sprint ? 5.8 : 4.0) * (p.isMoving ? 1.0 : 0.45);
                 const swimStrokeSurge = isSwimmingPre ? (0.92 + 0.16 * Math.sin(p.swimPhase)) : 1.0;
                 const exhaustedMult = (isSwimmingPre && p.swimStamina !== undefined && p.swimStamina <= 5) ? 0.68 : 1.0;
+                if ((p._batonSlowTimer || 0) > 0) {
+                    p._batonSlowTimer = Math.max(0, p._batonSlowTimer - dt);
+                }
+                if ((p._copArrestEngageFrame || 0) > 0) {
+                    p._copArrestEngageFrame = Math.max(0, p._copArrestEngageFrame - dt);
+                } else if ((p._copArrestTimer || 0) > 0) {
+                    p._copArrestTimer = Math.max(0, p._copArrestTimer - dt * 1.35);
+                }
+                const batonStaggerMult = (p._batonSlowTimer || 0) > 0 ? 0.68 : 1.0;
                 const baseFootSpd = isSkatingNow
                     ? (this.input.sprint ? 250 : 188)
                     : (this.input.sprint ? 198 : 142);
                 const walkSpeed = isSwimmingPre
                     ? ((this.input.sprint ? 128 : 92) * boostMult * swimStrokeSurge * exhaustedMult)
-                    : (baseFootSpd * boostMult * (preWaterInfo.inWater ? 0.82 : 1.0));
+                    : (baseFootSpd * boostMult * batonStaggerMult * (preWaterInfo.inWater ? 0.82 : 1.0));
 
                 const manualInput = this.input.up || this.input.down || this.input.left || this.input.right;
 
@@ -14865,19 +14865,32 @@ class LeonidaGame {
                     }
                 }
 
-                // Check close-range COP arrest / car-door pull / damage AND ranged weapon fire on local player even in client sync mode
+                // Check close-range COP baton strike / tackle arrest / car-door pull AND ranged weapon fire on local player even in client sync mode
                 if (ped.kind === "COP" && (this.wantedLevel > 0 || ped.carjackedCop) && !p.dead && !this.activeInterior) {
                     ped.inCombat = true;
+                    const effWantedSync = Math.max(1, this.wantedLevel || 1);
                     const targetEnt = p.inVehicle || p;
                     const dPlayer = Math.hypot(targetEnt.x - ped.x, targetEnt.y - ped.y);
-                    const vehDoorReach = p.inVehicle ? Math.max(44, ((p.inVehicle.w || 56) * 0.50) + 16) : 28;
-                    if (dPlayer <= vehDoorReach) {
+                    const vehDoorReach = p.inVehicle ? Math.max(44, ((p.inVehicle.w || 56) * 0.50) + 16) : 34;
+                    if (dPlayer <= vehDoorReach && !((ped.bustedGraceTimer || 0) > 0)) {
                         const maxHp = p.maxHp || 100;
                         if (!p.inVehicle) {
-                            if (p.hp < maxHp * 0.25) {
-                                this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
-                            } else {
-                                this.damagePlayer(18 * dt);
+                            p._copArrestEngageFrame = 0.12;
+                            p._copArrestTimer = (p._copArrestTimer || 0) + dt;
+                            ped.meleeCooldown = (ped.meleeCooldown || 0) - dt;
+                            if (ped.meleeCooldown <= 0) {
+                                ped.meleeCooldown = 0.56;
+                                ped.punchAnimTimer = 0.28;
+                                p._batonSlowTimer = 0.45;
+                                if (this.audio && typeof this.audio.playPunch === "function") this.audio.playPunch();
+                                this.damagePlayer(16);
+                                if (!p.dead && performance.now() - (this._lastBatonTextAt || 0) > 1200) {
+                                    this._lastBatonTextAt = performance.now();
+                                    this.addFloatingText(p.x, p.y - 26, "🚔 VCPD BATON! STOP RESISTING!", "#38bdf8");
+                                }
+                            }
+                            if (!p.dead && (p._copArrestTimer >= 1.35 || p.hp <= maxHp * (effWantedSync <= 1 ? 0.35 : 0.25))) {
+                                this.triggerWastedOrBusted("BUSTED!", "TACKLED & ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
                             }
                         } else if (Math.abs(p.inVehicle.speed || 0) < 65) {
                             p.inVehicle.doorOpenTimer = Math.max(p.inVehicle.doorOpenTimer || 0, 0.45);
@@ -14886,7 +14899,7 @@ class LeonidaGame {
                             p.inVehicle.speed *= Math.pow(0.08, dt);
                             p._copDoorPullTimer = (p._copDoorPullTimer || 0) + dt;
                             this.damagePlayer(24 * dt);
-                            if (p._copDoorPullTimer >= 0.55 || p.hp < maxHp * 0.35) {
+                            if (p._copDoorPullTimer >= 0.55 || p.hp < maxHp * (effWantedSync <= 1 ? 0.45 : 0.30)) {
                                 p._copDoorPullTimer = 0;
                                 this.triggerWastedOrBusted("BUSTED!", "PULLED FROM VEHICLE & ARRESTED BY LEONIDA VCPD", "#38bdf8", "POLICE");
                             }
@@ -14895,13 +14908,13 @@ class LeonidaGame {
                         p._copDoorPullTimer = Math.max(0, p._copDoorPullTimer - dt * 1.5);
                     }
                     ped.shootCooldown = (ped.shootCooldown || 0) - dt;
-                    if (dPlayer < 350 && ped.shootCooldown <= 0 && (ped.stunnedTimer || 0) <= 0) {
+                    const canSyncCopShoot = Boolean(effWantedSync >= 2 || (p.inVehicle && (dPlayer > vehDoorReach || Math.abs(p.inVehicle.speed || 0) >= 42)));
+                    if (canSyncCopShoot && dPlayer < 350 && ped.shootCooldown <= 0 && (ped.stunnedTimer || 0) <= 0) {
                         const blocked = this.map.traceSegment2D
                             ? this.map.traceSegment2D(ped.x, ped.y, targetEnt.x, targetEnt.y, ped.z || 2.0).hit
                             : false;
                         if (!blocked) {
-                            const effWanted = Math.max(1, this.wantedLevel || 1);
-                            const wep = ped.copWeapon || (effWanted >= 4 ? "SHOTGUN" : (effWanted >= 3 ? "UZI" : "PISTOL"));
+                            const wep = ped.copWeapon || (effWantedSync >= 4 ? "SHOTGUN" : (effWantedSync >= 3 ? "UZI" : "PISTOL"));
                             ped.shootCooldown = wep === "UZI" ? 0.34 : (wep === "SHOTGUN" ? 1.15 : 0.85);
                             const leadX = targetEnt.x + (targetEnt.vx || 0) * 0.12;
                             const leadY = targetEnt.y + (targetEnt.vy || 0) * 0.12;
@@ -15359,11 +15372,12 @@ class LeonidaGame {
                         }
                     }
 
-                    const baseCopSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 104 : 96;
-                    const copRunSpd = targetOnBeachOrParkForCop ? (baseCopSpd + 10) : baseCopSpd;
+                    const baseCopSpd = ped.copWeapon === "SHOTGUN" || effWanted >= 3 ? 132 : 126;
+                    const closeBatonLunge = (!copTarget.inVehicle && !copTarget.isSearchPoint && dTarget < 135) ? 20 : 0;
+                    const copRunSpd = (targetOnBeachOrParkForCop ? (baseCopSpd + 10) : baseCopSpd) + closeBatonLunge;
 
                     const playerVeh = (!copTarget.isSearchPoint && !copTarget.isRemote && !copTarget.isCriminalNPC && p && p.inVehicle) ? p.inVehicle : null;
-                    const vehDoorReach = playerVeh ? Math.max(44, ((playerVeh.w || 56) * 0.50) + 16) : 28;
+                    const vehDoorReach = playerVeh ? Math.max(44, ((playerVeh.w || 56) * 0.50) + 16) : 34;
                     let walkTargetX = copTarget.x;
                     let walkTargetY = copTarget.y;
                     let dWalkTarget = dTarget;
@@ -15377,7 +15391,7 @@ class LeonidaGame {
                         dWalkTarget = Math.hypot(walkTargetX - ped.x, walkTargetY - ped.y);
                     }
 
-                    const idealDist = copTarget.isCriminalNPC ? 95 : (playerVeh ? 16 : 28);
+                    const idealDist = copTarget.isCriminalNPC ? 95 : (playerVeh ? 16 : 24);
                     const checkDist = playerVeh ? dWalkTarget : dTarget;
 
                     if (checkDist > idealDist && (!playerVeh || dTarget > vehDoorReach)) {
@@ -15391,6 +15405,10 @@ class LeonidaGame {
                     } else {
 
                         ped.angle = Math.atan2(copTarget.y - ped.y, copTarget.x - ped.x);
+                        if (!playerVeh && checkDist > 18) {
+                            ped.x += Math.cos(ped.angle) * (copRunSpd * 0.55) * dt;
+                            ped.y += Math.sin(ped.angle) * (copRunSpd * 0.55) * dt;
+                        }
 
                         if (copTarget.isCriminalNPC && dTarget < 60) {
 
@@ -15406,19 +15424,33 @@ class LeonidaGame {
 
                             const maxHp = p.maxHp || 100;
 
-                            if (!p.inVehicle) {
-
-                                if (p.hp < maxHp * (effWanted <= 1 ? 0.35 : 0.25)) {
-
-                                    this.triggerWastedOrBusted("BUSTED!", "ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
-
-                                } else {
-
-                                    this.damagePlayer(18 * dt);
-
+                            if (!p.inVehicle && dTarget <= 34) {
+                                p._copArrestEngageFrame = 0.12;
+                                p._copArrestTimer = (p._copArrestTimer || 0) + dt;
+                                ped.meleeCooldown = (ped.meleeCooldown || 0) - dt;
+                                if (ped.meleeCooldown <= 0) {
+                                    ped.meleeCooldown = 0.56;
+                                    ped.punchAnimTimer = 0.28;
+                                    p._batonSlowTimer = 0.45;
+                                    // Physical baton jolt
+                                    const pushX = p.x + Math.cos(ped.angle) * 5.5;
+                                    const pushY = p.y + Math.sin(ped.angle) * 5.5;
+                                    if (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(pushX, pushY, 10, p.z || 2.0).hit) {
+                                        p.x = pushX;
+                                        p.y = pushY;
+                                    }
+                                    if (this.audio && typeof this.audio.playPunch === "function") this.audio.playPunch();
+                                    this.spawnParticle(p.x, p.y, "SPARK");
+                                    this.damagePlayer(16);
+                                    if (!p.dead && performance.now() - (this._lastBatonTextAt || 0) > 1200) {
+                                        this._lastBatonTextAt = performance.now();
+                                        this.addFloatingText(p.x, p.y - 26, "🚔 VCPD BATON! STOP RESISTING!", "#38bdf8");
+                                    }
                                 }
-
-                            } else if (dTarget <= vehDoorReach && Math.abs(p.inVehicle.speed || 0) < 65) {
+                                if (!p.dead && (p._copArrestTimer >= 1.35 || p.hp <= maxHp * (effWanted <= 1 ? 0.35 : 0.25))) {
+                                    this.triggerWastedOrBusted("BUSTED!", "TACKLED & ARRESTED BY LEONIDA VCPD — RELEASED AT PRECINCT HQ", "#38bdf8", "POLICE");
+                                }
+                            } else if (p.inVehicle && dTarget <= vehDoorReach && Math.abs(p.inVehicle.speed || 0) < 65) {
 
                                 // Foot officer at driver/passenger door of a stopped or slow vehicle: wrench door open, brake vehicle, and yank suspect out!
                                 p.inVehicle.doorOpenTimer = Math.max(p.inVehicle.doorOpenTimer || 0, 0.45);

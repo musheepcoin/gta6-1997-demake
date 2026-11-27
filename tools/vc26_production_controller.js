@@ -3089,6 +3089,42 @@ function runSimulations() {
             peakSup > peakSed + 32 && peakSed > peakBus + 14 && peakSup >= 195,
             `Live AI cruise reaches clearly distinct speeds on open road: Bus=${Math.round(peakBus)} px/s, Sedan=${Math.round(peakSed)} px/s, Supercar=${Math.round(peakSup)} px/s`
         );
+
+        // 3. Verify 1★ On-Foot VCPD Pursuit, Baton Strike & Real Un-Mocked triggerWastedOrBusted Arrest (Zero 34.9 HP Deadlock!)
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        g.player.inVehicle = null;
+        g.player.dead = false;
+        g.player.hp = 100;
+        g.player.armor = 50;
+        g.player.x = 436.5 * TS;
+        g.player.y = 175.5 * TS;
+        g.player.respawnGraceUntil = 0;
+        g.jailFreeCards = 1;
+        g.setWantedLevel(1, { x: g.player.x, y: g.player.y }, true);
+        const chaseCop = sandbox.makePed({
+            id: "cop_1star_53",
+            x: g.player.x - 95,
+            y: g.player.y,
+            z: 2.0,
+            angle: 0,
+            kind: "COP",
+            copWeapon: "PISTOL",
+            hp: 105,
+            speed: 126,
+            dead: false
+        });
+        g.peds.push(chaseCop);
+        let batonHitSeen = false;
+        for (let st = 0; st < 150 && !g.player.dead; st++) {
+            sandbox.advanceClock(1000 / 60);
+            g.update(1 / 60);
+            if ((g.player._batonSlowTimer || 0) > 0 || g.player.hp < 100) batonHitSeen = true;
+        }
+        assert(
+            batonHitSeen === true && g.player.dead === true && g.player.deathType === "POLICE" && g.wantedLevel === 0,
+            `1★ on-foot VCPD officer lunges, lands baton strikes (batonHit=${batonHitSeen}), and executes real un-mocked BUSTED arrest (dead=${g.player.dead}, deathType=${g.player.deathType})`
+        );
         console.log("");
     }
 
