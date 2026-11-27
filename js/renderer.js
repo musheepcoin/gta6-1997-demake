@@ -13386,7 +13386,7 @@ class RetroRenderer {
                 const jAlpha = Math.min(0.92, (1.0 - prog * 0.34) * 0.92);
                 const flowPhase = this.time * 16.5 + (pt.seed || 0);
                 // Soft translucent ground shadow offset along sun direction by actual 3D ballistic elevation!
-                if ((pt.isPrimarySlug || (i & 1) === 0) && elevZ > 0.01) {
+                if (pt.isPrimarySlug && elevZ > 0.01) {
                     const shOff = 1.8 + elevZ * 15.0;
                     this.pushSolidQuad3D(pt.x + sunCos * shOff, pt.y + sunSin * shOff, floorZ + 0.008, segLen * 0.72, segWid * 0.58, jAng, 0.02, 0.04, 0.07, 0.13 * (1.0 - prog * 0.55), SPRITE_DRAW_ORDER.TIRE_MARKS);
                 }

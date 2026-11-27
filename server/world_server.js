@@ -2792,11 +2792,13 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 continue;
             }
             const inSrvBox = Boolean(serverMap.getBlockInfo && serverMap.getBlockInfo(Math.floor(x / TS), Math.floor(y / TS), 1).lid === 25);
-            if ((nav.phase === "TO_SCENE" && distGoal < 165 && (!inSrvBox || distGoal < 68)) || timedOutToScene) {
+            const sceneStopDist = nav.role === "FIRE" ? 235 : 165;
+            const reqWorkSec = nav.role === "FIRE" ? 5.2 : 2.2;
+            if ((nav.phase === "TO_SCENE" && distGoal < sceneStopDist && (!inSrvBox || distGoal < 68)) || timedOutToScene) {
                 row[6] = 0;
                 row[7] = 0;
-                nav.workTimer = (nav.workTimer || 0) + (timedOutToScene ? 3.0 : dt);
-                if (nav.workTimer >= 2.2) {
+                nav.workTimer = (nav.workTimer || 0) + (timedOutToScene ? 6.0 : dt);
+                if (nav.workTimer >= reqWorkSec) {
                     nav.elapsedSec = 0;
                     if (nav.role === "EMS" && nav.targetId && room.corpses && room.corpses[nav.targetId]) {
                         const crow = room.corpses[nav.targetId];

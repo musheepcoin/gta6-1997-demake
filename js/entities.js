@@ -5116,6 +5116,44 @@ class Vehicle {
                     this.hp < this.maxHp * 0.3 ? "BLACK_SMOKE" : "WHITE_SMOKE"
                 );
             }
+            // Online Multiplayer Server-Driven VCFD Fire Engine (`fleet_fire_*`):
+            // Slew rooftop deck-gun monitor and blast 3D ballistic water stream onto any nearby burning car/wreck within 365px!
+            if (this.specKey === "FIRE_TRUCK" && !this.destroyed && game && Array.isArray(game.vehicles) && typeof game.emitPressurizedWaterJet === "function") {
+                let srvBurnTarget = null;
+                let srvBestDist = 365;
+                for (let ovi = 0; ovi < game.vehicles.length; ovi++) {
+                    const ov = game.vehicles[ovi];
+                    if (!ov || ov === this || ov.specKey === "BMX_BIKE" || ov.specKey === "E_SCOOTER") continue;
+                    const isBurn = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
+                    if (!isBurn) continue;
+                    const d = Math.hypot(ov.x - this.x, ov.y - this.y);
+                    if (d < srvBestDist && (!map.traceSegment2D || !map.traceSegment2D(this.x, this.y, ov.x, ov.y, this.z || 2.0).hit)) {
+                        srvBestDist = d;
+                        srvBurnTarget = ov;
+                    }
+                }
+                if (srvBurnTarget) {
+                    const wantAng = Math.atan2(srvBurnTarget.y - this.y, srvBurnTarget.x - this.x);
+                    const prevCAng = typeof this._cannonAngle === "number" ? this._cannonAngle : (this.angle || 0);
+                    const cErr = this.normalizeAngle(wantAng - prevCAng);
+                    this._cannonAngle = prevCAng + Math.max(-6.2 * dt, Math.min(6.2 * dt, cErr));
+                    this._sprayingCannonTimer = 0.16;
+                    this._srvSprayCd = (this._srvSprayCd || 0) - dt;
+                    if (this._srvSprayCd <= 0 && Math.abs(cErr) < 0.38) {
+                        this._srvSprayCd = 0.042;
+                        const cNow = this._cannonAngle;
+                        const vCos = Math.cos(this.angle || 0), vSin = Math.sin(this.angle || 0);
+                        const nozX = this.x + vCos * 22.0 + Math.cos(cNow) * 12.0;
+                        const nozY = this.y + vSin * 22.0 + Math.sin(cNow) * 12.0;
+                        const reachToTarget = Math.max(24, Math.hypot(srvBurnTarget.x - nozX, srvBurnTarget.y - nozY) - 8);
+                        game.emitPressurizedWaterJet(nozX, nozY, cNow, reachToTarget, true, srvBurnTarget, {
+                            carrierVx: (this.vx || 0) * 0.45,
+                            carrierVy: (this.vy || 0) * 0.45,
+                            sourceVeh: this
+                        });
+                    }
+                }
+            }
             return;
         }
 
