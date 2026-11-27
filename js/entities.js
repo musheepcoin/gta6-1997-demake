@@ -1861,13 +1861,22 @@ class Vehicle {
             const rLid = map.getBlockInfo ? map.getBlockInfo(rbx, rby, 1).lid : 0;
             const rCos = Math.cos(this.angle), rSin = Math.sin(this.angle);
             let rearBlocked = false;
-            const rearX = this.x - rCos * ((this.w || 48) * 0.5 + 24);
-            const rearY = this.y - rSin * ((this.w || 48) * 0.5 + 24);
+            const rearX = this.x - rCos * ((this.w || 48) * 0.5 + 28);
+            const rearY = this.y - rSin * ((this.w || 48) * 0.5 + 28);
             if (map.resolveCircleBuildingCollision && map.resolveCircleBuildingCollision(rearX, rearY, 12, curZ).hit) rearBlocked = true;
             if (!rearBlocked && map.surfaceGround) {
                 const rrBx = Math.floor(rearX / TILE_SIZE);
                 const rrBy = Math.floor(rearY / TILE_SIZE);
-                if (rrBx < 2 || rrBx >= MAP_COLS - 2 || rrBy < 2 || rrBy >= MAP_ROWS - 2 || map.surfaceGround[rrBy * MAP_COLS + rrBx] !== GROUND_TYPE.ROAD) {
+                const midRearX = this.x - rCos * ((this.w || 48) * 0.5 + 6);
+                const midRearY = this.y - rSin * ((this.w || 48) * 0.5 + 6);
+                const mrBx = Math.floor(midRearX / TILE_SIZE);
+                const mrBy = Math.floor(midRearY / TILE_SIZE);
+                if (
+                    rrBx < 2 || rrBx >= MAP_COLS - 2 || rrBy < 2 || rrBy >= MAP_ROWS - 2 ||
+                    map.surfaceGround[rrBy * MAP_COLS + rrBx] !== GROUND_TYPE.ROAD ||
+                    map.surfaceGround[mrBy * MAP_COLS + mrBx] !== GROUND_TYPE.ROAD ||
+                    (!this.gridlockStartedInBox && map.getBlockInfo && map.getBlockInfo(mrBx, mrBy, 1).lid === 25)
+                ) {
                     rearBlocked = true;
                 }
             }
@@ -2824,7 +2833,7 @@ class Vehicle {
                         desiredThrottle = Math.min(desiredThrottle, 0.22);
                     }
                 } else if ((isStopBlock || stopsInPreBlock) && !committedOnAmber) {
-                    this.aiState = "STOPPED_LIGHT";
+                    this.aiState = (nsStop || ewStop) ? "STOPPED_LIGHT" : "YIELD_BOX";
                     if (distToStopRef > stopDist + 3) {
                         const rollSpd = Math.max(0, Math.min(54, (distToStopRef - stopDist) * 1.65));
                         if (this.speed > rollSpd) {
@@ -4952,8 +4961,8 @@ class Vehicle {
                             }
                         }
                     }
-                    if (rearClear) {
-                        this.gridlockReverseTimer = inBox ? 2.2 : 3.2;
+                    if (rearClear && (inBox || this.aiState !== "YIELD_BOX")) {
+                        this.gridlockReverseTimer = inBox ? 2.2 : 2.6;
                         this.gridlockStartedInBox = inBox;
                         this.gridlockAvoidAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number" ? this.aiChosenDir.angle : this.angle;
                         this.gridlockAvoidTimer = 14.0;
@@ -4967,16 +4976,32 @@ class Vehicle {
                             this.aiReverseSteer = Math.random() < 0.5 ? 0.8 : -0.8;
                         }
                     } else {
-                        // Cooperative Ripple Back-Up: ask the queued AI car behind us to reverse ~25px so we can back out of the jam cleanly!
+                        // Cooperative Ripple Back-Up ONLY when `this` is trapped inside an intersection box (`inBox`)
+                        // and `blockingRearVeh` has safe non-intersection road behind it!
                         if (
+                            inBox &&
                             blockingRearVeh &&
                             blockingRearVeh.driver === "AI_TRAFFIC" &&
                             !blockingRearVeh.destroyed &&
                             !(blockingRearVeh.gridlockReverseTimer > 0)
                         ) {
-                            blockingRearVeh.gridlockReverseTimer = 1.65;
-                            blockingRearVeh.gridlockStartedInBox = false;
-                            this.gridlockTimer = Math.max(0, threshold - 0.95);
+                            const brCos = Math.cos(blockingRearVeh.angle || 0), brSin = Math.sin(blockingRearVeh.angle || 0);
+                            const brX = blockingRearVeh.x - brCos * ((blockingRearVeh.w || 48) * 0.5 + 28);
+                            const brY = blockingRearVeh.y - brSin * ((blockingRearVeh.w || 48) * 0.5 + 28);
+                            const brBx = Math.floor(brX / TILE_SIZE), brBy = Math.floor(brY / TILE_SIZE);
+                            const brSafeRoad = Boolean(
+                                map && map.surfaceGround &&
+                                brBx >= 2 && brBx < MAP_COLS - 2 && brBy >= 2 && brBy < MAP_ROWS - 2 &&
+                                map.surfaceGround[brBy * MAP_COLS + brBx] === GROUND_TYPE.ROAD &&
+                                (!map.getBlockInfo || map.getBlockInfo(brBx, brBy, 1).lid !== 25)
+                            );
+                            if (brSafeRoad) {
+                                blockingRearVeh.gridlockReverseTimer = 1.35;
+                                blockingRearVeh.gridlockStartedInBox = false;
+                                this.gridlockTimer = Math.max(0, threshold - 0.95);
+                            } else {
+                                this.gridlockTimer = 0;
+                            }
                         } else {
                             this.gridlockTimer = 0;
                         }
@@ -4984,7 +5009,13 @@ class Vehicle {
                         const gby = Math.floor(this.y / TILE_SIZE);
                         const gz = this.z !== undefined ? this.z : 2.0;
                         if (!inBox) {
-                            this.tryAdjacentLaneChange(gbx, gby, gz, map, game);
+                            if (!this.tryAdjacentLaneChange(gbx, gby, gz, map, game)) {
+                                this.gridlockAvoidAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number" ? this.aiChosenDir.angle : this.angle;
+                                this.gridlockAvoidTimer = 10.0;
+                                this.aiBlockX = -1;
+                                this.aiBlockY = -1;
+                                this.aiChosenDir = null;
+                            }
                         } else {
                             this.gridlockAvoidAngle = this.aiChosenDir && typeof this.aiChosenDir.angle === "number" ? this.aiChosenDir.angle : this.angle;
                             this.gridlockAvoidTimer = 10.0;
