@@ -5918,6 +5918,31 @@ class RetroRenderer {
                         ".KMMMMMMK.",
                         "..KKKKKK.."
                     ], bayPal);
+
+                    // 12) Textured 1997 Pixel-Art Chevron Blood Tire-Tread Imprint & Organic Splatter Droplet
+                    //     Neutral white/grey luminance mask tinted by arterial crimson RGB in batchWorldSprites3D!
+                    const bloodMaskPal = {
+                        D: [115, 95, 98, 175],   // Darker coagulated outer tire edge / faint lug
+                        M: [195, 180, 182, 232], // Mid-wet rubber tread groove
+                        W: [255, 250, 250, 255]  // Glossy wet arterial blood core
+                    };
+                    bakePartPixels("blood_tire_tread", 1476, 3995, [
+                        "..D...D...",
+                        "DMWWDMWWDM",
+                        ".MWWMMWWMD",
+                        ".MWWMMWWMD",
+                        "DMWWDMWWDM",
+                        "....D...D."
+                    ], bloodMaskPal);
+
+                    bakePartPixels("blood_splat_drop", 1492, 3995, [
+                        "..DD..",
+                        ".DMWD.",
+                        "DMWWWD",
+                        "DMWWMD",
+                        ".DMMD.",
+                        "...D.."
+                    ], bloodMaskPal);
                 }
 
                 // 7. Post-Render Anti-Fringe Bleed for Custom Sprites (origH <= y < origH + 240)
@@ -10768,6 +10793,19 @@ class RetroRenderer {
             const sr = typeof s.r === "number" ? s.r : 0.08;
             const sg = typeof s.g === "number" ? s.g : 0.08;
             const sb = typeof s.b === "number" ? s.b : 0.10;
+            if (s.surface === "BLOOD" || s.surface === "BLOOD_FOOT") {
+                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
+                const bRect = (s.variant === 1 || s.surface === "BLOOD_FOOT")
+                    ? objSprs["blood_splat_drop"]
+                    : objSprs["blood_tire_tread"];
+                if (bRect) {
+                    const bScale = (s.variant === 1 || s.surface === "BLOOD_FOOT")
+                        ? Math.max(0.42, sw / 6.0)
+                        : Math.max(0.52, sw / 9.2);
+                    this.pushAtlasSprite3D(bRect, s.x, s.y, sz, sang, bScale, SPRITE_DRAW_ORDER.TIRE_MARKS, sr, sg, sb, alpha);
+                    continue;
+                }
+            }
             this.pushSolidQuad3D(s.x, s.y, sz, sw, sh, sang, sr, sg, sb, alpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
         }
 

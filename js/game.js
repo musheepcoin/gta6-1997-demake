@@ -9543,7 +9543,9 @@ class LeonidaGame {
 
             maxLife,
 
-            surface: opts.surface || "ROAD"
+            surface: opts.surface || "ROAD",
+
+            variant: opts.variant || 0
 
         });
 

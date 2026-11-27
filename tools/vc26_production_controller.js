@@ -2276,11 +2276,21 @@ function runSimulations() {
         g.particles.length = 0;
         neonCar.emitWheelTracks(g.map, g);
         assert(
-            g.skidmarks.some((tr) => tr.surface === "BLOOD") &&
+            g.skidmarks.some((tr) => tr.surface === "BLOOD" && tr.variant === 0) &&
+            g.skidmarks.some((tr) => tr.surface === "BLOOD" && tr.variant === 1) &&
             g.particles.some((pt) => pt.color === "#e6c687"),
-            "Driving over a fresh corpse puddle on beach sand leaves crimson GTA 1/2 blood tire tracks (BLOOD) and kicks up golden Vice Beach sand-spray particles (#e6c687)"
+            "Driving over a fresh corpse puddle leaves textured blood_tire_tread + splatter droplets (variant 0 & 1) and kicks up Vice Beach sand-spray (#e6c687)"
         );
+        // Roll 140px away from the corpse (> ~116px max roll budget) and verify bloody tires dry off cleanly without endless trails!
         g.peds.pop();
+        for (let st = 0; st < 20; st++) {
+            neonCar.x += 8;
+            neonCar.emitWheelTracks(g.map, g);
+        }
+        assert(
+            (neonCar._bloodDistLeft || 0) === 0 && (neonCar._bloodDistRight || 0) === 0,
+            `Distance-gated blood tire trail dries out cleanly within ~116px (~1.8 car lengths, left=${neonCar._bloodDistLeft}, right=${neonCar._bloodDistRight})`
+        );
 
         g.player.inVehicle = null;
         g.activeFlashEvent = null;

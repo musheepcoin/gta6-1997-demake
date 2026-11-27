@@ -5408,35 +5408,37 @@ class Vehicle {
         const curSpeed = Math.hypot(this.vx, this.vy);
         if (curSpeed < 10) return;
 
-        // Check if tires roll over a fresh blood puddle (authentic GTA 1 & GTA 2 crimson blood tire tracks!)
-        if ((this._bloodyTiresTimer || 0) > 0) {
-            this._bloodyTiresTimer = Math.max(0, this._bloodyTiresTimer - 0.04);
-        }
+        const fx = Math.cos(this.angle);
+        const fy = Math.sin(this.angle);
+        const rx = -fy;
+        const ry = fx;
+
+        // Check if left/right tires roll through a fresh corpse blood puddle:
+        // Distance-based per-side wheel staining (~108..122px = ~1.8 car lengths, independent of speed!)
+        const MAX_BLOOD_ROLL_PX = 116.0;
+        let stainedInPuddleNow = false;
         if (game && Array.isArray(game.peds) && (this.driver === "PLAYER" || (game.player && Math.abs(this.x - game.player.x) < 640))) {
+            const halfSpan = Math.max(15, (this.w || 56) * 0.42);
+            const halfLat = Math.max(11, (this.h || 26) * 0.50);
             for (let pi = 0; pi < game.peds.length; pi++) {
                 const cp = game.peds[pi];
-                if (cp && cp.dead && (cp.deadTimer || 0) < 35 && Math.abs(cp.x - this.x) < 24 && Math.abs(cp.y - this.y) < 24) {
-                    this._bloodyTiresTimer = 4.2;
+                if (!cp || !cp.dead || (cp.deadTimer || 0) >= 32) continue;
+                const cdx = cp.x - this.x;
+                const cdy = cp.y - this.y;
+                if (Math.abs(cdx) > halfSpan + 10 || Math.abs(cdy) > halfSpan + 10) continue;
+                const cAlong = Math.abs(cdx * fx + cdy * fy);
+                const cLat = cdx * rx + cdy * ry;
+                if (cAlong < halfSpan && Math.abs(cLat) < halfLat) {
+                    if (cLat <= 5.5) this._bloodDistLeft = MAX_BLOOD_ROLL_PX * (0.92 + ((pi * 17) % 5) * 0.03);
+                    if (cLat >= -5.5) this._bloodDistRight = MAX_BLOOD_ROLL_PX * (0.94 + ((pi * 23) % 5) * 0.03);
+                    stainedInPuddleNow = true;
                     break;
                 }
             }
         }
 
-        const hasBloodTires = (this._bloodyTiresTimer || 0) > 0;
-        const style = hasBloodTires
-            ? {
-                surface: "BLOOD",
-                r: 0.58,
-                g: 0.04,
-                b: 0.07,
-                alpha: Math.min(0.72, 0.25 + (this._bloodyTiresTimer / 4.2) * 0.48),
-                maxLife: 14.0
-            }
-            : this.getSurfaceTrackStyle(this.x, this.y, map, Boolean(this.drifting));
-        if (!style) return;
-
-        // Distance-gate track segments so marks form smooth continuous ribbons regardless of framerate
-        const stepDist = 5.2;
+        // Distance-gate track segments so marks form crisp tire-tread imprints regardless of framerate
+        const stepDist = 5.0;
         const moved = this._lastTrackX === undefined
             ? 999
             : Math.hypot(this.x - this._lastTrackX, this.y - this._lastTrackY);
@@ -5444,18 +5446,27 @@ class Vehicle {
         this._lastTrackX = this.x;
         this._lastTrackY = this.y;
 
-        const fx = Math.cos(this.angle);
-        const fy = Math.sin(this.angle);
-        const rx = -fy;
-        const ry = fx;
+        if (!stainedInPuddleNow) {
+            const rollDecay = Math.min(18.0, moved);
+            if ((this._bloodDistLeft || 0) > 0) this._bloodDistLeft = Math.max(0, this._bloodDistLeft - rollDecay);
+            if ((this._bloodDistRight || 0) > 0) this._bloodDistRight = Math.max(0, this._bloodDistRight - rollDecay);
+        }
+        const maxBloodDist = Math.max(this._bloodDistLeft || 0, this._bloodDistRight || 0);
+        this._bloodyTiresTimer = maxBloodDist / 45.0;
+        this._bloodStepSeq = ((this._bloodStepSeq || 0) + 1) & 1023;
+
+        const hasBloodTires = maxBloodDist > 0;
+        const baseTerrainStyle = this.getSurfaceTrackStyle(this.x, this.y, map, Boolean(this.drifting));
+        if (!hasBloodTires && !baseTerrainStyle) return;
+
         const frontAng = this.angle + (this.steerAngleRad || 0) * 0.68;
         const rearAng = this.angle;
         const vz = this.z !== undefined ? this.z : 2.0;
-        const isOffroad = style.surface !== "ROAD" && style.surface !== "BLOOD";
+        const isOffroad = Boolean(baseTerrainStyle && baseTerrainStyle.surface !== "ROAD");
 
         // Emit golden sand-spray or drift tire-smoke puffs behind rear tires (GTA 6 Vice Beach & Street Drift vibe)
         if (game && Array.isArray(game.particles) && (this.driver === "PLAYER" || (game.player && Math.abs(this.x - game.player.x) < 620))) {
-            const onBeachSand = style.surface === "SAND" || (typeof TILE !== "undefined" && map.getTileAtPixel && map.getTileAtPixel(this.x, this.y) === TILE.SAND);
+            const onBeachSand = (baseTerrainStyle && baseTerrainStyle.surface === "SAND") || (typeof TILE !== "undefined" && map.getTileAtPixel && map.getTileAtPixel(this.x, this.y) === TILE.SAND);
             if (onBeachSand && curSpeed > 58 && game.particles.length < 220) {
                 const spX = this.x - fx * ((this.w || 48) * 0.42) + (Math.random() - 0.5) * 10;
                 const spY = this.y - fy * ((this.w || 48) * 0.42) + (Math.random() - 0.5) * 10;
@@ -5485,8 +5496,58 @@ class Vehicle {
             }
         }
 
-        const pushWheelMark = (wx, wy, ang, segLen, tireWidth, alphaMult = 1.0) => {
-            const wStyle = hasBloodTires ? style : (this.getSurfaceTrackStyle(wx, wy, map, Boolean(this.drifting)) || style);
+        const pushWheelMark = (wx, wy, ang, segLen, tireWidth, alphaMult = 1.0, sideSign = 0) => {
+            const sideBloodDist = sideSign < 0
+                ? (this._bloodDistLeft || 0)
+                : (sideSign > 0 ? (this._bloodDistRight || 0) : maxBloodDist);
+            if (sideBloodDist > 0) {
+                const wetness = Math.max(0, Math.min(1, sideBloodDist / MAX_BLOOD_ROLL_PX));
+                // As the tire dries out (< 34% wetness), skip intermittent tread lugs so the trail breaks up organically instead of cutting off flat!
+                const seq = this._bloodStepSeq + (sideSign > 0 ? 3 : 0);
+                if (wetness < 0.16 && (seq % 3) !== 0) return;
+                if (wetness < 0.34 && (seq % 2) === 1) return;
+
+                // Deep arterial crimson while wet -> darker coagulated maroon mixed with tire rubber as it dries
+                const br = 0.34 + wetness * 0.28;
+                const bg = 0.02 + wetness * 0.025;
+                const bb = 0.04 + wetness * 0.035;
+                const bAlpha = Math.min(0.84, (0.14 + Math.pow(wetness, 0.85) * 0.66) * alphaMult);
+                const wScale = 0.78 + wetness * 0.34;
+                game.addSkidmark(wx, wy, {
+                    z: vz,
+                    angle: ang,
+                    w: segLen * wScale,
+                    h: tireWidth * (0.82 + wetness * 0.28),
+                    r: br,
+                    g: bg,
+                    b: bb,
+                    alpha: bAlpha,
+                    life: 9.5,
+                    maxLife: 9.5,
+                    surface: "BLOOD",
+                    variant: 0
+                });
+                // Fresh puddle exit (> 68% wet): fling subtle organic blood splatter droplets beside the spinning tire!
+                if (wetness > 0.68 && (seq % 2) === 0) {
+                    const flingSide = (sideSign || 1) * (2.6 + (seq % 3) * 1.1);
+                    game.addSkidmark(wx + rx * flingSide, wy + ry * flingSide, {
+                        z: vz,
+                        angle: ang + 0.6,
+                        w: 3.2 + wetness * 1.4,
+                        h: 3.0,
+                        r: 0.56,
+                        g: 0.03,
+                        b: 0.05,
+                        alpha: bAlpha * 0.78,
+                        life: 8.0,
+                        maxLife: 8.0,
+                        surface: "BLOOD",
+                        variant: 1
+                    });
+                }
+                return;
+            }
+            const wStyle = this.getSurfaceTrackStyle(wx, wy, map, Boolean(this.drifting)) || baseTerrainStyle;
             if (!wStyle) return;
             game.addSkidmark(wx, wy, {
                 z: vz,
@@ -5508,11 +5569,11 @@ class Vehicle {
             const tireW = (this.specKey === "BMX_BIKE" || this.specKey === "E_SCOOTER") ? 1.8 : 2.4;
             const rearX = this.x + fx * this.rearTireOffset;
             const rearY = this.y + fy * this.rearTireOffset;
-            pushWheelMark(rearX, rearY, rearAng, 6.8, tireW, 1.0);
-            if (isOffroad) {
+            pushWheelMark(rearX, rearY, rearAng, 6.8, tireW, 1.0, 0);
+            if (isOffroad || hasBloodTires) {
                 const frontX = this.x + fx * this.frontTireOffset;
                 const frontY = this.y + fy * this.frontTireOffset;
-                pushWheelMark(frontX, frontY, frontAng, 6.4, tireW * 0.92, 0.88);
+                pushWheelMark(frontX, frontY, frontAng, 6.4, tireW * 0.92, 0.82, 0);
             }
             return;
         }
@@ -5523,7 +5584,7 @@ class Vehicle {
             for (const side of [-1, 1]) {
                 const tx = this.x + rx * (latOff * side);
                 const ty = this.y + ry * (latOff * side);
-                pushWheelMark(tx, ty, rearAng, 8.2, 5.4, 1.2);
+                pushWheelMark(tx, ty, rearAng, 8.2, 5.4, 1.2, side);
             }
             return;
         }
@@ -5554,7 +5615,8 @@ class Vehicle {
                     rearAng,
                     7.2,
                     3.8,
-                    1.08
+                    1.08,
+                    side
                 );
                 // Rear dual-wheel tandem axle 2 (inner/mid offset)
                 pushWheelMark(
@@ -5563,17 +5625,19 @@ class Vehicle {
                     rearAng,
                     7.0,
                     3.4,
-                    0.96
+                    0.96,
+                    side
                 );
                 // Steered front axle (2 front wheels)
-                if (isOffroad) {
+                if (isOffroad || hasBloodTires) {
                     pushWheelMark(
                         this.x + fx * frontOff + rx * (latOff * side),
                         this.y + fy * frontOff + ry * (latOff * side),
                         frontAng,
                         6.8,
                         3.0,
-                        0.92
+                        0.86,
+                        side
                     );
                 }
             }
@@ -5591,11 +5655,11 @@ class Vehicle {
         for (const side of [-1, 1]) {
             const rearX = this.x + fx * this.rearTireOffset + rx * (latOff * side);
             const rearY = this.y + fy * this.rearTireOffset + ry * (latOff * side);
-            pushWheelMark(rearX, rearY, rearAng, 7.0, tireW, 1.0);
-            if (isOffroad) {
+            pushWheelMark(rearX, rearY, rearAng, 7.0, tireW, 1.0, side);
+            if (isOffroad || hasBloodTires) {
                 const frontX = this.x + fx * this.frontTireOffset + rx * (latOff * side);
                 const frontY = this.y + fy * this.frontTireOffset + ry * (latOff * side);
-                pushWheelMark(frontX, frontY, frontAng, 6.6, tireW * 0.94, 0.90);
+                pushWheelMark(frontX, frontY, frontAng, 6.6, tireW * 0.94, 0.84, side);
             }
         }
     }
