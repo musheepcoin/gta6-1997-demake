@@ -3365,11 +3365,116 @@ function runSimulations() {
             );
         }
         console.log("");
+
+        // 56. Strict FDOT Pre-Crosswalk Stop-Bar, Zero Crab-Slip Kinematics & Quarter-Circle Bus/Limo Turn Arcs
+        console.log("── SCENARIO 56: Strict FDOT Pre-Crosswalk Stop-Bar, Zero Crab-Slip Kinematics & Quarter-Circle Turn Arcs ──");
+        {
+            const { g: g56, sandbox: sb56 } = createGameInstance(cmpBuf, true);
+            const m56 = g56.map;
+            g56.trafficManager.generateTrafficPeds = () => {};
+            g56.seedCityCurbsideParkedVehicles();
+            const cx56 = 444.5 * TS, cy56 = 280.5 * TS;
+            g56.vehicles = g56.vehicles.filter(v => !v.driver && Math.abs(v.x - cx56) < 900 && Math.abs(v.y - cy56) < 900);
+            g56.peds.length = 0;
+            g56.setWantedLevel(0);
+            g56.player.x = cx56 - 96;
+            g56.player.y = cy56 - 96;
+            g56.renderer.camX = cx56;
+            g56.renderer.camY = cy56;
+            g56.trafficManager.maxTrafficCars = 34;
+
+            // Verify O(1) FDOT Crosswalk + Stop-Bar mask covers >2400 signalized/approach crosswalks across Leonida
+            let cwCount56 = 0;
+            for (let y = 2; y < 510; y++) {
+                for (let x = 2; x < 510; x++) {
+                    if (m56.getCrosswalkBoxDir(x, y) >= 0) cwCount56++;
+                }
+            }
+            assert(cwCount56 >= 2400, `FDOT Crosswalk + White Stop-Bar O(1) mask indexes ${cwCount56} approach/exit crosswalks`);
+
+            // Seed mixed fleet (including 120px CITY_BUS & 111px STRETCH_LIMO) around Ocean Drive x 8th St
+            const specs56 = ["REGAL_SEDAN", "CITY_BUS", "STRETCH_LIMO", "VICE_CAB", "TULIP_MUSCLE", "BANSHEE_GT", "SUPERBIKE", "PICKUP_TRUCK"];
+            let sp56 = 0;
+            for (let r = 269; r <= 291 && sp56 < 28; r += 2) {
+                for (let c = 433; c <= 446 && sp56 < 28; c++) {
+                    if (m56.surfaceGround[r * 512 + c] !== 2 || m56.isStopLineBlock(c, r)) continue;
+                    const nav = m56.getNavigationBlock(c, r, 2.0);
+                    const lid1 = m56.getBlockInfo(c, r, 1).lid;
+                    if (!nav || nav.groundType !== 2 || nav.isParkingBay || nav.isRailway || lid1 === 25) continue;
+                    const dirs = m56.getAllowedRoadDirections(c, r, 2.0);
+                    if (dirs.length !== 1 || m56.getBlockInfo(c + dirs[0].dx, r + dirs[0].dy, 1).lid === 25) continue;
+                    const vx = (c + 0.5) * TS, vy = (r + 0.5) * TS;
+                    if (g56.vehicles.some(ov => Math.hypot(ov.x - vx, ov.y - vy) < 92)) continue;
+                    const car = sb56.makeVeh(`s56_${sp56}`, specs56[sp56 % specs56.length], vx, vy, dirs[0].angle);
+                    car.driver = "AI_TRAFFIC";
+                    car.speed = 74;
+                    car.vx = Math.cos(dirs[0].angle) * 74;
+                    car.vy = Math.sin(dirs[0].angle) * 74;
+                    g56.vehicles.push(car);
+                    sp56++;
+                }
+            }
+
+            let cwStop56 = 0, crab56 = 0, swOBB56 = 0;
+            const cwTicks56 = new Map();
+            const prevPos56 = new Map();
+            for (let st = 0; st < 30 * 60; st++) {
+                sb56.advanceClock(1000 / 60);
+                g56.update(1 / 60);
+                g56.renderer.camX = cx56;
+                g56.renderer.camY = cy56;
+                if (st % 2 !== 0) continue;
+                for (const v of g56.vehicles) {
+                    if (!v || v.destroyed || v.driver !== "AI_TRAFFIC") continue;
+                    const inCurb = Boolean(v.aiCurbParkingBay || (v._mergingFromCurbTimer > 0) || v.isCurbParked);
+                    const spd = Math.abs(v.speed || Math.hypot(v.vx || 0, v.vy || 0));
+                    if (!inCurb && !v.sirenActive && spd < 5.0) {
+                        const onCw = m56.doesVehicleOverlapCrosswalkOrBox(v.x, v.y, v.angle || 0, (v.w || 62) * 0.48, (v.h || 26) * 0.44, false);
+                        if (onCw) {
+                            const tk = (cwTicks56.get(v.id) || 0) + 1;
+                            cwTicks56.set(v.id, tk);
+                            if (tk >= 20) cwStop56++;
+                        } else {
+                            cwTicks56.delete(v.id);
+                        }
+                    } else {
+                        cwTicks56.delete(v.id);
+                    }
+                    const pp = prevPos56.get(v.id);
+                    if (pp && !inCurb && (v.gridlockReverseTimer || 0) <= 0) {
+                        const mdx = v.x - pp.x, mdy = v.y - pp.y;
+                        const tSpd = Math.hypot(mdx, mdy) * 30.0;
+                        if (tSpd > 20.0) {
+                            let slip = Math.atan2(mdy, mdx) - ((v.angle || 0) + (v.visualSteerYaw || 0));
+                            while (slip > Math.PI) slip -= Math.PI * 2;
+                            while (slip < -Math.PI) slip += Math.PI * 2;
+                            if (Math.abs(slip) > 0.17) crab56++;
+                        }
+                    }
+                    prevPos56.set(v.id, { x: v.x, y: v.y });
+                    if (!inCurb && !v.isMotorcycle) {
+                        const hl = (v.w || 62) * 0.44, hw = (v.h || 26) * 0.40;
+                        const c = Math.cos(v.angle || 0), s = Math.sin(v.angle || 0);
+                        for (const [lx, ly] of [[hl, -hw], [hl, hw], [-hl, -hw], [-hl, hw]]) {
+                            const cbx = Math.floor((v.x + lx * c - ly * s) / TS);
+                            const cby = Math.floor((v.y + lx * s + ly * c) / TS);
+                            const gt = m56.surfaceGround[cby * 512 + cbx];
+                            if (gt === 3 || gt === 4 || gt === 1 || gt === 5) { swOBB56++; break; }
+                        }
+                    }
+                }
+            }
+            assert(
+                cwStop56 === 0 && crab56 <= 3 && swOBB56 <= 3,
+                `30s Ocean Drive 60FPS mixed-fleet traffic (incl. 120px Bus & 111px Limo) runs with 0 crosswalk stops (${cwStop56}), <=3 crab-slip frames (${crab56}), and <=3 sidewalk OBB corner hits (${swOBB56})`
+            );
+        }
+        console.log("");
     }
 
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 55 FULL-GAME 200-LOOP AUDIT, FLUIDITY/PERF, CAR AI ZERO-DEFECT, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 56 FULL-GAME 200-LOOP AUDIT, STRICT CAR AI CROSSWALK/TRAJECTORY, FLUIDITY/PERF, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

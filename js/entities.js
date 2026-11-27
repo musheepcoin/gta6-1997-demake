@@ -1733,14 +1733,18 @@ class Vehicle {
        Checks adjacent road lane on 4-lane boulevards & highways when blocked ahead
        ======================================================================== */
     tryAdjacentLaneChange(bx, by, curZ, map, game) {
-        if (this.aiLaneChangeCooldown > 0 || !this.aiChosenDir || this.aiChosenDir.isTurn || Math.abs(this.speed || 0) < 16) return false;
+        if (this.aiLaneChangeCooldown > 0 || (this.aiLaneShiftTimer || 0) > 0 || !this.aiChosenDir || this.aiChosenDir.isTurn || Math.abs(this.speed || 0) < 34) return false;
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
         if (lidZ1 === 25 || lidZ1 === 24 || (map.isStopLineBlock && map.isStopLineBlock(bx, by))) return false;
 
         const dx = this.aiChosenDir.dx || 0;
         const dy = this.aiChosenDir.dy || 0;
         if (dx === 0 && dy === 0) return false;
-        if (map.getBlockInfo && map.getBlockInfo(bx + dx, by + dy, 1).lid === 25) return false;
+        if (map.getBlockInfo && (
+            map.getBlockInfo(bx + dx, by + dy, 1).lid === 25 ||
+            map.getBlockInfo(bx + dx * 2, by + dy * 2, 1).lid === 25
+        )) return false;
+        if (map.isStopLineBlock && map.isStopLineBlock(bx + dx, by + dy)) return false;
 
         const perpX = -dy;
         const perpY = dx;
@@ -1839,8 +1843,8 @@ class Vehicle {
                 this.aiBlockY = nby;
                 this.aiTargetBlockX = nbx + dx;
                 this.aiTargetBlockY = nby + dy;
-                this.aiLaneChangeCooldown = this.isMotorcycle ? 1.8 : 2.8;
-                this.aiLaneShiftTimer = 1.15;
+                this.aiLaneChangeCooldown = this.isMotorcycle ? 3.8 : 5.8;
+                this.aiLaneShiftTimer = 3.4;
                 this.aiLaneChangeSign = side;
                 this.aiTurnSignal = side;
                 this.aiState = "LANE_CHANGE";
@@ -1848,6 +1852,136 @@ class Vehicle {
             }
         }
         return false;
+    }
+
+    /* ========================================================================
+       KINEMATIC PURE-PURSUIT LANE TRACKING & QUARTER-CIRCLE INTERSECTION TURNS
+       - Zero perpendicular position teleport (`x += dxErr` eliminated -> 0.0 deg crab slip!)
+       - S-curve Pure-Pursuit steering on straightaways, pull-overs & lane changes
+       - Exact R=32px quarter-circle arc through intersection turn tiles (zero early
+         45-deg corner snaps and zero sidewalk OBB encroachment, even for 96px buses!)
+       ======================================================================== */
+    steerKinematicAlongRoadLane(dt, map, curZ, laneBlockX, laneBlockY, pullOff = 0) {
+        this.visualSteerYaw = 0;
+        this.steerAngleRad = 0;
+        this.angularVelocity = 0;
+        if (!this.aiChosenDir) return 0;
+
+        const outDx = this.aiChosenDir.dx || 0;
+        const outDy = this.aiChosenDir.dy || 0;
+        const outAngle = this.aiChosenDir.angle;
+        const rollSpd = Math.abs(this.speed || Math.hypot(this.vx || 0, this.vy || 0));
+        const inShift = (this.aiLaneShiftTimer || 0) > 0;
+        let desiredHeading = outAngle;
+        let signedLatErr = 0;
+
+        const rawEntryA = typeof this.aiTurnEntryAngle === "number"
+            ? this.aiTurnEntryAngle
+            : (typeof this.aiIntersectionEntryAngle === "number" ? this.aiIntersectionEntryAngle : this.angle);
+        const entryCard = Math.round(rawEntryA / (Math.PI * 0.5)) * (Math.PI * 0.5);
+        const inDx = Math.round(Math.cos(entryCard));
+        const inDy = Math.round(Math.sin(entryCard));
+        const isOrthoTurn = Boolean(
+            this.aiChosenDir.isTurn &&
+            (inDx !== 0 || inDy !== 0) &&
+            (outDx !== 0 || outDy !== 0) &&
+            (inDx * outDx + inDy * outDy === 0)
+        );
+
+        if (isOrthoTurn) {
+            const cx = (laneBlockX + 0.5) * TILE_SIZE;
+            const cy = (laneBlockY + 0.5) * TILE_SIZE;
+            const R = 32.0;
+            const pivotX = cx - inDx * R + outDx * R;
+            const pivotY = cy - inDy * R + outDy * R;
+            const relX = this.x - pivotX;
+            const relY = this.y - pivotY;
+            const a0 = relX * (-outDx) + relY * (-outDy);
+            const a1 = relX * inDx + relY * inDy;
+            const phi = Math.max(0, Math.min(Math.PI * 0.5, Math.atan2(Math.max(0, a1), Math.max(0.01, a0))));
+            // Exact turn radius by chassis length: 120px City Bus / Coach / Stretch Limo needs rTrack = 24.2px so BOTH inner plane (+13px > 0)
+            // AND outer rear overhang (sqrt(35.4^2 + 52.8^2) = 63.5px < 64px) stay 100% inside a 64px road lane without touching sidewalks!
+            const vLen = this.w || 62;
+            const rTrack = vLen >= 115 ? 26.8 : (vLen >= 95 ? 28.8 : (vLen >= 75 ? 30.2 : 32.0));
+            const arcTotal = Math.PI * 0.5 * R;
+            const sAhead = phi * R + Math.max(8.5, Math.min(13.5, rollSpd * 0.18));
+            let aimX, aimY;
+            if (sAhead <= arcTotal) {
+                const phiAim = sAhead / R;
+                aimX = pivotX + ((-outDx) * Math.cos(phiAim) + inDx * Math.sin(phiAim)) * rTrack;
+                aimY = pivotY + ((-outDy) * Math.cos(phiAim) + inDy * Math.sin(phiAim)) * rTrack;
+            } else {
+                const extra = Math.max(24.0, (sAhead - arcTotal) * 2.4);
+                aimX = cx + outDx * (R + extra);
+                aimY = cy + outDy * (R + extra);
+            }
+            desiredHeading = Math.atan2(aimY - this.y, aimX - this.x);
+        } else {
+            if (outDx !== 0) {
+                const centerY = (laneBlockY + 0.5) * TILE_SIZE + (outDx > 0 ? pullOff : -pullOff);
+                const dyErr = centerY - this.y;
+                signedLatErr = dyErr * (outDx > 0 ? 1 : -1);
+            } else if (outDy !== 0) {
+                const centerX = (laneBlockX + 0.5) * TILE_SIZE + (outDy > 0 ? -pullOff : pullOff);
+                const dxErr = centerX - this.x;
+                signedLatErr = dxErr * (outDy > 0 ? -1 : 1);
+            }
+            if (inShift && Math.abs(signedLatErr) < 5.5) {
+                const cbx = Math.floor(this.x / TILE_SIZE);
+                const cby = Math.floor(this.y / TILE_SIZE);
+                if (cbx === laneBlockX && cby === laneBlockY) {
+                    this.aiLaneShiftTimer = 0;
+                }
+            }
+            const lookAhead = Math.max(inShift ? 42 : 34, Math.min(92, Math.max(rollSpd, 42) * (inShift ? 0.66 : 0.52)));
+            const maxIntercept = inShift ? 0.36 : 0.22;
+            let interceptAng = Math.abs(signedLatErr) < 0.20
+                ? 0
+                : Math.max(-maxIntercept, Math.min(maxIntercept, Math.atan2(signedLatErr, lookAhead)));
+
+            // Smooth Control Barrier Function (CBF) against sidewalks & opposing yellow double-lines (zero position teleport!):
+            if (!inShift && !this.aiCurbParkingBay && (this._mergingFromCurbTimer || 0) <= 0 && map && map.surfaceGround) {
+                const curRightOff = pullOff - signedLatErr;
+                const maxSafeOff = Math.max(14.5, 29.0 - (this.h || 26) * 0.46);
+                const isSideForbidden = (sideSign) => {
+                    const nbx = laneBlockX - outDy * sideSign;
+                    const nby = laneBlockY + outDx * sideSign;
+                    if (nbx < 1 || nbx >= MAP_COLS - 1 || nby < 1 || nby >= MAP_ROWS - 1) return true;
+                    if (map.surfaceGround[nby * MAP_COLS + nbx] !== GROUND_TYPE.ROAD) return true;
+                    if (map.getBlockInfo && map.getBlockInfo(nbx, nby, 1).lid === 25) return false;
+                    const nb = map.getNavigationBlock ? map.getNavigationBlock(nbx, nby, curZ) : null;
+                    if (!nb || nb.isParkingBay || nb.isRailway) return true;
+                    const sameFlow =
+                        (outDx === 1 && nb.right && !nb.left) ||
+                        (outDx === -1 && nb.left && !nb.right) ||
+                        (outDy === 1 && nb.down && !nb.up) ||
+                        (outDy === -1 && nb.up && !nb.down);
+                    return !sameFlow;
+                };
+                if (curRightOff > maxSafeOff - 6.0 && isSideForbidden(1)) {
+                    interceptAng = Math.min(interceptAng, Math.max(-0.28, (maxSafeOff - curRightOff) * 0.045));
+                } else if (curRightOff < -(maxSafeOff - 6.0) && isSideForbidden(-1)) {
+                    interceptAng = Math.max(interceptAng, Math.min(0.28, (-maxSafeOff - curRightOff) * 0.045));
+                }
+            }
+            desiredHeading = outAngle + interceptAng;
+        }
+
+        if (rollSpd > 1.2) {
+            const ds = rollSpd * dt;
+            const maxCurv = isOrthoTurn ? (1.0 / 18.5) : (this.isHeavyVehicle ? (1.0 / 22.0) : (1.0 / 16.0));
+            const maxYawStep = Math.min(dt * (isOrthoTurn ? 5.2 : 5.2), ds * maxCurv + dt * 0.10);
+            const hDiff = this.normalizeAngle(desiredHeading - this.angle);
+            if (!isOrthoTurn && Math.abs(signedLatErr) < 0.5 && Math.abs(hDiff) < 0.012) {
+                this.angle = outAngle;
+            } else {
+                this.angle += Math.max(-maxYawStep, Math.min(maxYawStep, hDiff));
+            }
+            const dirSign = (this.speed || 0) < -0.5 ? -1 : 1;
+            this.vx = Math.cos(this.angle) * rollSpd * dirSign;
+            this.vy = Math.sin(this.angle) * rollSpd * dirSign;
+        }
+        return signedLatErr;
     }
 
     /* ========================================================================
@@ -1862,7 +1996,9 @@ class Vehicle {
         if (this.aiHazardStopTimer > 0) this.aiHazardStopTimer = Math.max(0, this.aiHazardStopTimer - dt);
         if (this.aiFlashHeadlightsTimer > 0) this.aiFlashHeadlightsTimer = Math.max(0, this.aiFlashHeadlightsTimer - dt);
         if (this.aiFilteringTimer > 0) this.aiFilteringTimer = Math.max(0, this.aiFilteringTimer - dt);
-        if (this._mergingFromCurbTimer > 0) this._mergingFromCurbTimer = Math.max(0, this._mergingFromCurbTimer - dt);
+        if (this._mergingFromCurbTimer > 0) {
+            this._mergingFromCurbTimer = Math.max(0, this._mergingFromCurbTimer - (Math.abs(this.speed || 0) > 8 ? dt : dt * 0.35));
+        }
         this.aiTurnSignal = (this.aiHazardStopTimer || 0) > 0 ? 2 : 0;
 
         const curZ = this.z !== undefined ? this.z : 2.0;
@@ -1956,9 +2092,16 @@ class Vehicle {
 
         let bx = Math.floor(this.x / TILE_SIZE);
         let by = Math.floor(this.y / TILE_SIZE);
-        // Clamp any active pull-over offset to safe in-lane limits so it never pushes `bx`/`by` into sidewalks or oncoming lanes
+        // Clamp any active pull-over offset to safe in-lane limits and prevent lateral offset from flipping `bx`/`by` into an adjacent tile!
         if (this.aiPullOverOffset && Math.abs(this.aiPullOverOffset) > 14) {
             this.aiPullOverOffset = Math.max(-13, Math.min(14, this.aiPullOverOffset));
+        }
+        if ((this.aiPullOverTimer > 0 || Math.abs(this.aiPullOverOffset || 0) > 6) && this.aiChosenDir && !this.aiChosenDir.isTurn && (this.aiLaneShiftTimer || 0) <= 0) {
+            if (this.aiChosenDir.dy !== 0 && typeof this.aiBlockX === "number" && this.aiBlockX >= 0 && Math.abs(bx - this.aiBlockX) <= 1) {
+                bx = this.aiBlockX;
+            } else if (this.aiChosenDir.dx !== 0 && typeof this.aiBlockY === "number" && this.aiBlockY >= 0 && Math.abs(by - this.aiBlockY) <= 1) {
+                by = this.aiBlockY;
+            }
         }
         const curBlk = map.getNavigationBlock ? map.getNavigationBlock(bx, by, curZ) : null;
         const lidZ1 = (map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0);
@@ -2066,12 +2209,7 @@ class Vehicle {
                         this.aiChosenDir = { ...matchDir, bx: adjX + matchDir.dx, by: adjY + matchDir.dy, isTurn: false };
                         this.aiTargetBlockX = adjX + matchDir.dx;
                         this.aiTargetBlockY = adjY + matchDir.dy;
-                        this.aiLaneShiftTimer = 0.85;
-                        const toLegalX = (adjX + 0.5) * TILE_SIZE - this.x;
-                        const toLegalY = (adjY + 0.5) * TILE_SIZE - this.y;
-                        const toLegalD = Math.hypot(toLegalX, toLegalY) || 1;
-                        this.x += (toLegalX / toLegalD) * Math.min(toLegalD, 72 * dt);
-                        this.y += (toLegalY / toLegalD) * Math.min(toLegalD, 72 * dt);
+                        this.aiLaneShiftTimer = 3.2;
                         shiftedToLegalLane = true;
                         break;
                     }
@@ -2090,12 +2228,15 @@ class Vehicle {
             }
         }
 
-        // Reset single-turn intersection guard and record entry heading whenever outside an intersection (lidZ1 !== 25)
+        // Reset single-turn intersection guard outside lid===25, while preserving aiIntersectionEntryAngle & aiTurnEntryAngle
+        // whenever currently executing an active road-bend turn (`this.aiChosenDir.isTurn`) even on non-lid-25 corner tiles!
         if (lidZ1 !== 25) {
             this.aiTurnedInIntersection = false;
-            this.aiIntersectionEntryAngle = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number")
-                ? this.aiChosenDir.angle
-                : this.angle;
+            if (!(this.aiChosenDir && this.aiChosenDir.isTurn && bx === this.aiBlockX && by === this.aiBlockY)) {
+                this.aiIntersectionEntryAngle = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number")
+                    ? this.aiChosenDir.angle
+                    : this.angle;
+            }
         }
 
         // 1. Commit to a valid outgoing NYC.CMP arrow direction upon entering each road block.
@@ -2172,6 +2313,10 @@ class Vehicle {
             }
             if (this.aiChosenDir.isTurn) {
                 this.aiTurnedInIntersection = true;
+                this.aiTurnEntryAngle = refAngle;
+                this.aiIntersectionEntryAngle = this.angle;
+            } else {
+                this.aiTurnEntryAngle = this.aiChosenDir.angle;
             }
             this.aiTargetBlockX = bx + this.aiChosenDir.dx;
             this.aiTargetBlockY = by + this.aiChosenDir.dy;
@@ -2300,8 +2445,8 @@ class Vehicle {
             this.aiBlockY = relBay.r;
             this.aiTargetBlockX = this.aiBlockX;
             this.aiTargetBlockY = this.aiBlockY + relSignY;
-            this.aiLaneShiftTimer = 0.85;
-            this._mergingFromCurbTimer = 1.45;
+            this.aiLaneShiftTimer = 3.0;
+            this._mergingFromCurbTimer = 3.0;
             this.aiCurbParkingBay = null;
             this.aiCurbParkedTimer = 0;
         }
@@ -2326,7 +2471,14 @@ class Vehicle {
             this.aiChosenDir.dy !== 0 &&
             (!map.getBlockInfo || (
                 map.getBlockInfo(bx, by + this.aiChosenDir.dy, 1).lid !== 25 &&
-                map.getBlockInfo(bx, by + this.aiChosenDir.dy * 2, 1).lid !== 25
+                map.getBlockInfo(bx, by + this.aiChosenDir.dy * 2, 1).lid !== 25 &&
+                map.getBlockInfo(bx, by - this.aiChosenDir.dy, 1).lid !== 25 &&
+                map.getBlockInfo(bx, by - this.aiChosenDir.dy * 2, 1).lid !== 25
+            )) &&
+            (!map.isStopLineBlock || (
+                !map.isStopLineBlock(bx, by) &&
+                !map.isStopLineBlock(bx, by + this.aiChosenDir.dy) &&
+                !map.isStopLineBlock(bx, by - this.aiChosenDir.dy)
             )) &&
             map.curbParkingBayByRoadTile &&
             this.aiTurnSeed < 0.22
@@ -2387,26 +2539,21 @@ class Vehicle {
             const travelSignY = Math.sin(bay.angle) >= 0 ? 1 : -1;
             const alongErr = (bay.y - this.y) * travelSignY;
             const latErr = bay.x - this.x;
-            // Right-hand side relative to vertical travel (0, travelSignY) is (-travelSignY, 0), so bay.dc * (-travelSignY) gives +1 right / -1 left
             const bayTurnSign = (bay.dc || 1) * (-travelSignY) >= 0 ? 1 : -1;
-            // Smoothly steer/glide laterally into the recessed bay ONLY when right alongside the stall (< 52px) so cars never cruise along the sidewalk!
             const bayRollSpd = Math.abs(this.speed || 0);
-            if (alongErr < 52 && alongErr > -14) {
-                const maxBayLat = Math.min(48, bayRollSpd * 0.48) * dt;
-                this.x += Math.max(-maxBayLat, Math.min(maxBayLat, latErr * Math.min(1, dt * 6.5)));
-            }
-            const signedBayLat = latErr * (-travelSignY);
-            if (bayRollSpd > 8 && Math.abs(latErr) > 2.2) {
-                const targetBayVis = Math.max(-0.26, Math.min(0.26, Math.atan2(signedBayLat * 0.65, 36)));
-                this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetBayVis - (this.visualSteerYaw || 0)) * Math.min(1, dt * 10.0);
-            } else {
-                this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.001, dt);
-                if (Math.abs(this.visualSteerYaw) < 0.005 || bayRollSpd < 3) this.visualSteerYaw = 0;
-            }
-            const angErr = this.normalizeAngle(bay.angle - this.angle);
-            this.angle += angErr * Math.min(1, dt * 10.0);
+            this.visualSteerYaw = 0;
             this.angularVelocity = 0;
             this.steerAngleRad = 0;
+            if (bayRollSpd > 2.0 && alongErr > -14) {
+                const aimBayY = this.y + travelSignY * Math.max(22, Math.min(48, Math.max(24, alongErr)));
+                const aimBayX = alongErr < 64 ? bay.x : ((bay.c + (bay.dc || 0) + 0.5) * TILE_SIZE);
+                const wantBayAng = Math.atan2(aimBayY - this.y, aimBayX - this.x);
+                const hDiff = this.normalizeAngle(wantBayAng - this.angle);
+                const maxStep = Math.min(dt * 4.5, (bayRollSpd * dt) / 16.0 + dt * 0.12);
+                this.angle += Math.max(-maxStep, Math.min(maxStep, hDiff));
+                this.vx = Math.cos(this.angle) * bayRollSpd;
+                this.vy = Math.sin(this.angle) * bayRollSpd;
+            }
 
             if (Math.abs(alongErr) <= 10 && Math.abs(latErr) <= 5) {
                 this.x = bay.x;
@@ -2471,8 +2618,8 @@ class Vehicle {
                         this.aiBlockY = bay.r;
                         this.aiTargetBlockX = this.aiBlockX;
                         this.aiTargetBlockY = this.aiBlockY + travelSignY;
-                        this.aiLaneShiftTimer = 0.85;
-                        this._mergingFromCurbTimer = 1.45;
+                        this.aiLaneShiftTimer = 3.2;
+                        this._mergingFromCurbTimer = 3.2;
                         this.aiLaneChangeSign = -bayTurnSign;
                         this.aiTurnSignal = -bayTurnSign;
                         this.aiState = "CRUISE";
@@ -2501,8 +2648,8 @@ class Vehicle {
                 this.aiBlockY = by;
                 this.aiTargetBlockX = this.aiBlockX;
                 this.aiTargetBlockY = by + travelSignY;
-                this.aiLaneShiftTimer = 0.85;
-                this._mergingFromCurbTimer = 1.45;
+                this.aiLaneShiftTimer = 3.0;
+                this._mergingFromCurbTimer = 3.0;
             }
         }
 
@@ -2525,9 +2672,18 @@ class Vehicle {
                 (map.getBlockInfo && (
                     map.getBlockInfo(bx + cDx, by + cDy, 1).lid === 25 ||
                     map.getBlockInfo(bx + cDx * 2, by + cDy * 2, 1).lid === 25 ||
-                    map.getBlockInfo(bx - cDx, by - cDy, 1).lid === 25
+                    map.getBlockInfo(bx + cDx * 3, by + cDy * 3, 1).lid === 25 ||
+                    map.getBlockInfo(bx - cDx, by - cDy, 1).lid === 25 ||
+                    map.getBlockInfo(bx - cDx * 2, by - cDy * 2, 1).lid === 25 ||
+                    map.getBlockInfo(bx - cDx * 3, by - cDy * 3, 1).lid === 25
                 )) ||
-                (map.isStopLineBlock && (map.isStopLineBlock(bx, by) || map.isStopLineBlock(bx + cDx, by + cDy)))
+                (map.isStopLineBlock && (
+                    map.isStopLineBlock(bx, by) ||
+                    map.isStopLineBlock(bx + cDx, by + cDy) ||
+                    map.isStopLineBlock(bx + cDx * 2, by + cDy * 2) ||
+                    map.isStopLineBlock(bx - cDx, by - cDy) ||
+                    map.isStopLineBlock(bx - cDx * 2, by - cDy * 2)
+                ))
             );
             if (nearJunction) {
                 this.aiPassengerStopTimer = 0;
@@ -2572,13 +2728,10 @@ class Vehicle {
             }
             if (!nearJunction && (this.aiPassengerTarget || (this.aiPassengerStopTimer || 0) > 0)) {
                 const isBusOrCoach = (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH");
-                this.aiPullOverOffset = isBusOrCoach ? 12 : 16;
+                this.aiPullOverOffset = isBusOrCoach ? 11 : 13;
                 this.aiPullOverTimer = 1.2;
                 this.aiTurnSignal = 2; // 4-way hazard flashers while picking up / dropping off passengers
                 this.aiState = "STOPPED_LIGHT";
-                if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
-                    this.angle = this.aiChosenDir.angle;
-                }
                 const brakeMult = Math.pow(0.015, dt);
                 this.vx *= brakeMult;
                 this.vy *= brakeMult;
@@ -2587,6 +2740,9 @@ class Vehicle {
                     this.vx = 0;
                     this.vy = 0;
                     this.speed = 0;
+                    if (this.aiChosenDir && typeof this.aiChosenDir.angle === "number") {
+                        this.angle = this.aiChosenDir.angle;
+                    }
                     if (this.aiPassengerDropPending && game && typeof game.spawnAlightingPassenger === "function") {
                         this.aiPassengerDropPending = false;
                         game.spawnAlightingPassenger(this);
@@ -2607,81 +2763,65 @@ class Vehicle {
             }
         }
 
-        // 2. Strict Cardinal Lane-Centered Steering & Clean 90-Degree Pivot Alignment
+        // 2. Kinematic Pure-Pursuit Lane Steering & Quarter-Circle 90-Degree Turn Arcs (Zero Crab-Sliding!)
         const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
         const ty = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
-        const desiredAngle = Math.atan2(ty - this.y, tx - this.x);
-        const angleDiff = this.normalizeAngle(desiredAngle - this.angle);
-        let steer = Math.max(-1, Math.min(1, angleDiff * 2.4));
-
-        const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-        if (Math.abs(laneAngleDiff) < 0.025) {
-            this.angle = this.aiChosenDir.angle;
-        } else {
-            this.angle += laneAngleDiff * Math.min(1, dt * (this.aiChosenDir.isTurn ? 10.5 : 15.0));
-        }
-        this.angularVelocity = 0;
-        this.steerAngleRad = 0;
-        steer = 0;
-
-        // Always center vehicle smoothly onto the active lane centerline ONLY while rolling forward (zero sideways strafing while stopped!)
-        const rollSpd = Math.abs(this.speed || 0);
-        const maxLatRate = this.aiChosenDir.isTurn
-            ? Math.min(82, rollSpd * 0.85)
-            : Math.min(54, rollSpd * 0.48);
-        const maxLatStep = maxLatRate * dt;
+        let steer = 0;
         const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
         const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
         const rawPullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
         const pullOff = rawPullOff
             ? this.clampSafeInLaneOffset(rawPullOff, laneBlockX, laneBlockY, this.aiChosenDir.dx || 0, this.aiChosenDir.dy || 0, curZ, map)
             : 0;
-        let signedLatErr = 0;
-        if (this.aiChosenDir.dx !== 0) {
-            const centerY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
-            const dyErr = centerY - this.y;
-            signedLatErr = dyErr * (this.aiChosenDir.dx > 0 ? 1 : -1);
-            this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 8.5)));
-        } else if (this.aiChosenDir.dy !== 0) {
-            const centerX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
-            const dxErr = centerX - this.x;
-            signedLatErr = dxErr * (this.aiChosenDir.dy > 0 ? -1 : 1);
-            this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 8.5)));
-        }
-        // Purely visual nose yaw for the renderer during lane changes / pull-overs (never alters physics this.angle or AI radars!)
-        const isBusOrCoach = (this.specKey === "CITY_BUS" || this.specKey === "TOUR_COACH");
-        if (!this.aiChosenDir.isTurn && !isBusOrCoach && rollSpd > 14 && Math.abs(signedLatErr) > 2.2) {
-            const targetVisYaw = Math.max(-0.26, Math.min(0.26, Math.atan2(signedLatErr * 0.65, Math.max(36, rollSpd * 0.55))));
-            this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetVisYaw - (this.visualSteerYaw || 0)) * Math.min(1, dt * 11.0);
-        } else {
-            this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.0005, dt);
-            if (Math.abs(this.visualSteerYaw) < 0.005 || rollSpd < 4 || isBusOrCoach) this.visualSteerYaw = 0;
+        this.steerKinematicAlongRoadLane(dt, map, curZ, laneBlockX, laneBlockY, pullOff);
+        const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
+        if ((this.aiLaneShiftTimer || 0) > 0 && !isPanicked) {
+            desiredThrottle = Math.max(desiredThrottle, 0.34);
         }
 
-        // 2B. Progressive Intersection-Approach Speed Staging (Allows full 54..256 px/s diversity on straightaways while guaranteeing 0 red-light runs!)
-        const nextLidZ1 = map.getBlockInfo ? map.getBlockInfo(this.aiTargetBlockX, this.aiTargetBlockY, 1).lid : 0;
-        const stepDx = this.aiTargetBlockX - bx;
-        const stepDy = this.aiTargetBlockY - by;
-        const twoAheadLidZ1 = map.getBlockInfo
-            ? map.getBlockInfo(this.aiTargetBlockX + stepDx, this.aiTargetBlockY + stepDy, 1).lid
-            : 0;
-        const threeAheadLidZ1 = map.getBlockInfo
-            ? map.getBlockInfo(this.aiTargetBlockX + stepDx * 2, this.aiTargetBlockY + stepDy * 2, 1).lid
-            : 0;
+        // 2B. Unified Pre-Crosswalk Intersection Approach Staging & Anti-Dilemma Stop Line
+        // Scans 1..3 tiles ahead along the lane axis to locate any upcoming junction box (lid === 25) and its FDOT Crosswalk + White Stop Bar!
+        const stepDx = this.aiChosenDir.dx || (this.aiTargetBlockX - laneBlockX);
+        const stepDy = this.aiChosenDir.dy || (this.aiTargetBlockY - laneBlockY);
+        const nextLidZ1 = map.getBlockInfo ? map.getBlockInfo(laneBlockX + stepDx, laneBlockY + stepDy, 1).lid : 0;
+        const twoAheadLidZ1 = map.getBlockInfo ? map.getBlockInfo(laneBlockX + stepDx * 2, laneBlockY + stepDy * 2, 1).lid : 0;
+        const threeAheadLidZ1 = map.getBlockInfo ? map.getBlockInfo(laneBlockX + stepDx * 3, laneBlockY + stepDy * 3, 1).lid : 0;
+        let approachStepsToBox = 0;
+        if (lidZ1 !== 25 && (stepDx !== 0 || stepDy !== 0)) {
+            if (nextLidZ1 === 25) approachStepsToBox = 1;
+            else if (twoAheadLidZ1 === 25) approachStepsToBox = 2;
+            else if (threeAheadLidZ1 === 25) approachStepsToBox = 3;
+        }
+        const boxBx = approachStepsToBox > 0 ? (laneBlockX + stepDx * approachStepsToBox) : this.aiTargetBlockX;
+        const boxBy = approachStepsToBox > 0 ? (laneBlockY + stepDy * approachStepsToBox) : this.aiTargetBlockY;
+        const boxCenterX = (boxBx + 0.5) * TILE_SIZE;
+        const boxCenterY = (boxBy + 0.5) * TILE_SIZE;
         const distToTargetCenter = Math.hypot(tx - this.x, ty - this.y);
-        const isStopBlock = (lidZ1 !== 25 && nextLidZ1 === 25 && distToTargetCenter > 31.5);
-        const isPreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 === 25);
-        const isThreePreStopBlock = (lidZ1 !== 25 && nextLidZ1 !== 25 && twoAheadLidZ1 !== 25 && threeAheadLidZ1 === 25);
+        const distToBoxCenter = approachStepsToBox > 0
+            ? ((boxCenterX - this.x) * stepDx + (boxCenterY - this.y) * stepDy)
+            : 9999;
+        const isStopBlock = (approachStepsToBox === 1 && distToBoxCenter > 31.5);
+        const isPreStopBlock = (approachStepsToBox === 2);
+        const isThreePreStopBlock = (approachStepsToBox === 3);
+        const approachCwTileBx = boxBx - stepDx;
+        const approachCwTileBy = boxBy - stepDy;
+        const hasCwBeforeBox = approachStepsToBox > 0 && (
+            map.getCrosswalkBoxDir
+                ? map.getCrosswalkBoxDir(approachCwTileBx, approachCwTileBy) >= 0
+                : Boolean(map.isStopLineBlock && map.isStopLineBlock(approachCwTileBx, approachCwTileBy))
+        );
+        const halfLen = (this.w || 62) * 0.5;
+        // Stop front bumper 35px upstream of lid===25 edge (7px behind the FDOT Transverse White Stop Bar & 16px clear of the Zebra Crosswalk!)
+        const stopDist = (hasCwBeforeBox ? 67 : 39) + halfLen;
 
         if (!isPanicked && !sirenBehind && this.driver === "AI_TRAFFIC") {
             const onBridgeSpan = Boolean(map.bridgeMask && map.bridgeMask[by * MAP_COLS + bx] > 0);
             const personalCruise = (this.aiTargetCruiseSpeed || ((this.maxSpeed || 280) * (this.aiCruiseFactor || 0.50))) * (onBridgeSpan ? 1.08 : 1.0);
-            // Only stage speed down when approaching an intersection (3 -> 2 -> 1 tiles ahead); on open blocks each vehicle runs at its personal cruise speed!
             const approachCap = isStopBlock
-                ? (this.isHeavyVehicle ? 72 : 84)
+                ? (this.isHeavyVehicle ? 74 : 84)
                 : (isPreStopBlock
-                    ? (this.isHeavyVehicle ? 76 : 94)
-                    : (isThreePreStopBlock ? (this.isHeavyVehicle ? 96 : 138) : personalCruise));
+                    ? (this.isHeavyVehicle ? 78 : 92)
+                    : (isThreePreStopBlock ? (this.isHeavyVehicle ? 96 : 134) : personalCruise));
             if (this.speed > approachCap + 1) {
                 desiredThrottle = 0;
                 const capMult = Math.pow((isStopBlock || isPreStopBlock) ? 0.12 : 0.18, dt);
@@ -2691,8 +2831,8 @@ class Vehicle {
             }
         }
 
-        const maxTurnSpd = this.isHeavyVehicle ? 68 : 82;
-        if (Math.abs(laneAngleDiff) > 0.16 || this.aiChosenDir.isTurn) {
+        const maxTurnSpd = this.isHeavyVehicle ? 64 : 78;
+        if ((Math.abs(laneAngleDiff) > 0.20 && (this.aiLaneShiftTimer || 0) <= 0) || this.aiChosenDir.isTurn) {
             if (this.speed > maxTurnSpd) {
                 desiredThrottle = 0;
                 const slowMult = Math.pow(0.15, dt);
@@ -2704,12 +2844,9 @@ class Vehicle {
             }
         }
 
-        // 3. Authentic GTA 1 / GTA 2 Entrance Stop-Line Traffic Lights
-        // Check signal presence relative to the intersection entry block (boxBx, boxBy) so PreStopBlock, StopBlock, and Box agree 100%!
-        const sigBoxX = isPreStopBlock ? (this.aiTargetBlockX + stepDx + 0.5) * TILE_SIZE : tx;
-        const sigBoxY = isPreStopBlock ? (this.aiTargetBlockY + stepDy + 0.5) * TILE_SIZE : ty;
-        const hasSignal = (isStopBlock || isPreStopBlock) && map && typeof map.hasTrafficSignalNear === "function"
-            ? map.hasTrafficSignalNear(sigBoxX, sigBoxY, 360)
+        // 3. FDOT White Stop-Bar Traffic Signals & Exit-Clearance "Don't Block the Box / Crosswalk"
+        const hasSignal = approachStepsToBox > 0 && map && typeof map.hasTrafficSignalNear === "function"
+            ? map.hasTrafficSignalNear(boxCenterX, boxCenterY, 360)
             : true;
         // Compute active turn signal / blinker indicator (-1 = left, +1 = right, 2 = 4-way hazards)
         if (!this.aiTurnSignal) {
@@ -2721,16 +2858,15 @@ class Vehicle {
                 if (Math.abs(turnDelta) > 0.12) {
                     this.aiTurnSignal = turnDelta >= 0 ? 1 : -1;
                 }
-            } else if (isStopBlock && typeof map.chooseNextRoadBlock === "function") {
-                // Pre-signal upcoming turn at the intersection box ahead (cached per target block so we don't recompute 60x/s at red lights!)
-                const previewKey = ((this.aiTargetBlockY & 511) << 9) | (this.aiTargetBlockX & 511);
+            } else if ((isStopBlock || isPreStopBlock) && typeof map.chooseNextRoadBlock === "function") {
+                const previewKey = ((boxBy & 511) << 9) | (boxBx & 511);
                 if (this._previewTurnBoxKey !== previewKey) {
                     this._previewTurnBoxKey = previewKey;
                     this._previewTurnSignalVal = 0;
                     const baseA = this.aiChosenDir ? this.aiChosenDir.angle : this.angle;
                     const previewTurn = map.chooseNextRoadBlock(
-                        this.aiTargetBlockX,
-                        this.aiTargetBlockY,
+                        boxBx,
+                        boxBy,
                         baseA,
                         curZ,
                         (this.aiTurnSeed * 1.6180339887 + 0.31) % 1.0,
@@ -2745,12 +2881,13 @@ class Vehicle {
                     }
                 }
                 this.aiTurnSignal = this._previewTurnSignalVal || 0;
+                if (this._previewTurnSignalVal && isStopBlock && !sirenBehind) {
+                    this.aiPullOverOffset = 0;
+                    this.aiPullOverTimer = 0;
+                }
             }
         }
 
-        // 3B. "Don't Block the Box" Anti-Gridlock Rule:
-        // Even on a GREEN light, if a same-direction car inside or just exiting the intersection box ahead is stopped (< 8px/s),
-        // hold behind the stop line so we never trap cross-traffic when the signal changes!
         const isFarOffScreenTraffic = Boolean(
             !isPanicked &&
             !sirenBehind &&
@@ -2762,44 +2899,147 @@ class Vehicle {
         );
         const runFullRadarNow = !isFarOffScreenTraffic || ((this._farRadarTick = (this._farRadarTick === undefined ? 0 : ((this._farRadarTick + 1) & 3))) === 0);
 
+        // Trace the vehicle's actual outgoing exit leg `(exitBx, exitBy, exitDx, exitDy, exitAngle)` through the 1..4 intersection tiles
+        // (including T-junction forced turns & left/right turns!) so Queue-Slot Accounting checks the REAL exit street we will enter!
+        let boxSpanTiles = 1;
+        let exitBx = boxBx + stepDx;
+        let exitBy = boxBy + stepDy;
+        let exitDx = stepDx;
+        let exitDy = stepDy;
+        let exitAngle = this.aiChosenDir.angle;
+        let exitHasCw = false;
+        if (approachStepsToBox > 0 && map.getBlockInfo) {
+            while (boxSpanTiles < 4 && map.getBlockInfo(boxBx + stepDx * boxSpanTiles, boxBy + stepDy * boxSpanTiles, 1).lid === 25) {
+                boxSpanTiles++;
+            }
+            exitBx = boxBx + stepDx * boxSpanTiles;
+            exitBy = boxBy + stepDy * boxSpanTiles;
+            if (typeof map.chooseNextRoadBlock === "function") {
+                const legCacheKey = (((boxBy & 511) << 9) | (boxBx & 511)) ^ (((Math.round(this.aiTurnSeed * 1000)) & 1023) << 18);
+                if (this._cachedExitLegKey !== legCacheKey || !this._cachedExitLeg) {
+                    let simBx = boxBx;
+                    let simBy = boxBy;
+                    let simRefAng = this.aiChosenDir.angle;
+                    const simEntryAng = simRefAng;
+                    let simTurned = false;
+                    let simSeed = this.aiTurnSeed;
+                    for (let ps = 0; ps < approachStepsToBox; ps++) {
+                        simSeed = (simSeed * 1.6180339887 + 0.31) % 1.0;
+                    }
+                    for (let st = 0; st < 4; st++) {
+                        if (map.getBlockInfo(simBx, simBy, 1).lid !== 25) break;
+                        const stepOut = map.chooseNextRoadBlock(simBx, simBy, simRefAng, curZ, simSeed, simTurned, simEntryAng);
+                        if (!stepOut || (stepOut.dx === 0 && stepOut.dy === 0)) break;
+                        if (stepOut.isTurn) simTurned = true;
+                        simBx += stepOut.dx;
+                        simBy += stepOut.dy;
+                        simRefAng = stepOut.angle;
+                        exitDx = stepOut.dx;
+                        exitDy = stepOut.dy;
+                        exitAngle = stepOut.angle;
+                        simSeed = (simSeed * 1.6180339887 + 0.31) % 1.0;
+                    }
+                    this._cachedExitLegKey = legCacheKey;
+                    this._cachedExitLeg = { bx: simBx, by: simBy, dx: exitDx, dy: exitDy, angle: exitAngle };
+                }
+                exitBx = this._cachedExitLeg.bx;
+                exitBy = this._cachedExitLeg.by;
+                exitDx = this._cachedExitLeg.dx;
+                exitDy = this._cachedExitLeg.dy;
+                exitAngle = this._cachedExitLeg.angle;
+            }
+            exitHasCw = map.getCrosswalkBoxDir
+                ? map.getCrosswalkBoxDir(exitBx, exitBy) >= 0
+                : Boolean(map.isStopLineBlock && map.isStopLineBlock(exitBx, exitBy));
+        }
+        const distToBoxFarEdge = distToBoxCenter - 32 + boxSpanTiles * TILE_SIZE;
+        const exitEntryX = (exitBx + 0.5) * TILE_SIZE - exitDx * 32;
+        const exitEntryY = (exitBy + 0.5) * TILE_SIZE - exitDy * 32;
+        const nearStopStaging = approachStepsToBox > 0 && distToBoxCenter <= stopDist + 96;
+
         let boxExitBlocked = false;
-        if (!isPanicked && isStopBlock && runFullRadarNow && game && Array.isArray(game.vehicles)) {
+        if (!isPanicked && nearStopStaging && runFullRadarNow && game && Array.isArray(game.vehicles)) {
             const gHead = game._vehGridHead;
             const gNext = game._vehGridNext;
-            const checkBoxVeh = (ov) => {
+            const axisRx = -stepDy;
+            const axisRy = stepDx;
+            const exitRx = -exitDy;
+            const exitRy = exitDx;
+            let nearestStoppedOnExitPx = 9999;
+            let movingTowardExitDemandPx = 0;
+            // Check if a second red-light intersection sits closely downstream along `(exitBx, exitBy)` + `(exitDx, exitDy)`!
+            if (map.getBlockInfo && game && (exitDx !== 0 || exitDy !== 0)) {
+                for (let ds = 1; ds <= 5; ds++) {
+                    const nbx2 = exitBx + exitDx * ds;
+                    const nby2 = exitBy + exitDy * ds;
+                    if (map.getBlockInfo(nbx2, nby2, 1).lid === 25) {
+                        const cw2X = nbx2 - exitDx, cw2Y = nby2 - exitDy;
+                        if (map.isRedLightForApproach && map.isRedLightForApproach(cw2X, cw2Y, exitDx, exitDy, game.trafficLightTimer || 0, curZ)) {
+                            const hasCw2 = map.getCrosswalkBoxDir ? map.getCrosswalkBoxDir(cw2X, cw2Y) >= 0 : true;
+                            const stopBarAlongExit = ds * TILE_SIZE + 32 - (hasCw2 ? 67 : 39);
+                            if (stopBarAlongExit > 0 && stopBarAlongExit < nearestStoppedOnExitPx) {
+                                nearestStoppedOnExitPx = stopBarAlongExit;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            const inspectCorridorVeh = (ov) => {
                 if (!ov || ov === this || ov.destroyed || ov.isCurbParked || ov.aiCurbParkingBay || ov.isEstateCar) return false;
+                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) return false;
                 const dx = ov.x - this.x;
                 const dy = ov.y - this.y;
-                if (Math.abs(dx) > 220 || Math.abs(dy) > 220) return false;
-                if (ov.z !== undefined && Math.abs(ov.z - curZ) > 0.85) return false;
-                const fwd = dx * fx + dy * fy;
-                const lat = Math.abs(dx * rx + dy * ry);
+                if (Math.abs(dx) > 540 || Math.abs(dy) > 540) return false;
+                const fwd = dx * stepDx + dy * stepDy;
+                const lat = Math.abs(dx * axisRx + dy * axisRy);
                 const ovSpd = Math.abs(ov.speed || Math.hypot(ov.vx || 0, ov.vy || 0));
-                const ovCos = Math.cos((ov.angle || 0) - this.angle);
+                const ovCos = Math.cos((ov.angle || 0) - this.aiChosenDir.angle);
                 const ovAbsCos = Math.abs(ovCos);
                 const ovLid = map.getBlockInfo ? map.getBlockInfo(ov.x >> 6, ov.y >> 6, 1).lid : 0;
-                // 0. Never enter an intersection box if ANY vehicle stopped/deployed inside the box physically occupies our lane corridor
-                //    (lat < 46 for cross/diagonal |cos| <= 0.78; lat < 26 for parallel/oncoming so opposite-lane traffic at lat=64px is never blocked!)
-                const stopCorridorLat = ovAbsCos <= 0.78 ? 46 : 26;
-                if (ovLid === 25 && fwd > 4 && fwd < 180 && lat < stopCorridorLat && (ovSpd < 9 || ov.driver === null || ov.deployedMedic || ov._parkedAtFireScene)) return true;
-                // 1. Hold at stop line if ANY cross or diagonal vehicle (|cos| <= 0.78, ~38°..142°) is clearing the intersection box ahead!
-                if (ovLid === 25 && ovAbsCos <= 0.78 && fwd > 4 && fwd < 170 && lat < 62) return true;
-                // 2. Unsignalized intersection yield: yield at stop line if cross-traffic is actively entering the box!
-                if (!hasSignal && ovAbsCos <= 0.65 && ovSpd > 10 && fwd > 6 && fwd < 155 && lat < 92) return true;
-                // 3. "Don't Block the Box": hold at stop line if a same-direction vehicle is stopped inside the box or right in the exit throat!
-                if (ovCos >= 0.65 && lat < 24 && ovSpd < 7 && fwd > 22 && (ovLid === 25 ? fwd < 225 : fwd < 155)) return true;
+                if (fwd > 8 && fwd > distToBoxCenter - 58) {
+                    const stopCorridorLat = ovAbsCos <= 0.78 ? 46 : 26;
+                    if (ovLid === 25 && fwd < distToBoxFarEdge + 24 && lat < stopCorridorLat && (ovSpd < 9 || ov.driver === null || ov.deployedMedic || ov._parkedAtFireScene)) return true;
+                    if (ovLid === 25 && ovAbsCos <= 0.78 && fwd < distToBoxFarEdge + 18 && lat < 62) return true;
+                    if (!hasSignal && ovAbsCos <= 0.65 && ovSpd > 10 && fwd < distToBoxFarEdge + 18 && lat < 92) return true;
+                }
+                // 1) Vehicles ahead of us on our approach lane before the intersection that will also consume exit space if going the same way:
+                if (fwd > 12 && fwd < distToBoxCenter - 16 && lat < 24 && ovCos >= 0.65 && ovSpd >= 16) {
+                    movingTowardExitDemandPx += (ov.w || 62) + 17;
+                }
+                // 2) Vehicles on or entering our ACTUAL committed outgoing exit leg `(exitEntryX, exitEntryY)` along `(exitDx, exitDy)`:
+                const exRelX = ov.x - exitEntryX;
+                const exRelY = ov.y - exitEntryY;
+                const alongExit = exRelX * exitDx + exRelY * exitDy;
+                const latExit = Math.abs(exRelX * exitRx + exRelY * exitRy);
+                const cosExit = Math.cos((ov.angle || 0) - exitAngle);
+                if (latExit < 26 && alongExit > -56 && alongExit < 460 && cosExit >= 0.52) {
+                    const ovQueued = ovSpd < 24 || ov.aiState === "STOPPED_LIGHT" || ov.aiState === "STOPPED_QUEUE" || ov.aiState === "YIELD_BOX";
+                    if (ovQueued && alongExit > -32) {
+                        const rearAlongExit = alongExit - (ov.w || 60) * 0.5;
+                        if (rearAlongExit < nearestStoppedOnExitPx) {
+                            nearestStoppedOnExitPx = rearAlongExit;
+                        }
+                    } else if (!ovQueued && alongExit < nearestStoppedOnExitPx) {
+                        movingTowardExitDemandPx += (ov.w || 62) + 17;
+                    }
+                }
                 return false;
             };
             if (gHead && gNext) {
-                const gx0 = Math.max(0, (this.x >> 8) - 1);
-                const gx1 = Math.min(127, (this.x >> 8) + 1);
-                const gy0 = Math.max(0, (this.y >> 8) - 1);
-                const gy1 = Math.min(127, (this.y >> 8) + 1);
+                const exScanX = (exitEntryX + exitDx * 160) >> 8;
+                const exScanY = (exitEntryY + exitDy * 160) >> 8;
+                const bScanX = boxCenterX >> 8;
+                const bScanY = boxCenterY >> 8;
+                const gx0 = Math.max(0, Math.min(this.x >> 8, bScanX, exScanX) - 1);
+                const gx1 = Math.min(127, Math.max(this.x >> 8, bScanX, exScanX) + 1);
+                const gy0 = Math.max(0, Math.min(this.y >> 8, bScanY, exScanY) - 1);
+                const gy1 = Math.min(127, Math.max(this.y >> 8, bScanY, exScanY) + 1);
                 for (let gy = gy0; gy <= gy1 && !boxExitBlocked; gy++) {
                     const rowOff = gy << 7;
                     for (let gx = gx0; gx <= gx1; gx++) {
                         for (let vi = gHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
-                            if (checkBoxVeh(game.vehicles[vi])) {
+                            if (inspectCorridorVeh(game.vehicles[vi])) {
                                 boxExitBlocked = true;
                                 break;
                             }
@@ -2809,20 +3049,27 @@ class Vehicle {
                 }
             } else {
                 for (let vi = 0; vi < game.vehicles.length; vi++) {
-                    if (checkBoxVeh(game.vehicles[vi])) {
+                    if (inspectCorridorVeh(game.vehicles[vi])) {
                         boxExitBlocked = true;
                         break;
                     }
                 }
             }
+            if (!boxExitBlocked && nearestStoppedOnExitPx < 9000) {
+                const availAfterBox = nearestStoppedOnExitPx - movingTowardExitDemandPx;
+                const needAfterBox = (exitHasCw ? 35 : 9) + (this.w || 62) + 18;
+                if (availAfterBox < needAfterBox) {
+                    boxExitBlocked = true;
+                }
+            }
             this._cachedBoxBlocked = boxExitBlocked;
-        } else if (isFarOffScreenTraffic && isStopBlock) {
+        } else if (isFarOffScreenTraffic && nearStopStaging) {
             boxExitBlocked = Boolean(this._cachedBoxBlocked);
         } else {
             this._cachedBoxBlocked = false;
         }
 
-        if (!isPanicked && curBlk && (isStopBlock || isPreStopBlock) && ((hasSignal && !sirenBehind) || boxExitBlocked) && game) {
+        if (!isPanicked && curBlk && nearStopStaging && ((hasSignal && !sirenBehind) || boxExitBlocked) && game) {
             const isNSLane = stepDy !== 0 ? true : (Boolean(curBlk.up || curBlk.down) && !curBlk.left && !curBlk.right);
             const isEWLane = stepDx !== 0 ? true : (Boolean(curBlk.left || curBlk.right) && !curBlk.up && !curBlk.down);
             const nsState = hasSignal && isNSLane && typeof game.getNSTrafficLightState === "function"
@@ -2831,35 +3078,55 @@ class Vehicle {
             const ewState = hasSignal && isEWLane && typeof game.getEWTrafficLightState === "function"
                 ? game.getEWTrafficLightState()
                 : (hasSignal && isEWLane && typeof game.isEWGreen === "function" ? (game.isEWGreen() ? "GREEN" : "RED") : "GREEN");
+            const tlPh = (((game.trafficLightTimer || 0) % 12.0) + 12.0) % 12.0;
             const nsStop = !sirenBehind && isNSLane && nsState !== "GREEN";
             const ewStop = !sirenBehind && isEWLane && ewState !== "GREEN";
-            const tlPh = (((game.trafficLightTimer || 0) % 12.0) + 12.0) % 12.0;
-            const isEarlyYellow = (isNSLane && nsState === "AMBER" && tlPh < 5.05) || (isEWLane && ewState === "AMBER" && tlPh >= 10.6 && tlPh < 11.05);
-            if (nsStop || ewStop || boxExitBlocked) {
-                const halfLen = (this.w || 62) * 0.5;
-                const stopDist = 37 + halfLen;
-                const distToStopRef = isStopBlock ? distToTargetCenter : (distToTargetCenter + TILE_SIZE);
-                const stopsInPreBlock = isPreStopBlock && stopDist > 94;
-                const committedOnAmber = isEarlyYellow && !boxExitBlocked && isStopBlock && distToStopRef < (stopDist - 12) && Math.abs(this.speed || 0) > 24;
-                if (committedOnAmber) {
-                    desiredThrottle = Math.max(desiredThrottle, 0.46);
-                } else if (isPreStopBlock && !stopsInPreBlock) {
-                    if (this.speed > 56) {
-                        desiredThrottle = 0;
-                        const preMult = Math.pow(0.08, dt);
-                        this.vx *= preMult;
-                        this.vy *= preMult;
-                        this.speed *= preMult;
-                    } else {
-                        desiredThrottle = Math.min(desiredThrottle, 0.22);
+            // Stale-Green Dilemma Eliminator: if still behind the White Stop Bar in the last 1.05s of GREEN and unable to enter
+            // the junction box well before yellow expires, begin smooth braking BEFORE crossing the stop bar (zero crosswalk stranding & zero red-light runs!).
+            const curCheckSpd = Math.max(52, Math.abs(this.speed || 0));
+            const staleGreenNS = !sirenBehind && hasSignal && isNSLane && nsState === "GREEN" && tlPh >= 3.55 &&
+                distToBoxCenter >= stopDist - 3 && (distToBoxCenter - 32) > curCheckSpd * Math.max(0.05, 4.78 - tlPh);
+            const staleGreenEW = !sirenBehind && hasSignal && isEWLane && ewState === "GREEN" && tlPh >= 9.55 &&
+                distToBoxCenter >= stopDist - 3 && (distToBoxCenter - 32) > curCheckSpd * Math.max(0.05, 10.78 - tlPh);
+            const canBeatAmberNS = isNSLane && nsState === "AMBER" && tlPh < 4.96 && (distToBoxCenter - 32) <= Math.max(60, Math.abs(this.speed || 0)) * (5.06 - tlPh);
+            const canBeatAmberEW = isEWLane && ewState === "AMBER" && tlPh >= 10.6 && tlPh < 10.96 && (distToBoxCenter - 32) <= Math.max(60, Math.abs(this.speed || 0)) * (11.06 - tlPh);
+            const pastStopBarAlready = distToBoxCenter < stopDist - 4;
+
+            if (nsStop || ewStop || staleGreenNS || staleGreenEW || boxExitBlocked) {
+                const signalAllowsProceed = (isNSLane && (nsState === "GREEN" || canBeatAmberNS)) ||
+                    (isEWLane && (ewState === "GREEN" || canBeatAmberEW));
+                // Once past the White Stop Bar on a valid green / early-clearable amber, NEVER stop on the crosswalk for downstream queue speed —
+                // only emergency-brake if an actual cross-hull inside lid===25 blocks immediate entry!
+                let immediateBoxCollision = false;
+                if (pastStopBarAlready && boxExitBlocked && game && Array.isArray(game.vehicles)) {
+                    for (let k = 0; k < game.vehicles.length; k++) {
+                        const ov = game.vehicles[k];
+                        if (!ov || ov === this || ov.destroyed) continue;
+                        const fwd = (ov.x - this.x) * stepDx + (ov.y - this.y) * stepDy;
+                        const lat = Math.abs(-(ov.x - this.x) * stepDy + (ov.y - this.y) * stepDx);
+                        if (fwd > 4 && fwd < (halfLen + 44) && lat < 30 && Math.abs(ov.speed || 0) < 8) {
+                            immediateBoxCollision = true;
+                            break;
+                        }
                     }
-                } else if ((isStopBlock || stopsInPreBlock) && !committedOnAmber) {
-                    this.aiState = (nsStop || ewStop) ? "STOPPED_LIGHT" : "YIELD_BOX";
-                    if (distToStopRef > stopDist + 3) {
-                        const rollSpd = Math.max(0, Math.min(54, (distToStopRef - stopDist) * 1.65));
-                        if (this.speed > rollSpd) {
+                }
+                const committedPastBar = pastStopBarAlready && signalAllowsProceed && !immediateBoxCollision;
+                if (committedPastBar) {
+                    desiredThrottle = Math.max(desiredThrottle, 0.74);
+                    if ((this.speed || 0) < 82) {
+                        const boostSpd = Math.min(86, Math.max(56, (this.speed || 0) + 210 * dt));
+                        this.speed = boostSpd;
+                        this.vx = Math.cos(this.angle) * boostSpd;
+                        this.vy = Math.sin(this.angle) * boostSpd;
+                    }
+                } else if (distToBoxCenter >= stopDist - 4) {
+                    this.aiState = (nsStop || ewStop || staleGreenNS || staleGreenEW) ? "STOPPED_LIGHT" : "YIELD_BOX";
+                    const remToBar = distToBoxCenter - stopDist;
+                    if (remToBar > 2.5) {
+                        const rollToBar = Math.max(0, Math.min(60, remToBar * 1.50));
+                        if (this.speed > rollToBar) {
                             desiredThrottle = 0;
-                            const slowMult = Math.pow(0.015, dt);
+                            const slowMult = Math.pow(remToBar < 22 ? 0.008 : 0.025, dt);
                             this.vx *= slowMult;
                             this.vy *= slowMult;
                             this.speed *= slowMult;
@@ -2868,17 +3135,20 @@ class Vehicle {
                         }
                     } else {
                         desiredThrottle = 0;
-                        const brakeMult = Math.pow(0.0005, dt);
-                        this.vx *= brakeMult;
-                        this.vy *= brakeMult;
-                        this.speed *= brakeMult;
-                        if (Math.abs(this.speed) < 34 || distToStopRef <= stopDist + 1) {
-                            this.vx = 0;
-                            this.vy = 0;
-                            this.speed = 0;
-                            return { throttle: 0, steer: 0, handbrake: true };
-                        }
+                        this.vx = 0;
+                        this.vy = 0;
+                        this.speed = 0;
+                        return { throttle: 0, steer: 0, handbrake: true };
                     }
+                } else {
+                    // Past stop bar when signal is RED or late un-clearable AMBER (or immediate collision inside box):
+                    // MUST stop before entering lid===25 (`distToBoxCenter = 32`) so we NEVER run a red light!
+                    this.aiState = (nsStop || ewStop) ? "STOPPED_LIGHT" : "YIELD_BOX";
+                    desiredThrottle = 0;
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.speed = 0;
+                    return { throttle: 0, steer: 0, handbrake: true };
                 }
             }
         }
@@ -2970,28 +3240,21 @@ class Vehicle {
                 }
 
                 // B2. Rear-View Mirror Tailgater Detection:
-                // If a fast-moving vehicle (player or speeding car) is closing in directly behind us in our lane,
-                // cautious drivers yield the lane or pull slightly right, while aggressive drivers honk!
+                // If a fast-moving vehicle (player or speeding car) is closing in directly behind us on a multi-lane boulevard,
+                // cautious drivers change to an adjacent lane cleanly (without twitchy single-lane swerves!), while aggressive drivers honk!
                 if (
                     !isPanicked &&
                     this.driver === "AI_TRAFFIC" &&
                     this.aiState !== "STOPPED_LIGHT" &&
-                    cosDiff > 0.72 &&
-                    forwardDist < -14 &&
-                    forwardDist > -95 &&
-                    lateralDist < 20 &&
-                    otherSpd > Math.abs(this.speed || 0) + 42
+                    cosDiff > 0.78 &&
+                    forwardDist < -16 &&
+                    forwardDist > -90 &&
+                    lateralDist < 18 &&
+                    otherSpd > Math.abs(this.speed || 0) + 48
                 ) {
                     if (!this.aiAggressive) {
                         if (this.aiLaneChangeCooldown <= 0) {
                             this.tryAdjacentLaneChange(bx, by, curZ, map, game);
-                        } else {
-                            const safeYieldRight = this.clampSafeInLaneOffset(14, laneBlockX, laneBlockY, this.aiChosenDir ? (this.aiChosenDir.dx || 0) : 0, this.aiChosenDir ? (this.aiChosenDir.dy || 0) : 0, curZ, map);
-                            if (safeYieldRight >= 8) {
-                                this.aiPullOverOffset = safeYieldRight;
-                                this.aiPullOverTimer = 1.1;
-                                this.aiTurnSignal = 1;
-                            }
                         }
                     } else if (this.aiHornCooldown <= 0 && game && game.audio && other.driver === "PLAYER") {
                         this.aiHornCooldown = 5.0;
@@ -3137,7 +3400,45 @@ class Vehicle {
             !closestEntity.towingVehicle &&
             Math.hypot(closestEntity.x - closestEntity.towTarget.x, closestEntity.y - closestEntity.towTarget.y) < 220
         );
-        const minStopGap = isManeuveringTowAhead ? 92 : (this.isMotorcycle ? 11 : (involvesLongVeh ? 20 : 15));
+        let minStopGap = isManeuveringTowAhead ? 92 : (inIntersectionBox ? 7 : (this.isMotorcycle ? 11 : (involvesLongVeh ? 20 : 15)));
+        // Queue Keep-Clear Rule (Never Stop on a Painted Crosswalk or Inside an Intersection Box!):
+        // 1) If we are NOT currently overlapping any crosswalk/box, but stopping `minStopGap` behind a stopped lead vehicle WOULD
+        //    park our hull on a zebra crosswalk or inside a junction box, hold upstream BEFORE the crosswalk/box!
+        // 2) Conversely, if our tail is STILL overlapping an exit crosswalk/box while there is safe bumper room (>9px) ahead,
+        //    tighten `minStopGap` to 8px so we pull completely clear of the crosswalk/box!
+        if (
+            closestEntity &&
+            !isManeuveringTowAhead &&
+            !this.sirenActive &&
+            !this.aiCurbParkingBay &&
+            map &&
+            typeof map.doesVehicleOverlapCrosswalkOrBox === "function"
+        ) {
+            const leadSpd = closestEntity.speed !== undefined ? Math.abs(closestEntity.speed) : 0;
+            const myHL = (this.w || 62) * 0.49;
+            const myHW = (this.h || 26) * 0.45;
+            const nowOnCwOrBox = map.doesVehicleOverlapCrosswalkOrBox(this.x, this.y, this.angle, myHL, myHW, true);
+            if (nowOnCwOrBox && closestBumperGap > 9) {
+                minStopGap = Math.min(minStopGap, 8);
+            } else if (!nowOnCwOrBox && leadSpd < 10 && closestBumperGap < 210) {
+                const restAdv = Math.max(0, closestBumperGap - minStopGap);
+                const restX = this.x + fx * restAdv;
+                const restY = this.y + fy * restAdv;
+                if (map.doesVehicleOverlapCrosswalkOrBox(restX, restY, this.angle, myHL, myHW, true)) {
+                    let lo = 0;
+                    let hi = restAdv;
+                    for (let it = 0; it < 5; it++) {
+                        const mid = (lo + hi) * 0.5;
+                        if (map.doesVehicleOverlapCrosswalkOrBox(this.x + fx * mid, this.y + fy * mid, this.angle, myHL, myHW, true)) {
+                            hi = mid;
+                        } else {
+                            lo = mid;
+                        }
+                    }
+                    minStopGap = Math.max(minStopGap, closestBumperGap - Math.max(0, lo - 3.0));
+                }
+            }
+        }
         const curForwardSpd = Math.max(0, this.speed || 0);
         const highSpeedStoppingBuffer = Math.max(0, curForwardSpd - 120) * 0.65;
         const followHorizon = Math.max(145, minStopGap + curForwardSpd * (this.isHeavyVehicle ? 0.88 : 0.72) + highSpeedStoppingBuffer + 44);
@@ -3164,16 +3465,16 @@ class Vehicle {
             const myDesiredCruiseSpd = this.aiTargetCruiseSpeed || ((this.maxSpeed || 210) * (this.aiCruiseFactor || 0.50));
             const isSlowerMovingCar = Boolean(
                 this.aiState !== "STOPPED_LIGHT" &&
-                obstacleSpeed >= 10 &&
-                obstacleSpeed < myDesiredCruiseSpd * 0.84 &&
-                (this.isMotorcycle || this.aiAggressive || myDesiredCruiseSpd >= 140 || closestEntity.isHeavyVehicle || obstacleSpeed < 95)
+                obstacleSpeed >= 12 &&
+                obstacleSpeed < myDesiredCruiseSpd * 0.74 &&
+                (this.isMotorcycle || this.aiAggressive || myDesiredCruiseSpd >= 155 || closestEntity.isHeavyVehicle || obstacleSpeed < 85)
             );
             const overtakeTriggerGap = Math.max(116, Math.min(180, 96 + Math.max(0, curForwardSpd - obstacleSpeed) * 0.85));
             if ((isStationaryCar || isSlowerMovingCar || sirenBehind || this.driver === "AI_TOW") && closestBumperGap < overtakeTriggerGap && this.aiLaneChangeCooldown <= 0) {
                 this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
-            // Motorcycle Lane-Splitting / Queue Filtering at Red Lights & Traffic Queues:
-            // Agile motorcycles filter along the lane-divider strip (±15px) past stopped cars up to the stop line!
+            // Motorcycle Multi-Lane Overtake: use adjacent legal lane changes (`tryAdjacentLaneChange`) rather than squeezing
+            // within 14px of single-lane cars where 2-axle collision capsules overlap!
             if (
                 this.isMotorcycle &&
                 !isPanicked &&
@@ -3185,19 +3486,10 @@ class Vehicle {
                 !closestEntity.isMotorcycle &&
                 obstacleSpeed < 10 &&
                 closestBumperGap < 72 &&
-                (!this.aiChosenDir || !this.aiChosenDir.isTurn)
+                (!this.aiChosenDir || !this.aiChosenDir.isTurn) &&
+                this.aiLaneChangeCooldown <= 0
             ) {
-                for (const fSide of [-1, 1]) {
-                    const safeStrip = this.clampSafeInLaneOffset(fSide * 14, laneBlockX, laneBlockY, this.aiChosenDir ? (this.aiChosenDir.dx || 0) : 0, this.aiChosenDir ? (this.aiChosenDir.dy || 0) : 0, curZ, map);
-                    if (Math.abs(safeStrip) >= 11) {
-                        this.aiPullOverOffset = safeStrip;
-                        this.aiPullOverTimer = 1.0;
-                        this.aiFilteringTimer = 1.0;
-                        this.aiTurnSignal = fSide;
-                        this.aiState = "LANE_CHANGE";
-                        return { throttle: this.speed > 52 ? 0 : 0.28, steer: 0, handbrake: false };
-                    }
-                }
+                this.tryAdjacentLaneChange(bx, by, curZ, map, game);
             }
             // Never wait forever behind a destroyed wreck or in-lane abandoned driverless vehicle:
             // first try changing to a legal adjacent same-direction lane, otherwise squeeze within safe in-lane limits (±14px max, never onto sidewalks or oncoming lanes!)
@@ -3417,7 +3709,7 @@ class Vehicle {
         let bx = Math.floor(this.x / TILE_SIZE);
         let by = Math.floor(this.y / TILE_SIZE);
         // Prevent a lateral pull-over offset from accidentally switching `bx` or `by` into the opposing traffic lane tile (which would flip direction 180°!)
-        if ((this.aiPullOverTimer > 0 || Math.abs(this.aiPullOverOffset || 0) > 8) && this.aiChosenDir && !this.aiChosenDir.isTurn) {
+        if ((this.aiPullOverTimer > 0 || Math.abs(this.aiPullOverOffset || 0) > 8) && this.aiChosenDir && !this.aiChosenDir.isTurn && (this.aiLaneShiftTimer || 0) <= 0) {
             if (this.aiChosenDir.dy !== 0 && typeof this.aiBlockX === "number" && this.aiBlockX >= 0 && Math.abs(bx - this.aiBlockX) <= 1) {
                 bx = this.aiBlockX;
             } else if (this.aiChosenDir.dx !== 0 && typeof this.aiBlockY === "number" && this.aiBlockY >= 0 && Math.abs(by - this.aiBlockY) <= 1) {
@@ -3427,9 +3719,11 @@ class Vehicle {
         const lidZ1 = map.getBlockInfo ? map.getBlockInfo(bx, by, 1).lid : 0;
         if (lidZ1 !== 25) {
             this.aiTurnedInIntersection = false;
-            this.aiIntersectionEntryAngle = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number")
-                ? this.aiChosenDir.angle
-                : this.angle;
+            if (!(this.aiChosenDir && this.aiChosenDir.isTurn && bx === this.aiBlockX && by === this.aiBlockY)) {
+                this.aiIntersectionEntryAngle = (this.aiChosenDir && typeof this.aiChosenDir.angle === "number")
+                    ? this.aiChosenDir.angle
+                    : this.angle;
+            }
         }
         if (lidZ1 === 25 && this.aiLaneShiftTimer > 0) {
             this.aiLaneShiftTimer = 0;
@@ -3472,6 +3766,10 @@ class Vehicle {
             }
             if (this.aiChosenDir.isTurn) {
                 this.aiTurnedInIntersection = true;
+                this.aiTurnEntryAngle = refAngle;
+                this.aiIntersectionEntryAngle = this.angle;
+            } else {
+                this.aiTurnEntryAngle = this.aiChosenDir.angle;
             }
             this.aiTargetBlockX = bx + this.aiChosenDir.dx;
             this.aiTargetBlockY = by + this.aiChosenDir.dy;
@@ -3498,12 +3796,22 @@ class Vehicle {
                 const dy = other.y - this.y;
                 const fDist = dx * fx + dy * fy;
                 const lDist = Math.abs(dx * rx + dy * ry);
-                const halfLenSum = ((this.w || 62) + (other.w || 62)) * 0.50;
-                const bumperGap = fDist - halfLenSum;
-                if (fDist > 4 && bumperGap < 125 && lDist < 24) {
+                const cosOther = Math.cos((other.angle || 0) - this.angle);
+                const absCos = Math.abs(cosOther);
+                const absSin = Math.sqrt(Math.max(0, 1 - Math.min(1, cosOther * cosOther)));
+                const oHalfL = (other.w || 62) * 0.50;
+                const oHalfW = (other.h || 28) * 0.48;
+                const projLen = absCos * oHalfL + absSin * oHalfW;
+                const projWid = absCos * oHalfW + absSin * oHalfL;
+                const myHalfL = (this.w || 62) * 0.50;
+                const myHalfW = (this.h || 28) * 0.48;
+                const bumperGap = fDist - (myHalfL + projLen);
+                const crossBlocking = cosOther <= 0.45 && fDist > 2 && lDist < (myHalfW + projWid + 2) &&
+                    ((-dx * Math.cos(other.angle || 0) - dy * Math.sin(other.angle || 0)) < 8);
+                if (fDist > 4 && bumperGap < 125 && (lDist < 24 || crossBlocking)) {
                     if (bumperGap < sameLaneLeadGap) {
                         sameLaneLeadGap = bumperGap;
-                        sameLaneLeadSpd = Math.max(0, other.speed || 0);
+                        sameLaneLeadSpd = crossBlocking ? 0 : Math.max(0, other.speed || 0);
                     }
                     // Code-3 Overtaking: change to a same-direction adjacent lane, or offset within our own lane (max ±14px so we never enter an opposing lane tile!)
                     const changed = this.aiLaneChangeCooldown <= 0
@@ -3542,50 +3850,20 @@ class Vehicle {
             }
         }
 
-        const tx = (this.aiTargetBlockX + 0.5) * TILE_SIZE;
-        const ty = (this.aiTargetBlockY + 0.5) * TILE_SIZE;
         let steer = 0;
         let throttle = maxThrottle;
 
-        const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
-        if (Math.abs(laneAngleDiff) < 0.03) {
-            this.angle = this.aiChosenDir.angle;
-        } else {
-            this.angle += laneAngleDiff * Math.min(1, dt * (this.aiChosenDir.isTurn ? 11.0 : 15.0));
-        }
-        this.angularVelocity = 0;
-        this.steerAngleRad = 0;
-
-        const emRollSpd = Math.abs(this.speed || 0);
-        const maxLatStep = Math.min(72, Math.max(28, emRollSpd * 0.62)) * dt;
         const laneBlockX = typeof this.aiBlockX === "number" && this.aiBlockX >= 0 ? this.aiBlockX : bx;
         const laneBlockY = typeof this.aiBlockY === "number" && this.aiBlockY >= 0 ? this.aiBlockY : by;
         const rawPullOff = (!this.aiChosenDir.isTurn && this.aiPullOverOffset) ? this.aiPullOverOffset : 0;
         const pullOff = rawPullOff
             ? this.clampSafeInLaneOffset(rawPullOff, laneBlockX, laneBlockY, this.aiChosenDir.dx || 0, this.aiChosenDir.dy || 0, curZ, map)
             : 0;
-        let emSignedLat = 0;
-        if (this.aiChosenDir.dx !== 0) {
-            const centerY = (laneBlockY + 0.5) * TILE_SIZE + (this.aiChosenDir.dx > 0 ? pullOff : -pullOff);
-            const dyErr = centerY - this.y;
-            emSignedLat = dyErr * (this.aiChosenDir.dx > 0 ? 1 : -1);
-            this.y += Math.max(-maxLatStep, Math.min(maxLatStep, dyErr * Math.min(1, dt * 8.5)));
-        } else if (this.aiChosenDir.dy !== 0) {
-            const centerX = (laneBlockX + 0.5) * TILE_SIZE + (this.aiChosenDir.dy > 0 ? -pullOff : pullOff);
-            const dxErr = centerX - this.x;
-            emSignedLat = dxErr * (this.aiChosenDir.dy > 0 ? -1 : 1);
-            this.x += Math.max(-maxLatStep, Math.min(maxLatStep, dxErr * Math.min(1, dt * 8.5)));
-        }
-        if (!this.aiChosenDir.isTurn && emRollSpd > 14 && Math.abs(emSignedLat) > 2.2) {
-            const targetVisYaw = Math.max(-0.22, Math.min(0.22, Math.atan2(emSignedLat * 0.55, Math.max(36, emRollSpd * 0.55))));
-            this.visualSteerYaw = (this.visualSteerYaw || 0) + (targetVisYaw - (this.visualSteerYaw || 0)) * Math.min(1, dt * 11.0);
-        } else {
-            this.visualSteerYaw = (this.visualSteerYaw || 0) * Math.pow(0.0005, dt);
-            if (Math.abs(this.visualSteerYaw) < 0.005 || emRollSpd < 4) this.visualSteerYaw = 0;
-        }
+        this.steerKinematicAlongRoadLane(dt, map, curZ, laneBlockX, laneBlockY, pullOff);
+        const laneAngleDiff = this.normalizeAngle(this.aiChosenDir.angle - this.angle);
 
-        if (Math.abs(laneAngleDiff) > 0.18 || this.aiChosenDir.isTurn) {
-            if (this.speed > 96) {
+        if ((Math.abs(laneAngleDiff) > 0.22 && (this.aiLaneShiftTimer || 0) <= 0) || this.aiChosenDir.isTurn) {
+            if (this.speed > 92) {
                 throttle = 0;
                 const slowMult = Math.pow(0.15, dt);
                 this.vx *= slowMult;
@@ -4650,7 +4928,7 @@ class Vehicle {
         //    - If the road ahead of target is blocked by other cars/walls (e.g. a pileup), execute a physical 3-point K-turn with the wheels
         //      until the Tow Truck faces outbound and its rear boom faces target!
         // 2) Once target is behind the Tow Truck (`along <= -10`), reverse slowly (`throttle = -0.34`) guiding the rear boom up to target's bumper!
-        if (!targetStillBurning && dist < 185 && along > -10) {
+        if (!targetStillBurning && dist < 245 && along > -10) {
             const curZ = this.z !== undefined ? this.z : 2.0;
             const aheadX = target.x + hCos * 82;
             const aheadY = target.y + hSin * 82;
@@ -4711,18 +4989,18 @@ class Vehicle {
         }
 
         // Once target is behind the Tow Truck's rear boom (`along <= -10`), back the rear winch boom right up to target's bumper!
-        if (!targetStillBurning && dist < 185 && along <= -10 && rearBoomDist > 38 && noProgress < 2.2) {
+        if (!targetStillBurning && dist < 255 && along <= -10 && rearBoomDist > 38 && noProgress < 2.6) {
             this.towHookTimer = 0;
             const rearToTargetAng = this.normalizeAngle(Math.atan2(target.y - this.y, target.x - this.x) - (this.angle + Math.PI));
             const revSteer = Math.max(-0.85, Math.min(0.85, -rearToTargetAng * 2.2));
             return {
-                throttle: this.speed < -38 ? 0 : -0.34,
+                throttle: this.speed < -44 ? 0 : -0.40,
                 steer: revSteer,
                 handbrake: false
             };
         }
 
-        if (!targetStillBurning && along <= -6 && (rearBoomDist <= 38 || dist < hookDist || (dist < 175 && noProgress >= 2.2))) {
+        if (!targetStillBurning && along <= -6 && (rearBoomDist <= 40 || dist < hookDist || (dist < 225 && noProgress >= 2.2))) {
             // Stop for 1.8s to attach the rear tow winch cable before pulling away!
             this.towHookTimer = (this.towHookTimer || 0) + dt;
             if (this.towHookTimer < 1.8) {
@@ -5408,13 +5686,16 @@ class Vehicle {
             const dy = lead.y - this.y;
             const fDist = dx * cfx + dy * cfy;
             const lDist = Math.abs(-dx * cfy + dy * cfx);
-            const latTol = Math.min(27, ((this.h || 28) + (lead.h || 28)) * 0.43);
-            const minCenterDist = ((this.w || 62) + (lead.w || 62)) * 0.50 + (this.isMotorcycle ? 12 : 18);
+            const isFilteringNow = Boolean(this.isMotorcycle && (this.aiFilteringTimer || 0) > 0 && !lead.isMotorcycle && Math.abs(lead.speed || 0) < 12);
+            const latTol = isFilteringNow ? 9.5 : Math.min(27, ((this.h || 28) + (lead.h || 28)) * 0.43);
+            const minCenterDist = ((this.w || 62) + (lead.w || 62)) * 0.50 + 5.5;
             if (fDist > 4 && fDist < minCenterDist && lDist < latTol) {
                 const pushBack = minCenterDist - fDist;
-                this.x -= cfx * pushBack;
-                this.y -= cfy * pushBack;
-                const capSpd = Math.max(0, (lead.speed || 0) * 0.90);
+                const fwdStep = (this.x - preMoveX) * cfx + (this.y - preMoveY) * cfy;
+                const maxBack = (lead.speed || 0) < -1 ? pushBack : Math.max(0, Math.min(pushBack, fwdStep));
+                this.x -= cfx * maxBack;
+                this.y -= cfy * maxBack;
+                const capSpd = Math.max(0, (lead.speed || 0) * 0.85);
                 if (this.speed > capSpd) {
                     this.speed = capSpd;
                     this.vx = cfx * capSpd;

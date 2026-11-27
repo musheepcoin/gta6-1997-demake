@@ -2153,6 +2153,8 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
         const vz = serverMap.getHeightAtPixel(vx, vy, 4.0);
         const navSt = serverMap.getNavigationBlock ? serverMap.getNavigationBlock(bx, by, vz) : null;
         const lidSt = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
+        const onCwTile = Boolean(serverMap.isStopLineBlock && serverMap.isStopLineBlock(bx, by));
+        if (onCwTile) continue;
         const isValidCruiseLane = Boolean(
             navSt &&
             navSt.groundType === global.GROUND_TYPE.ROAD &&
@@ -2195,7 +2197,7 @@ function ensureRoomAutonomousPopulation(roomCode, room) {
             if (serverMap.surfaceGround && serverMap.surfaceGround[by * 512 + bx] !== global.GROUND_TYPE.ROAD) continue;
             if (serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(bx, by)) continue;
             const lidZ1 = serverMap.getBlockInfo ? serverMap.getBlockInfo(bx, by, 1).lid : 0;
-            if (lidZ1 === 25) continue;
+            if (lidZ1 === 25 || (serverMap.isStopLineBlock && serverMap.isStopLineBlock(bx, by))) continue;
             const vx = (bx + 0.5) * TS;
             const vy = (by + 0.5) * TS;
             const vz = serverMap.getHeightAtPixel(vx, vy, 4.0);
@@ -2879,34 +2881,35 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
         const curDirsNow = onTrueRoad ? serverMap.getAllowedRoadDirections(bx, by, z) : [];
         if (onTrueRoad && curLid1 !== 25 && curDirsNow.length === 1 && Math.cos(a - curDirsNow[0].angle) < -0.35) {
             a = curDirsNow[0].angle;
+            nav.blockX = -1;
+            nav.blockY = -1;
             nav.targetBx = null;
             nav.targetBy = null;
         }
+        if (curLid1 !== 25) {
+            nav.turnedInIntersection = false;
+            nav.entryAngle = typeof nav.chosenAngle === "number" ? nav.chosenAngle : a;
+        }
 
-        if (
-            !onTrueRoad ||
-            typeof nav.targetBx !== "number" ||
-            typeof nav.targetBy !== "number" ||
-            !Number.isFinite(nav.targetBx) ||
-            !Number.isFinite(nav.targetBy) ||
-            (bx === nav.targetBx && by === nav.targetBy && Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) < 26) ||
-            Math.hypot((nav.targetBx + 0.5) * TS - x, (nav.targetBy + 0.5) * TS - y) > TS * 2.6
-        ) {
+        const movedBlock = !onTrueRoad || nav.blockX !== bx || nav.blockY !== by || typeof nav.targetBx !== "number" || typeof nav.targetBy !== "number";
+        if (movedBlock) {
             nav.turnSeed = (nav.turnSeed + 0.381966011) % 1.0;
-            const curDirs = onTrueRoad ? curDirsNow : [];
-            if (curDirs.length <= 1) {
-                nav.turnedInIntersection = false;
-                nav.entryAngle = a;
-            }
+            const refAngle = typeof nav.chosenAngle === "number" ? nav.chosenAngle : a;
+            const entryAng = curLid1 === 25 && typeof nav.entryAngle === "number" ? nav.entryAngle : refAngle;
+            nav.blockX = bx;
+            nav.blockY = by;
             const nextStep = onTrueRoad
                 ? ((nav.role && Number.isFinite(nav.goalX) && Number.isFinite(nav.goalY))
-                    ? serverMap.chooseTargetGuidedRoadBlock(bx, by, a, nav.goalX, nav.goalY, z, nav.turnedInIntersection, nav.entryAngle)
-                    : serverMap.chooseNextRoadBlock(bx, by, a, z, nav.turnSeed, nav.turnedInIntersection, nav.entryAngle))
+                    ? serverMap.chooseTargetGuidedRoadBlock(bx, by, refAngle, nav.goalX, nav.goalY, z, Boolean(nav.turnedInIntersection), entryAng)
+                    : serverMap.chooseNextRoadBlock(bx, by, refAngle, z, nav.turnSeed, Boolean(nav.turnedInIntersection), entryAng))
                 : null;
             if (nextStep) {
                 nav.targetBx = nextStep.bx;
                 nav.targetBy = nextStep.by;
-                nav.targetAngle = nextStep.angle;
+                nav.chosenDx = nextStep.dx || 0;
+                nav.chosenDy = nextStep.dy || 0;
+                nav.chosenAngle = nextStep.angle;
+                nav.isTurn = Boolean(nextStep.isTurn);
                 if (nextStep.isTurn) nav.turnedInIntersection = true;
             } else {
                 const nearestRd = snapStationToNearestRoad(x, y);
@@ -2914,42 +2917,128 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 const rby = Math.floor(nearestRd.y / TS);
                 nav.targetBx = rbx;
                 nav.targetBy = rby;
-                nav.targetAngle = nearestRd.angle || 0;
+                nav.chosenDx = Math.round(Math.cos(nearestRd.angle || 0));
+                nav.chosenDy = Math.round(Math.sin(nearestRd.angle || 0));
+                nav.chosenAngle = nearestRd.angle || 0;
+                nav.isTurn = false;
                 x += (nearestRd.x - x) * Math.min(1, dt * 3.5);
                 y += (nearestRd.y - y) * Math.min(1, dt * 3.5);
             }
         }
 
-        const tx = (nav.targetBx + 0.5) * TS;
-        const ty = (nav.targetBy + 0.5) * TS;
-        const desiredAng = (tx !== x || ty !== y) ? Math.atan2(ty - y, tx - x) : a;
-        let angDiff = desiredAng - a;
-        while (angDiff > Math.PI) angDiff -= Math.PI * 2;
-        while (angDiff < -Math.PI) angDiff += Math.PI * 2;
-        const maxTurn = 7.8 * dt;
-        if (Math.abs(angDiff) <= maxTurn) a = desiredAng;
-        else a += Math.sign(angDiff) * maxTurn;
+        // Smooth Pure-Pursuit Lane Centering & R=32px Quarter-Circle Intersection Turn Tangents
+        const outDx = nav.chosenDx || 0;
+        const outDy = nav.chosenDy || 0;
+        const outAng = typeof nav.chosenAngle === "number" ? nav.chosenAngle : a;
+        const entryCard = Math.round((typeof nav.entryAngle === "number" ? nav.entryAngle : a) / (Math.PI * 0.5)) * (Math.PI * 0.5);
+        const inDx = Math.round(Math.cos(entryCard));
+        const inDy = Math.round(Math.sin(entryCard));
+        let desiredAng = outAng;
+        if (nav.isTurn && (inDx !== 0 || inDy !== 0) && (outDx !== 0 || outDy !== 0) && (inDx * outDx + inDy * outDy === 0)) {
+            const cx = (bx + 0.5) * TS;
+            const cy = (by + 0.5) * TS;
+            const R = 32.0;
+            const pivX = cx - inDx * R + outDx * R;
+            const pivY = cy - inDy * R + outDy * R;
+            const a0 = (x - pivX) * (-outDx) + (y - pivY) * (-outDy);
+            const a1 = (x - pivX) * inDx + (y - pivY) * inDy;
+            const phi = Math.max(0, Math.min(Math.PI * 0.5, Math.atan2(Math.max(0, a1), Math.max(0.01, a0))));
+            const sAhead = phi * R + 16.0;
+            const arcTotal = Math.PI * 0.5 * R;
+            let aimX, aimY;
+            if (sAhead <= arcTotal) {
+                const phiAim = sAhead / R;
+                aimX = pivX + ((-outDx) * Math.cos(phiAim) + inDx * Math.sin(phiAim)) * R;
+                aimY = pivY + ((-outDy) * Math.cos(phiAim) + inDy * Math.sin(phiAim)) * R;
+            } else {
+                const extra = sAhead - arcTotal;
+                aimX = cx + outDx * (R + extra);
+                aimY = cy + outDy * (R + extra);
+            }
+            desiredAng = Math.atan2(aimY - y, aimX - x);
+        } else if (outDx !== 0) {
+            const dyErr = ((by + 0.5) * TS - y) * (outDx > 0 ? 1 : -1);
+            desiredAng = outAng + Math.max(-0.22, Math.min(0.22, Math.atan2(dyErr, 44.0)));
+        } else if (outDy !== 0) {
+            const dxErr = ((bx + 0.5) * TS - x) * (outDy > 0 ? -1 : 1);
+            desiredAng = outAng + Math.max(-0.22, Math.min(0.22, Math.atan2(dxErr, 44.0)));
+        }
 
-        // Check red traffic light when approaching intersection (unless emergency siren is active)
+        // Pre-Crosswalk FDOT Stop-Bar Traffic Light Staging & Exit-Clearance Check (Zero Crosswalk Stopping!)
         let targetSpd = getServerVehicleCruiseSpeed(specKey, drvCode, sirenActive, vid);
+        if (nav.isTurn) targetSpd = Math.min(targetSpd, 72);
         let stoppedAtRedLight = false;
-        if (!sirenActive && serverMap.isRedLightForApproach) {
-            const hdx = Math.round(Math.cos(a));
-            const hdy = Math.round(Math.sin(a));
-            if ((hdx !== 0 || hdy !== 0) && serverMap.isRedLightForApproach(bx, by, hdx, hdy, room.trafficLightTimer, z)) {
-                targetSpd = 0;
-                stoppedAtRedLight = true;
+        if (!sirenActive && curLid1 !== 25 && (outDx !== 0 || outDy !== 0) && serverMap.getBlockInfo) {
+            let stepsToBox = 0;
+            if (serverMap.getBlockInfo(bx + outDx, by + outDy, 1).lid === 25) stepsToBox = 1;
+            else if (serverMap.getBlockInfo(bx + outDx * 2, by + outDy * 2, 1).lid === 25) stepsToBox = 2;
+            if (stepsToBox > 0) {
+                const boxBx = bx + outDx * stepsToBox;
+                const boxBy = by + outDy * stepsToBox;
+                const boxCx = (boxBx + 0.5) * TS;
+                const boxCy = (boxBy + 0.5) * TS;
+                const distToBox = (boxCx - x) * outDx + (boxCy - y) * outDy;
+                const cwTileX = boxBx - outDx;
+                const cwTileY = boxBy - outDy;
+                const hasCw = serverMap.getCrosswalkBoxDir
+                    ? serverMap.getCrosswalkBoxDir(cwTileX, cwTileY) >= 0
+                    : Boolean(serverMap.isStopLineBlock && serverMap.isStopLineBlock(cwTileX, cwTileY));
+                const srvStopDist = (hasCw ? 68 : 40) + 31; // Front bumper stops behind FDOT White Stop Bar!
+                const lightRed = serverMap.isRedLightForApproach && serverMap.isRedLightForApproach(cwTileX, cwTileY, outDx, outDy, room.trafficLightTimer, z);
+                const ph = (((room.trafficLightTimer || 0) % 12.0) + 12.0) % 12.0;
+                const isNS = Math.abs(outDy) >= Math.abs(outDx);
+                const hasSig = serverMap.hasTrafficSignalNear && serverMap.hasTrafficSignalNear(boxCx, boxCy, 380);
+                const staleGreen = hasSig && !lightRed && distToBox >= srvStopDist - 3 && (
+                    (isNS && ph >= 3.85 && ph < 4.6) || (!isNS && ph >= 9.85 && ph < 10.6)
+                );
+                // Server "Don't Block the Box": hold behind the upstream stop bar if any slow/stopped vehicle occupies the box or exit throat ahead!
+                let srvBoxBlocked = false;
+                if (distToBox >= srvStopDist - 5 && distToBox <= srvStopDist + 70) {
+                    const gx0 = x >> 8, gy0 = y >> 8;
+                    for (let sdy = -1; sdy <= 1 && !srvBoxBlocked; sdy++) {
+                        for (let sdx = -1; sdx <= 1 && !srvBoxBlocked; sdx++) {
+                            const bkt = cellBuckets.get(((gy0 + sdy) << 8) | (gx0 + sdx));
+                            if (!bkt) continue;
+                            for (let bi = 0; bi < bkt.length; bi++) {
+                                const ov = bkt[bi];
+                                if (ov === row || !Number.isFinite(ov[2]) || !Number.isFinite(ov[3])) continue;
+                                const fwd = (ov[2] - x) * outDx + (ov[3] - y) * outDy;
+                                const lat = Math.abs(-(ov[2] - x) * outDy + (ov[3] - y) * outDx);
+                                if (fwd > distToBox - 34 && fwd < distToBox + 215 && lat < 24) {
+                                    const ovSpd = Math.hypot(ov[6] || 0, ov[7] || 0);
+                                    const ovCos = Math.cos((ov[5] || 0) - outAng);
+                                    if (ovCos > 0.55 && ovSpd < 16) {
+                                        srvBoxBlocked = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if ((lightRed || staleGreen || srvBoxBlocked) && distToBox >= srvStopDist - 5) {
+                    const rem = distToBox - srvStopDist;
+                    if (rem <= 6) {
+                        targetSpd = 0;
+                        stoppedAtRedLight = true;
+                    } else if (rem < 58) {
+                        targetSpd = Math.min(targetSpd, Math.max(12, rem * 1.15));
+                    }
+                }
             }
         }
 
-        // Check lead vehicle spacing in spatial hash (scales lookahead with speed so fast supercars brake smoothly behind slower vehicles!)
+        // Check lead vehicle spacing in spatial hash + Queue Crosswalk/Box Keep-Clear!
         if (targetSpd > 0) {
             const cfx = Math.cos(a);
             const cfy = Math.sin(a);
             const gx = x >> 8;
             const gy = y >> 8;
-            const leadLookAhead = Math.max(88, targetSpd * 0.72);
+            const leadLookAhead = Math.max(115, targetSpd * 0.80);
             let blockedByLead = false;
+            const nowOnCw = serverMap.doesVehicleOverlapCrosswalkOrBox
+                ? serverMap.doesVehicleOverlapCrosswalkOrBox(x, y, a, 30, 12, true)
+                : false;
             for (let dy = -1; dy <= 1 && !blockedByLead; dy++) {
                 for (let dx = -1; dx <= 1 && !blockedByLead; dx++) {
                     const bucket = cellBuckets.get(((gy + dy) << 8) | (gx + dx));
@@ -2966,15 +3055,39 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                             const otherSpd = Math.hypot(other[6] || 0, other[7] || 0);
                             const otherAng = Number.isFinite(other[5]) ? other[5] : a;
                             const cosOther = Math.cos(otherAng - a);
-                            // Ignore oncoming cars in adjacent opposite lanes, and break mutual crossing standoffs deterministically
                             if ((otherSpd > 5 && cosOther < -0.15) || (cosOther < -0.55 && lat > 13)) continue;
                             if (Math.abs(cosOther) <= 0.55 && otherSpd < 4 && (sirenActive || String(vid) > String(other[0])) && fwd > 38) continue;
-                            targetSpd = fwd < 58 ? 0 : Math.min(targetSpd, otherSpd * 0.90);
-                            if (targetSpd === 0) blockedByLead = true;
+                            let minCenterGap = nowOnCw ? 62 : 74;
+                            if (!nowOnCw && otherSpd < 8 && serverMap.doesVehicleOverlapCrosswalkOrBox) {
+                                const restAdv = Math.max(0, fwd - minCenterGap);
+                                if (serverMap.doesVehicleOverlapCrosswalkOrBox(x + cfx * restAdv, y + cfy * restAdv, a, 31, 13, true)) {
+                                    let lo = 0, hi = restAdv;
+                                    for (let it = 0; it < 5; it++) {
+                                        const mid = (lo + hi) * 0.5;
+                                        if (serverMap.doesVehicleOverlapCrosswalkOrBox(x + cfx * mid, y + cfy * mid, a, 31, 13, true)) hi = mid;
+                                        else lo = mid;
+                                    }
+                                    minCenterGap = Math.max(minCenterGap, fwd - Math.max(0, lo - 4.0));
+                                }
+                            }
+                            if (fwd < minCenterGap + (otherSpd < 5 ? 6 : 0)) {
+                                targetSpd = 0;
+                                blockedByLead = true;
+                            } else {
+                                targetSpd = Math.min(targetSpd, otherSpd * 0.90 + Math.max(0, fwd - minCenterGap) * 0.85);
+                            }
                         }
                     }
                 }
             }
+        }
+        if (targetSpd > 1) {
+            let angDiff = desiredAng - a;
+            while (angDiff > Math.PI) angDiff -= Math.PI * 2;
+            while (angDiff < -Math.PI) angDiff += Math.PI * 2;
+            const maxTurn = Math.min(dt * 4.5, (targetSpd * dt) / 22.0 + dt * 0.15);
+            if (Math.abs(angDiff) <= maxTurn) a = desiredAng;
+            else a += Math.sign(angDiff) * maxTurn;
         }
         if (targetSpd === 0 && !stoppedAtRedLight) {
             nav.stuckTicks = (nav.stuckTicks || 0) + 1;

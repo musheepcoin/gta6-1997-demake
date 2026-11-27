@@ -14110,7 +14110,7 @@ class LeonidaGame {
         for (let ai = 0; ai < activeVehs.length; ai++) {
 
             const a = activeVehs[ai];
-            const aRad = Math.max(10, Math.min(16, (a.h || 28) * 0.45));
+            const aRad = Math.max(a.isMotorcycle ? 6.5 : 10, Math.min(16, (a.h || 28) * 0.45));
             const aHalfL = Math.max(0, (a.w || 62) * 0.50 - aRad);
             const aCos = Math.cos(a.angle), aSin = Math.sin(a.angle);
             const ax0 = a.x + aCos * aHalfL, ay0 = a.y + aSin * aHalfL;
@@ -14138,7 +14138,7 @@ class LeonidaGame {
 
                 if (a.towingVehicle === b || b.towingVehicle === a || a.towTarget === b || b.towTarget === a) continue;
 
-                const bRad = Math.max(10, Math.min(16, (b.h || 28) * 0.45));
+                const bRad = Math.max(b.isMotorcycle ? 6.5 : 10, Math.min(16, (b.h || 28) * 0.45));
 
                 const bHalfL = Math.max(0, (b.w || 62) * 0.50 - bRad);
 
@@ -14354,13 +14354,15 @@ class LeonidaGame {
 
                                 const rSin = Math.sin(rear.angle);
 
-                                const sep = bestOverlap + 2.0;
-
-                                clampShovedVehToWorld(rear, rear.x - rCos * sep, rear.y - rSin * sep);
+                                const sep = Math.min(bestOverlap + 0.5, 1.8);
 
                                 const frontSpd = Math.max(0, Math.hypot(front.vx, front.vy) * 0.85);
 
-                                const rearSpd = Math.min(Math.hypot(rear.vx, rear.vy), frontSpd);
+                                if (frontSpd > 2 || bestOverlap > 2.5) {
+                                    clampShovedVehToWorld(rear, rear.x - rCos * sep, rear.y - rSin * sep);
+                                }
+
+                                const rearSpd = frontSpd < 2 ? 0 : Math.min(Math.hypot(rear.vx, rear.vy), frontSpd);
 
                                 rear.vx = rCos * rearSpd;
 
@@ -17674,9 +17676,17 @@ class LeonidaGame {
                             // Subtle right-hand sidewalk lane offset (9px, or 4px for a formation leader so their partner fits alongside)
                             const rightPerpX = -Math.sin(nextStep.angle);
                             const rightPerpY = Math.cos(nextStep.angle);
-                            const laneOff = ped.formationRole === "LEADER" ? 4.0 : 9.0;
+                            const laneOff = ped.formationRole === "LEADER" ? 4.0 : (ped.isCrossingRoad ? 5.0 : 9.0);
                             ped.targetOffX = rightPerpX * laneOff;
                             ped.targetOffY = rightPerpY * laneOff;
+                            // When crossing on a painted FDOT Continental Crosswalk tile, align walking path directly onto the zebra bars (0..19px from junction edge)!
+                            if (ped.isCrossingRoad && typeof this.map.getCrosswalkBoxDir === "function") {
+                                const cwDir = this.map.getCrosswalkBoxDir(ped.targetBx, ped.targetBy);
+                                if (cwDir === 0) ped.targetOffY -= 18.0;
+                                else if (cwDir === 1) ped.targetOffY += 18.0;
+                                else if (cwDir === 2) ped.targetOffX -= 18.0;
+                                else if (cwDir === 3) ped.targetOffX += 18.0;
+                            }
 
                             const centerTx = (ped.targetBx + 0.5) * TILE_SIZE;
                             const centerTy = (ped.targetBy + 0.5) * TILE_SIZE;

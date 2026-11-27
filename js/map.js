@@ -5859,6 +5859,94 @@ class LeonidaMap {
         return Boolean(blk && (blk.lid === 24 || blk.trafficHint === 1));
     }
 
+    _ensureCrosswalkDirMask() {
+        if (this._crosswalkDirMask) return this._crosswalkDirMask;
+        const mask = new Int8Array(MAP_COLS * MAP_ROWS);
+        mask.fill(-1);
+        if (this.stopLineMask) {
+            const isBox = (x, y) => {
+                if (x < 0 || x >= MAP_COLS || y < 0 || y >= MAP_ROWS) return false;
+                const b = this.getBlockInfo(x, y, 1);
+                return Boolean(b && b.lid === 25);
+            };
+            for (let y = 1; y < MAP_ROWS - 1; y++) {
+                const rowOff = y * MAP_COLS;
+                for (let x = 1; x < MAP_COLS - 1; x++) {
+                    if (this.stopLineMask[rowOff + x] !== 1) continue;
+                    const b = this.getBlockInfo(x, y, 1);
+                    if (!b || b.lid === 25) continue;
+                    if (isBox(x, y - 1)) mask[rowOff + x] = 0;      // Junction box North
+                    else if (isBox(x, y + 1)) mask[rowOff + x] = 1; // Junction box South
+                    else if (isBox(x - 1, y)) mask[rowOff + x] = 2; // Junction box West
+                    else if (isBox(x + 1, y)) mask[rowOff + x] = 3; // Junction box East
+                }
+            }
+        }
+        this._crosswalkDirMask = mask;
+        return mask;
+    }
+
+    getCrosswalkBoxDir(bx, by) {
+        if (bx < 0 || bx >= MAP_COLS || by < 0 || by >= MAP_ROWS) return -1;
+        return this._ensureCrosswalkDirMask()[by * MAP_COLS + bx];
+    }
+
+    doesVehicleOverlapCrosswalkOrBox(vx, vy, vang, halfL, halfW, includeBox = false) {
+        const cwMask = this._ensureCrosswalkDirMask();
+        const cbx = vx >> 6;
+        const cby = vy >> 6;
+        const c = Math.cos(vang || 0);
+        const s = Math.sin(vang || 0);
+        const ac = Math.abs(c);
+        const as = Math.abs(s);
+        const KEEP_CLEAR_DEPTH = 29.0; // Covers painted FDOT Zebra Bars (2..19.2px) + Transverse White Stop Bar (24..28.2px)
+        for (let dy = -1; dy <= 1; dy++) {
+            const ty = cby + dy;
+            if (ty < 1 || ty >= MAP_ROWS - 1) continue;
+            const rowOff = ty * MAP_COLS;
+            for (let dx = -1; dx <= 1; dx++) {
+                const tx = cbx + dx;
+                if (tx < 1 || tx >= MAP_COLS - 1) continue;
+                const cwDir = cwMask[rowOff + tx];
+                if (cwDir >= 0) {
+                    let rx0 = tx * TILE_SIZE + 3, rx1 = (tx + 1) * TILE_SIZE - 3;
+                    let ry0 = ty * TILE_SIZE + 3, ry1 = (ty + 1) * TILE_SIZE - 3;
+                    if (cwDir === 0) { ry0 = ty * TILE_SIZE; ry1 = ty * TILE_SIZE + KEEP_CLEAR_DEPTH; }
+                    else if (cwDir === 1) { ry0 = (ty + 1) * TILE_SIZE - KEEP_CLEAR_DEPTH; ry1 = (ty + 1) * TILE_SIZE; }
+                    else if (cwDir === 2) { rx0 = tx * TILE_SIZE; rx1 = tx * TILE_SIZE + KEEP_CLEAR_DEPTH; }
+                    else if (cwDir === 3) { rx0 = (tx + 1) * TILE_SIZE - KEEP_CLEAR_DEPTH; rx1 = (tx + 1) * TILE_SIZE; }
+                    const rcx = (rx0 + rx1) * 0.5, rcy = (ry0 + ry1) * 0.5;
+                    const rhl = (rx1 - rx0) * 0.5, rhw = (ry1 - ry0) * 0.5;
+                    const odx = vx - rcx, ody = vy - rcy;
+                    if (
+                        Math.abs(odx) <= rhl + halfL * ac + halfW * as &&
+                        Math.abs(ody) <= rhw + halfL * as + halfW * ac &&
+                        Math.abs(odx * c + ody * s) <= halfL + rhl * ac + rhw * as &&
+                        Math.abs(-odx * s + ody * c) <= halfW + rhl * as + rhw * ac
+                    ) {
+                        return true;
+                    }
+                } else if (includeBox) {
+                    const blk = this.getBlockInfo(tx, ty, 1);
+                    if (blk && blk.lid === 25) {
+                        const rcx = (tx + 0.5) * TILE_SIZE, rcy = (ty + 0.5) * TILE_SIZE;
+                        const rhl = 29.5, rhw = 29.5;
+                        const odx = vx - rcx, ody = vy - rcy;
+                        if (
+                            Math.abs(odx) <= rhl + halfL * ac + halfW * as &&
+                            Math.abs(ody) <= rhw + halfL * as + halfW * ac &&
+                            Math.abs(odx * c + ody * s) <= halfL + rhl * ac + rhw * as &&
+                            Math.abs(-odx * s + ody * c) <= halfW + rhl * as + rhw * ac
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     isRedLightForApproach(bx, by, hdx, hdy, trafficLightTimer = 0, zBlocks = 2.0) {
         if (bx < 1 || bx >= MAP_COLS - 1 || by < 1 || by >= MAP_ROWS - 1) return false;
         const curLid = this.getBlockInfo(bx, by, 1).lid;
