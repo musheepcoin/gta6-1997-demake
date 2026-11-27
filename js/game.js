@@ -9621,54 +9621,187 @@ class LeonidaGame {
 
 
 
-    emitPressurizedWaterJet(nozX, nozY, aimAngle, targetDist, isDeckGun = false, targetEntity = null) {
+    emitPressurizedWaterJet(nozX, nozY, aimAngle, targetDist, isDeckGun = false, targetEntity = null, opts = null) {
         if (!Array.isArray(this.particles)) return;
-        if (this.particles.length >= 640) {
-            this.particles.splice(0, this.particles.length - 575);
+        if (this.particles.length >= 630) {
+            this.particles.splice(0, this.particles.length - 560);
         }
-        // Compute exact travel distance so the pressurized stream reaches 100% of the way onto the target (or stops cleanly against a solid 3D wall!)
-        let reachPx = Math.max(22, Math.min(isDeckGun ? 325 : 265, targetDist));
-        if (!targetEntity && this.map && typeof this.map.traceSegment2D === "function") {
-            const endX = nozX + Math.cos(aimAngle) * reachPx;
-            const endY = nozY + Math.sin(aimAngle) * reachPx;
-            const hit = this.map.traceSegment2D(nozX, nozY, endX, endY, 2.0);
-            if (hit && hit.hit && typeof hit.x === "number" && typeof hit.y === "number") {
-                reachPx = Math.max(16, Math.hypot(hit.x - nozX, hit.y - nozY) - 4);
-            }
-        }
-        const baseSpeed = isDeckGun ? 440 : 385;
-        const slugCount = isDeckGun ? 2 : 2;
+        // Real-world calibrated VCFD nozzle ranges at Vice City 26 scale (~12 px = 1 meter, 1 car ≈ 56 px = 4.6 m):
+        // - Rooftop Deck-Gun Monitor (1000 GPM): up to 375 px (~31 m ≈ 6.2 car lengths, spans a full 4-lane boulevard + sidewalks!)
+        // - Handheld 1.75" Attack Hose (150 GPM): up to 190 px (~16 m ≈ 3.1 car lengths)
+        const maxNozzleReach = isDeckGun ? 375 : 190;
+        const desiredReach = Math.max(24, Math.min(maxNozzleReach, targetDist || maxNozzleReach));
+        const carrierVx = (opts && typeof opts.carrierVx === "number") ? opts.carrierVx : 0;
+        const carrierVy = (opts && typeof opts.carrierVy === "number") ? opts.carrierVy : 0;
+        const sourceVeh = (opts && opts.sourceVeh) ? opts.sourceVeh : null;
+        const fromPlayer = Boolean(opts && opts.fromPlayer);
+        const refZ = (opts && typeof opts.sourceZ === "number")
+            ? opts.sourceZ
+            : ((sourceVeh && typeof sourceVeh.z === "number") ? sourceVeh.z : 2.0);
+        const nozFloorZ = (this.map && typeof this.map.getHeightAtPixel === "function")
+            ? this.map.getHeightAtPixel(nozX, nozY, refZ)
+            : refZ;
+        const startZ = nozFloorZ + (isDeckGun ? 0.165 : 0.075);
+
+        // 3D Parabolic Ballistics + Aerodynamic Drag (`dragK`):
+        // With horizontal drag dv/dt = -dragK * v, distance x(t) = (v0 / dragK) * (1 - exp(-dragK * t)).
+        // Solving for flight time `tFlight` to reach `desiredReach`, and vertical launch `vz0` under gravity `WATER_GRAV = 1.05`!
+        const baseSpeed = isDeckGun ? 510 : 395;
+        const dragK = isDeckGun ? 0.82 : 1.02;
+        const WATER_GRAV = 1.05;
+        const slugCount = 3;
+
         for (let k = 0; k < slugCount; k++) {
-            const spread = (Math.random() - 0.5) * (isDeckGun ? 0.085 : 0.070);
+            const spread = (Math.random() - 0.5) * (isDeckGun ? 0.052 : 0.046);
             const sAng = aimAngle + spread;
-            const spd = baseSpeed * (0.94 + Math.random() * 0.12);
-            const jitterDist = reachPx + (Math.random() - 0.5) * 14;
-            const flightDur = Math.max(0.08, Math.min(0.88, jitterDist / spd));
-            const leadOffset = k * 7.5;
+            const spd = baseSpeed * (0.96 + Math.random() * 0.08);
+            const jitterReach = Math.min(maxNozzleReach + 8, desiredReach + (Math.random() - 0.5) * 12);
+            const maxHorizAsymptote = spd / dragK;
+            const ratio = Math.min(0.86, jitterReach / maxHorizAsymptote);
+            const flightDur = Math.max(0.09, Math.min(1.05, -Math.log(1.0 - ratio) / dragK));
+            // Target landing height (~0.04 blocks above ground, or slightly higher when aimed onto a vehicle hull)
+            const targetLandZ = nozFloorZ + (targetEntity ? 0.06 : 0.02);
+            const vz0 = ((targetLandZ - startZ) + 0.5 * WATER_GRAV * flightDur * flightDur) / flightDur;
+            const leadTime = (k / slugCount) * 0.036;
+            const vx0 = Math.cos(sAng) * spd + carrierVx;
+            const vy0 = Math.sin(sAng) * spd + carrierVy;
+
             this.particles.push({
-                x: nozX + Math.cos(sAng) * leadOffset,
-                y: nozY + Math.sin(sAng) * leadOffset,
-                vx: Math.cos(sAng) * spd,
-                vy: Math.sin(sAng) * spd,
+                x: nozX + vx0 * leadTime,
+                y: nozY + vy0 * leadTime,
+                z: startZ + vz0 * leadTime - 0.5 * WATER_GRAV * leadTime * leadTime,
+                vx: vx0 * (1.0 - dragK * leadTime),
+                vy: vy0 * (1.0 - dragK * leadTime),
+                vz: vz0 - WATER_GRAV * leadTime,
+                grav: WATER_GRAV,
+                dragK,
+                traveled: spd * leadTime,
+                maxReach: maxNozzleReach,
                 ang: sAng,
-                baseScale: isDeckGun ? 0.88 : 0.72,
-                peakZ: isDeckGun ? 0.20 : 0.10,
-                kind: "WATER_JET",
-                color: "#38bdf8",
+                seed: Math.random() * 12.0,
+                isDeckGun,
+                isPrimarySlug: k === 0,
                 spawnSplash: k === 0,
-                life: Math.max(0.05, flightDur - leadOffset / spd),
+                sourceVeh,
+                fromPlayer,
+                kind: "WATER_JET",
+                color: "#e0f2fe",
+                life: Math.max(0.04, flightDur - leadTime),
                 maxLife: flightDur
             });
         }
-        // Subtle pressurized water-rush sound when spraying near the player
-        if (this.audio && this.player && Math.hypot(nozX - this.player.x, nozY - this.player.y) < 520) {
+
+        // Occasional fine lateral air-shear spray droplet tearing off the main stream
+        if (Math.random() < 0.45 && this.particles.length < 635) {
+            const mAng = aimAngle + (Math.random() - 0.5) * 0.22;
+            const mSpd = (isDeckGun ? 240 : 185) * (0.75 + Math.random() * 0.45);
+            this.particles.push({
+                x: nozX + Math.cos(aimAngle) * 18,
+                y: nozY + Math.sin(aimAngle) * 18,
+                vx: Math.cos(mAng) * mSpd + carrierVx,
+                vy: Math.sin(mAng) * mSpd + carrierVy,
+                rot: mAng,
+                size: 2.2 + Math.random() * 1.4,
+                foam: true,
+                kind: "WATER_DROP",
+                color: "#e0f2fe",
+                life: 0.24,
+                maxLife: 0.24
+            });
+        }
+
+        // Pressurized water-rush & nozzle hiss audio when spraying near the player
+        if (this.audio && this.player && Math.hypot(nozX - this.player.x, nozY - this.player.y) < 560) {
             const nowMs = performance.now();
             if (nowMs - (this._lastWaterJetSfxAt || 0) > 85) {
                 this._lastWaterJetSfxAt = nowMs;
                 const d = Math.hypot(nozX - this.player.x, nozY - this.player.y);
-                const prox = Math.max(0.15, 1 - d / 520);
-                this.audio.playBandNoise(0.095, isDeckGun ? 1250 : 1550, 0.95, 0.015 * prox);
+                const prox = Math.max(0.15, 1 - d / 560);
+                this.audio.playBandNoise(0.095, isDeckGun ? 1180 : 1480, 0.90, 0.015 * prox);
             }
+        }
+    }
+
+    triggerWaterImpactAt(pt, hitNormalX = 0, hitNormalY = 0, hitHotSurface = false) {
+        const hitX = pt.x;
+        const hitY = pt.y;
+        const floorZ = (this.map && typeof this.map.getHeightAtPixel === "function")
+            ? this.map.getHeightAtPixel(hitX, hitY, 2.0)
+            : 2.0;
+        const isDeck = Boolean(pt.isDeckGun);
+
+        // 1. Convert arriving water slug in-place into an organic foaming mist burst (GPU Shader Mode C, modeType = 1)
+        pt.kind = "WATER_SPLASH";
+        pt.vx = hitNormalX * 8;
+        pt.vy = hitNormalY * 8;
+        pt.vz = 0;
+        pt.z = Math.max(floorZ + 0.04, Math.min(floorZ + 0.20, pt.z || (floorZ + 0.05)));
+        pt.baseScale = isDeck ? 0.94 : 0.74;
+        pt.rot = Math.random() * 6.283;
+        pt.life = 0.36;
+        pt.maxLife = 0.36;
+
+        // 2. Spawn rebounding fine water droplets (biased along surface reflection if hitting a wall/vehicle!)
+        if (this.particles.length < 632) {
+            const hasNormal = (hitNormalX !== 0 || hitNormalY !== 0);
+            const baseReflAng = hasNormal ? Math.atan2(hitNormalY, hitNormalX) : Math.random() * 6.283;
+            for (let di = 0; di < 2; di++) {
+                const dAng = hasNormal
+                    ? (baseReflAng + (Math.random() - 0.5) * 1.65)
+                    : (Math.random() * 6.283);
+                const dSpd = (isDeck ? 58 : 42) + Math.random() * 58;
+                this.particles.push({
+                    x: hitX,
+                    y: hitY,
+                    vx: Math.cos(dAng) * dSpd,
+                    vy: Math.sin(dAng) * dSpd,
+                    rot: dAng,
+                    size: 2.4 + Math.random() * 1.4,
+                    foam: true,
+                    kind: "WATER_DROP",
+                    color: "#e0f2fe",
+                    life: 0.24,
+                    maxLife: 0.24
+                });
+            }
+        }
+
+        // 3. Extinguish any live ground FIRE particles within 24px and convert hot impacts into rising white STEAM!
+        let dousedFlameParticle = false;
+        for (let fi = 0; fi < this.particles.length; fi++) {
+            const fp = this.particles[fi];
+            if (fp && fp.kind === "FIRE" && Math.abs(fp.x - hitX) < 24 && Math.abs(fp.y - hitY) < 24) {
+                fp.kind = "SMOKE";
+                fp.color = "#e2e8f0";
+                fp.vx = (Math.random() - 0.5) * 20;
+                fp.vy = (Math.random() - 0.5) * 20 - 12;
+                fp.life = Math.max(fp.life, 0.55);
+                fp.maxLife = 0.65;
+                dousedFlameParticle = true;
+            }
+        }
+        if ((hitHotSurface || dousedFlameParticle) && Math.random() < 0.72) {
+            this.spawnParticle(hitX + (Math.random() - 0.5) * 16, hitY + (Math.random() - 0.5) * 16, "WHITE_SMOKE");
+        }
+
+        // 4. Deposit realistic dark-wet specular runoff puddles on asphalt / sidewalks (GPU Shader Mode D)
+        const pTick = this._waterPuddleTick || 0;
+        this._waterPuddleTick = (pTick + 1) % 3;
+        if (pTick === 0 && (!this.map || !this.map.isWaterAtPixel || !this.map.isWaterAtPixel(hitX, hitY))) {
+            const pW = (isDeck ? 18.0 : 14.0) + Math.random() * 7.5;
+            this.addSkidmark(hitX + (Math.random() - 0.5) * 6, hitY + (Math.random() - 0.5) * 6, {
+                z: floorZ,
+                angle: Math.random() * 6.283,
+                w: pW,
+                h: pW * (0.78 + Math.random() * 0.28),
+                r: 0.05,
+                g: 0.08,
+                b: 0.12,
+                alpha: 0.42,
+                life: 8.5,
+                maxLife: 8.5,
+                surface: "WATER_PUDDLE"
+            });
         }
     }
 
@@ -13407,78 +13540,50 @@ class LeonidaGame {
                 const mySeat = p.seatIndex || 0;
 
                 if (v && v.specKey === "FIRE_TRUCK" && mySeat === 0) {
-                    // Rooftop High-Pressure Water Cannon when driving a Fire Truck!
-                    p.shootCooldown = 0.042;
-                    const cannonAng = shotAngle;
+                    // Rooftop High-Pressure Deck-Gun Water Monitor (~375px = 31m reach, hydraulic slew inertia & velocity inheritance!)
+                    p.shootCooldown = 0.040;
+                    const prevCannonAng = typeof v._cannonAngle === "number" ? v._cannonAngle : (v.angle || 0);
+                    const angErr = Math.atan2(Math.sin(shotAngle - prevCannonAng), Math.cos(shotAngle - prevCannonAng));
+                    const maxSlewStep = 6.4 * 0.040;
+                    const cannonAng = prevCannonAng + Math.max(-maxSlewStep, Math.min(maxSlewStep, angErr));
                     v._cannonAngle = cannonAng;
                     v._sprayingCannonTimer = 0.16;
-                    const nozX = v.x + Math.cos(v.angle || 0) * 8 + Math.cos(cannonAng) * 16;
-                    const nozY = v.y + Math.sin(v.angle || 0) * 8 + Math.sin(cannonAng) * 16;
-                    let closestTargetDist = 255;
+                    const vCos = Math.cos(v.angle || 0), vSin = Math.sin(v.angle || 0);
+                    const nozX = v.x + vCos * 22.0 + Math.cos(cannonAng) * 12.0;
+                    const nozY = v.y + vSin * 22.0 + Math.sin(cannonAng) * 12.0;
+
+                    // Determine desired elevation/range: full 375px open reach, or depress nozzle onto the closest vehicle/burning-ped target in the stream cone
+                    let aimReachPx = 375;
                     let hitVehTarget = null;
-                    // Extinguish burning vehicles / wrecks & knock back pedestrians in the water stream cone (up to 265px!)
                     for (const ov of this.vehicles) {
-                        if (ov === v) continue;
-                        const dx = ov.x - v.x;
-                        const dy = ov.y - v.y;
+                        if (!ov || ov === v) continue;
+                        const dx = ov.x - nozX;
+                        const dy = ov.y - nozY;
                         const dist = Math.hypot(dx, dy);
-                        if (dist > 265) continue;
+                        if (dist > 385) continue;
                         const aDiff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - cannonAng), Math.cos(Math.atan2(dy, dx) - cannonAng)));
-                        if (aDiff > 0.34) continue;
-                        if (dist < closestTargetDist) {
-                            closestTargetDist = Math.max(28, dist - 18);
+                        if (aDiff <= 0.24 && dist < aimReachPx) {
+                            aimReachPx = Math.max(28, dist - 8);
                             hitVehTarget = ov;
                         }
-                        const wasBurning = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
-                        if (wasBurning) {
-                            ov.extinguishProgress = (ov.extinguishProgress || 0) + 0.10;
-                            if (Math.random() < 0.65) {
-                                this.spawnParticle(ov.x + (Math.random() - 0.5) * 22, ov.y + (Math.random() - 0.5) * 22, "WHITE_SMOKE");
-                            }
-                            if (!ov.destroyed) {
-                                ov.hp = Math.min(ov.maxHp, Math.max(ov.hp + 6.5, 60));
-                                ov.burnTimer = 0;
-                                ov.chainExplodeTimer = 0;
-                                if (ov.extinguishProgress >= 1.1 && !ov._playerFireReward) {
-                                    ov._playerFireReward = true;
-                                    this.score += 150;
-                                    this.addFloatingText(ov.x, ov.y - 24, "🚒 VCFD +$150 — FIRE EXTINGUISHED!", "#38bdf8");
-                                    this.updateHud();
-                                }
-                            } else if (ov.extinguishProgress >= 1.5 && !ov.fireExtinguished) {
-                                ov.fireExtinguished = true;
-                                ov.burnTimer = 0;
-                                this.score += 150;
-                                this.addFloatingText(ov.x, ov.y - 24, "🚒 VCFD +$150 — WRECK EXTINGUISHED!", "#38bdf8");
-                                this.updateHud();
-                            }
-                        }
                     }
-                    this.emitPressurizedWaterJet(nozX, nozY, cannonAng, closestTargetDist, true, hitVehTarget);
-                    for (const ped of this.peds) {
-                        if (ped.dead) continue;
-                        const dx = ped.x - v.x;
-                        const dy = ped.y - v.y;
+                    for (const pd of this.peds) {
+                        if (!pd || pd.dead) continue;
+                        const dx = pd.x - nozX;
+                        const dy = pd.y - nozY;
                         const dist = Math.hypot(dx, dy);
-                        if (dist > 175) continue;
+                        if (dist > 375) continue;
                         const aDiff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - cannonAng), Math.cos(Math.atan2(dy, dx) - cannonAng)));
-                        if (aDiff <= 0.30) {
-                            ped.burnTimer = 0;
-                            ped.stunnedTimer = Math.max(ped.stunnedTimer || 0, 0.75);
-                            ped.panicTimer = 4.0;
-                            let kx = ped.x + Math.cos(cannonAng) * 5.5;
-                            let ky = ped.y + Math.sin(cannonAng) * 5.5;
-                            if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
-                                const kc = this.map.resolveCircleBuildingCollision(kx, ky, 8, ped.z || 2.0, false);
-                                kx = kc.x;
-                                ky = kc.y;
-                            }
-                            if (!this.map || !this.map.isWaterAtPixel || !this.map.isWaterAtPixel(kx, ky)) {
-                                ped.x = kx;
-                                ped.y = ky;
-                            }
+                        if (aDiff <= 0.22 && dist < aimReachPx) {
+                            aimReachPx = Math.max(24, dist);
                         }
                     }
+                    this.emitPressurizedWaterJet(nozX, nozY, cannonAng, aimReachPx, true, hitVehTarget, {
+                        carrierVx: (v.vx || 0) * 0.45,
+                        carrierVy: (v.vy || 0) * 0.45,
+                        sourceVeh: v,
+                        fromPlayer: true
+                    });
                 } else {
 
                 const occList = (v && typeof v.getOccupiedSeats === "function") ? v.getOccupiedSeats(this) : [];
@@ -15100,7 +15205,7 @@ class LeonidaGame {
 
             // GTA 2 ePedestrianState_Drowning: pedestrians can't swim — knocked/fleeing into deep water they sink
 
-            if (ped.kind !== "GATOR" && !((ped.drownTimer || 0) > 0) && this.map && this.map.getGroundTypeAt &&
+            if (ped.kind !== "GATOR" && (ped.z || 2.0) <= 2.38 && !((ped.drownTimer || 0) > 0) && this.map && this.map.getGroundTypeAt &&
 
                 this.map.getGroundTypeAt(ped.x, ped.y) === GROUND_TYPE.WATER) {
 
@@ -16476,11 +16581,21 @@ class LeonidaGame {
                 if (targetFire && ped.firemanOutTimer < 38.0) {
 
                     const hasFireLOS = !this.map.traceSegment2D || !this.map.traceSegment2D(ped.x, ped.y, targetFire.x, targetFire.y, ped.z || 2.0).hit;
-                    const maxHoseReach = (ped.firemanStuckTimer || 0) > 0.8 ? 255 : 185;
+                    const maxHoseReach = (ped.firemanStuckTimer || 0) > 0.8 ? 190 : 142;
 
                     if (bestDist < maxHoseReach && hasFireLOS) {
 
                         ped.angle = Math.atan2(targetFire.y - ped.y, targetFire.x - ped.x);
+                        // Maintain safe 52px thermal standoff from an unexploded burning car so firefighter never stands inside the flames!
+                        if (!isPedTarget && !targetFire.destroyed && bestDist < 52) {
+                            const backStep = 34 * dt;
+                            const bx = ped.x - Math.cos(ped.angle) * backStep;
+                            const by = ped.y - Math.sin(ped.angle) * backStep;
+                            if (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(bx, by, 8, ped.z || 2.0).hit) {
+                                ped.x = bx;
+                                ped.y = by;
+                            }
+                        }
 
                         ped.speed = 0;
 
@@ -16492,9 +16607,9 @@ class LeonidaGame {
 
                         const nozY = ped.y + Math.sin(ped.angle) * 12;
 
-                        const distFromNozzle = Math.max(18, Math.hypot(targetFire.x - nozX, targetFire.y - nozY) - (isPedTarget ? 4 : 10));
+                        const distFromNozzle = Math.max(18, Math.hypot(targetFire.x - nozX, targetFire.y - nozY) - (isPedTarget ? 4 : 12));
 
-                        this.emitPressurizedWaterJet(nozX, nozY, ped.angle, distFromNozzle, false, targetFire);
+                        this.emitPressurizedWaterJet(nozX, nozY, ped.angle, distFromNozzle, false, targetFire, { sourceVeh: ft });
 
                         if (Math.random() < 0.55) {
 
@@ -18979,10 +19094,193 @@ class LeonidaGame {
 
 
 
-        // 9. Particles & Floating Texts Update (with GTA 2 gibs.cpp + 3D bouncing detached car parts! Single-pass O(N) compaction)
+        // 9. Particles & Floating Texts Update (with 3D Ballistic Hydrodynamic Water Jets, GTA 2 gibs.cpp + 3D bouncing detached car parts!)
+        if (typeof this.ensureVehicleSpatialGrid === "function") this.ensureVehicleSpatialGrid();
         let pWrite = 0;
         for (let i = 0; i < this.particles.length; i++) {
             const pt = this.particles[i];
+            if (pt.kind === "WATER_JET") {
+                // Aerodynamic drag + 3D gravity arc + real physical collisions against walls, vehicle OBBs & pedestrians!
+                const dragMult = Math.exp(-(pt.dragK || 0.85) * dt);
+                pt.vx *= dragMult;
+                pt.vy *= dragMult;
+                if (typeof pt.vz === "number") {
+                    pt.vz -= (pt.grav || 1.05) * dt;
+                    pt.z = (pt.z || 2.08) + pt.vz * dt;
+                }
+                const stepDx = pt.vx * dt;
+                const stepDy = pt.vy * dt;
+                const nextX = pt.x + stepDx;
+                const nextY = pt.y + stepDy;
+                pt.traveled = (pt.traveled || 0) + Math.hypot(stepDx, stepDy);
+
+                const refFloorZ = typeof pt.z === "number" ? pt.z : 2.0;
+                const floorZ = (this.map && typeof this.map.getHeightAtPixel === "function")
+                    ? this.map.getHeightAtPixel(nextX, nextY, refFloorZ)
+                    : 2.0;
+                let impacted = false;
+                let impNx = 0, impNy = 0, hitHot = false;
+
+                // A. True 3D Building Wall Collision (airborne water flies freely over seawalls, curbs & guardrails, stopping ONLY on solid 3D buildings!)
+                if (this.map && this.map.surfaceGround) {
+                    const nbx = Math.floor(nextX / TILE_SIZE);
+                    const nby = Math.floor(nextY / TILE_SIZE);
+                    if (nbx >= 0 && nbx < MAP_COLS && nby >= 0 && nby < MAP_ROWS && this.map.surfaceGround[nby * MAP_COLS + nbx] === GROUND_TYPE.BUILDING) {
+                        const jLen = Math.hypot(stepDx, stepDy) || 1;
+                        impNx = -stepDx / jLen;
+                        impNy = -stepDy / jLen;
+                        impacted = true;
+                    }
+                }
+                if (!impacted) {
+                    pt.x = nextX;
+                    pt.y = nextY;
+                }
+
+                // B. Physical Vehicle OBB Impact & Pedagogical/Hydrodynamic Effects (checked on primary slugs via spatial grid!)
+                if (!impacted && pt.isPrimarySlug && Array.isArray(this.vehicles)) {
+                    const gHead = this._vehGridHead;
+                    const gNext = this._vehGridNext;
+                    const testVehHit = (ov) => {
+                        if (!ov || ov === pt.sourceVeh) return false;
+                        const dx = pt.x - ov.x;
+                        const dy = pt.y - ov.y;
+                        if (Math.abs(dx) > 68 || Math.abs(dy) > 68) return false;
+                        const ovZ = ov.z !== undefined ? ov.z : 2.0;
+                        if (typeof pt.z === "number" && pt.z > ovZ + 0.24) return false;
+                        const cA = Math.cos(ov.angle || 0), sA = Math.sin(ov.angle || 0);
+                        const locX = dx * cA + dy * sA;
+                        const locY = -dx * sA + dy * cA;
+                        const halfL = (ov.w || 58) * 0.50 + 3.0;
+                        const halfW = (ov.h || 26) * 0.50 + 3.0;
+                        if (Math.abs(locX) <= halfL && Math.abs(locY) <= halfW) {
+                            const dLen = Math.hypot(dx, dy) || 1;
+                            impNx = dx / dLen;
+                            impNy = dy / dLen;
+                            // Wash blood off stained tires when hosed down!
+                            if (ov._bloodDistLeft) ov._bloodDistLeft *= 0.82;
+                            if (ov._bloodDistRight) ov._bloodDistRight *= 0.82;
+                            // Hydrodynamic push on light 2-wheelers / micro-karts at close-to-medium range!
+                            const pressRatio = Math.max(0.1, 1.0 - (pt.traveled || 0) / (pt.maxReach || 375));
+                            if ((ov.isMotorcycle || ov.specKey === "MICRO_KART") && ov.driver !== "PLAYER" && pressRatio > 0.35) {
+                                const jLen = Math.hypot(pt.vx, pt.vy) || 1;
+                                ov.vx = (ov.vx || 0) + (pt.vx / jLen) * 16 * pressRatio;
+                                ov.vy = (ov.vy || 0) + (pt.vy / jLen) * 16 * pressRatio;
+                            }
+                            const wasBurning = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
+                            if (wasBurning) {
+                                hitHot = true;
+                                ov.extinguishProgress = (ov.extinguishProgress || 0) + (pt.fromPlayer ? 0.14 : 0.045);
+                                if (!ov.destroyed) {
+                                    ov.chainExplodeTimer = 0;
+                                    if (pt.fromPlayer) {
+                                        ov.hp = Math.min(ov.maxHp, Math.max(ov.hp + 7.5, 60));
+                                        ov.burnTimer = 0;
+                                        if (ov.extinguishProgress >= 1.0 && !ov._playerFireReward) {
+                                            ov._playerFireReward = true;
+                                            this.score += 150;
+                                            this.addFloatingText(ov.x, ov.y - 24, "🚒 VCFD +$150 — FIRE EXTINGUISHED!", "#e0f2fe");
+                                            this.updateHud();
+                                        }
+                                    }
+                                } else if (pt.fromPlayer && ov.extinguishProgress >= 1.35 && !ov.fireExtinguished) {
+                                    ov.fireExtinguished = true;
+                                    ov.burnTimer = 0;
+                                    this.score += 150;
+                                    this.addFloatingText(ov.x, ov.y - 24, "🚒 VCFD +$150 — WRECK EXTINGUISHED!", "#e0f2fe");
+                                    this.updateHud();
+                                }
+                            }
+                            return true;
+                        }
+                        return false;
+                    };
+                    if (gHead && gNext) {
+                        const gx0 = Math.max(0, (pt.x >> 8) - 1), gx1 = Math.min(127, (pt.x >> 8) + 1);
+                        const gy0 = Math.max(0, (pt.y >> 8) - 1), gy1 = Math.min(127, (pt.y >> 8) + 1);
+                        for (let gy = gy0; gy <= gy1 && !impacted; gy++) {
+                            const rowOff = gy << 7;
+                            for (let gx = gx0; gx <= gx1 && !impacted; gx++) {
+                                for (let vi = gHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
+                                    if (testVehHit(this.vehicles[vi])) {
+                                        impacted = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        for (let vi = 0; vi < this.vehicles.length; vi++) {
+                            if (testVehHit(this.vehicles[vi])) {
+                                impacted = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // C. Physical Pedestrian Hydrodynamic Knockback & Flame Dousing in Flight (spray cone widens naturally with distance!)
+                if (!impacted && pt.isPrimarySlug && Array.isArray(this.peds)) {
+                    const distFrac = Math.min(1.0, (pt.traveled || 0) / (pt.maxReach || 375));
+                    const pressRatio = Math.max(0.12, 1.0 - distFrac * 0.85);
+                    const sprayRad = 11.5 + distFrac * 13.5;
+                    const jSpd = Math.hypot(pt.vx, pt.vy) || 1;
+                    const jCos = pt.vx / jSpd, jSin = pt.vy / jSpd;
+                    for (let pi = 0; pi < this.peds.length; pi++) {
+                        const ped = this.peds[pi];
+                        if (!ped || ped.dead || (ped.kind === "FIREMAN" && !pt.fromPlayer)) continue;
+                        if (Math.abs(ped.x - pt.x) > sprayRad || Math.abs(ped.y - pt.y) > sprayRad) continue;
+                        if (Math.hypot(ped.x - pt.x, ped.y - pt.y) > sprayRad) continue;
+                        if (typeof pt.z === "number" && pt.z > (ped.z || 2.0) + 0.28) continue;
+                        const wasPedOnFire = (ped.burnTimer || 0) > 0;
+                        if (wasPedOnFire) {
+                            hitHot = true;
+                            ped.burnTimer = 0;
+                            ped.hp = Math.max(ped.hp || 40, 40);
+                            if (pt.fromPlayer && !ped._playerSavedBurn) {
+                                ped._playerSavedBurn = true;
+                                this.score += 100;
+                                this.addFloatingText(ped.x, ped.y - 22, "🚒 +$100 — CITIZEN EXTINGUISHED!", "#e0f2fe");
+                                this.updateHud();
+                            }
+                        }
+                        if (pt.fromPlayer || wasPedOnFire) {
+                            const pushPx = (pt.isDeckGun ? 9.5 : 4.8) * pressRatio;
+                            if (pressRatio > 0.30 && ped.kind !== "FIREMAN") {
+                                ped.stunnedTimer = Math.max(ped.stunnedTimer || 0, 0.78 * pressRatio);
+                                if (ped.kind === "CIVILIAN") ped.panicTimer = Math.max(ped.panicTimer || 0, 4.0);
+                            }
+                            let kx = ped.x + jCos * pushPx;
+                            let ky = ped.y + jSin * pushPx;
+                            if (this.map && typeof this.map.resolveCircleBuildingCollision === "function") {
+                                const kc = this.map.resolveCircleBuildingCollision(kx, ky, 8, ped.z || 2.0, false);
+                                kx = kc.x;
+                                ky = kc.y;
+                            }
+                            if (!this.map || !this.map.isWaterAtPixel || !this.map.isWaterAtPixel(kx, ky) || (ped.z || 2.0) > 2.38) {
+                                ped.x = kx;
+                                ped.y = ky;
+                            }
+                            impNx = -jCos;
+                            impNy = -jSin;
+                            impacted = true;
+                            break;
+                        }
+                    }
+                }
+
+                // D. Ground Touchdown at End of 3D Parabolic Arc (`pt.z <= floorZ + 0.015` or `pt.life <= dt`)
+                pt.life -= dt;
+                if (impacted || (typeof pt.z === "number" && pt.z <= floorZ + 0.015) || pt.life <= 0) {
+                    if (pt.spawnSplash) {
+                        this.triggerWaterImpactAt(pt, impNx, impNy, hitHot);
+                        this.particles[pWrite++] = pt;
+                    }
+                } else {
+                    this.particles[pWrite++] = pt;
+                }
+                continue;
+            }
             if (!pt.isRestingGib) {
                 const nextX = pt.x + pt.vx * dt;
                 const nextY = pt.y + pt.vy * dt;
@@ -19025,55 +19323,6 @@ class LeonidaGame {
                         pt.life = settleDur;
                         pt.maxLife = settleDur;
                         this.particles[pWrite++] = pt;
-                    }
-                } else if (pt.kind === "WATER_JET") {
-                    if (pt.spawnSplash) {
-                        // Convert arriving water slug in-place into a foaming splash ring RIGHT ON THE TARGET + radial spray droplets + wet runoff puddle!
-                        const hitX = pt.x;
-                        const hitY = pt.y;
-                        pt.kind = "WATER_SPLASH";
-                        pt.vx = 0;
-                        pt.vy = 0;
-                        pt.baseScale = 0.58;
-                        pt.rot = Math.random() * 6.28;
-                        pt.life = 0.26;
-                        pt.maxLife = 0.26;
-                        this.particles[pWrite++] = pt;
-                        if (this.particles.length < 635) {
-                            for (let di = 0; di < 2; di++) {
-                                const dAng = Math.random() * 6.283;
-                                const dSpd = 42 + Math.random() * 62;
-                                this.particles.push({
-                                    x: hitX,
-                                    y: hitY,
-                                    vx: Math.cos(dAng) * dSpd,
-                                    vy: Math.sin(dAng) * dSpd,
-                                    rot: dAng,
-                                    size: 2.8 + Math.random() * 1.6,
-                                    foam: di === 0,
-                                    kind: "WATER_DROP",
-                                    color: di === 0 ? "#bae6fd" : "#38bdf8",
-                                    life: 0.22,
-                                    maxLife: 0.22
-                                });
-                            }
-                        }
-                        this._waterPuddleTick = ((this._waterPuddleTick || 0) + 1) & 3;
-                        if (this._waterPuddleTick === 0 && (!this.map || !this.map.isWaterAtPixel || !this.map.isWaterAtPixel(hitX, hitY))) {
-                            this.addSkidmark(hitX + (Math.random() - 0.5) * 10, hitY + (Math.random() - 0.5) * 10, {
-                                z: 2.0,
-                                angle: Math.random() * 6.28,
-                                w: 11.5 + Math.random() * 5.5,
-                                h: 11.5,
-                                r: 0.08,
-                                g: 0.24,
-                                b: 0.36,
-                                alpha: 0.34,
-                                life: 6.5,
-                                maxLife: 6.5,
-                                surface: "WATER_PUDDLE"
-                            });
-                        }
                     }
                 } else if (pt.kind === "GIB_ARC" && !pt.isRestingGib) {
                     pt.isRestingGib = true;

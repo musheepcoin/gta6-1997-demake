@@ -2791,7 +2791,8 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
                 parkFleetUnit(room, vid);
                 continue;
             }
-            if ((nav.phase === "TO_SCENE" && distGoal < 165) || timedOutToScene) {
+            const inSrvBox = Boolean(serverMap.getBlockInfo && serverMap.getBlockInfo(Math.floor(x / TS), Math.floor(y / TS), 1).lid === 25);
+            if ((nav.phase === "TO_SCENE" && distGoal < 165 && (!inSrvBox || distGoal < 68)) || timedOutToScene) {
                 row[6] = 0;
                 row[7] = 0;
                 nav.workTimer = (nav.workTimer || 0) + (timedOutToScene ? 3.0 : dt);

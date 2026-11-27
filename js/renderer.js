@@ -1418,8 +1418,8 @@ class RetroRenderer {
                         gl_FragColor = vec4(col, vColor.a);
                         return;
                     }
-                    // Mode B: Procedural Worn, Chipped & Shadowed Road Paint / Oil Stain (vUV.x <= -2.8)
-                    if (vUV.x <= -2.8) {
+                    // Mode B: Procedural Worn, Chipped & Shadowed Road Paint / Oil Stain (vUV.x in [-3.3 .. -2.8])
+                    if (vUV.x <= -2.8 && vUV.x > -3.3) {
                         vec2 wp = vWorldPos.xz;
                         float wear = 0.52 + 0.48 * sNoise(wp * 6.8 + 31.4);
                         float chip = step(0.68, sHash(floor(wp * 42.0))) * 0.36;
@@ -1427,6 +1427,72 @@ class RetroRenderer {
                         if (alpha < 0.03) discard;
                         vec3 col = vColor.rgb + (sHash(floor(wp * 32.0)) - 0.5) * 0.035;
                         col = applyRoadLighting(clamp(col, 0.0, 1.0));
+                        gl_FragColor = vec4(col, alpha);
+                        return;
+                    }
+                    // Mode C: Procedural Hydrodynamic Pressurized Water Stream & Atomized Foaming Mist (vUV.x in [-4.7 .. -3.4])
+                    if (vUV.x <= -3.4 && vUV.x > -4.75) {
+                        float u = clamp(vUV.x + 4.5, 0.0, 1.0);
+                        float v = clamp(vUV.y, 0.0, 1.0);
+                        float prog = clamp(vColor.r, 0.0, 1.0);
+                        float phase = vColor.g;
+                        float modeType = vColor.b;
+                        if (modeType < 0.5) {
+                            // Continuous Turbulent Liquid Ribbon + Aerated White Core + Feathered Mist Veil
+                            float dy = (v - 0.5) * 2.0;
+                            float endTaper = smoothstep(0.0, 0.30, u) * smoothstep(1.0, 0.70, u);
+                            float n1 = sNoise(vec2(u * 3.6 - phase, dy * 2.6 + 3.1));
+                            float n2 = sNoise(vec2(u * 8.4 - phase * 1.35, dy * 6.2 - 7.7));
+                            float turb = n1 * 0.62 + n2 * 0.38;
+                            float wobble = (n1 - 0.5) * (0.10 + prog * 0.44);
+                            float ady = abs(dy - wobble);
+                            float coreHalf = mix(0.25, 0.10, prog) * (0.78 + turb * 0.44);
+                            float coreMask = (1.0 - smoothstep(coreHalf * 0.32, coreHalf, ady)) * (1.0 - prog * 0.45);
+                            float bodyHalf = mix(0.46, 0.80, prog) * (0.68 + turb * 0.52);
+                            float bodyMask = (1.0 - smoothstep(coreHalf * 0.55, bodyHalf, ady)) * (0.52 + turb * 0.56);
+                            float mistHalf = mix(0.68, 0.98, prog);
+                            float mistMask = (1.0 - smoothstep(0.16, mistHalf, ady)) * smoothstep(0.26, 0.82, turb) * (0.26 + prog * 0.44);
+                            float alpha = vColor.a * endTaper * clamp(coreMask * 0.92 + bodyMask * 0.58 + mistMask * 0.36, 0.0, 0.94);
+                            if (alpha < 0.014) discard;
+                            vec3 mistCol = applyRoadLighting(vec3(0.77, 0.85, 0.91));
+                            vec3 foamCol = applyRoadLighting(vec3(0.92, 0.96, 0.99));
+                            vec3 coreCol = mix(applyRoadLighting(vec3(0.98, 0.995, 1.0)), vec3(1.0), 0.32);
+                            vec3 col = mix(mistCol, foamCol, clamp(bodyMask * 1.25, 0.0, 1.0));
+                            col = mix(col, coreCol, clamp(coreMask * 1.35, 0.0, 1.0));
+                            gl_FragColor = vec4(col, alpha);
+                            return;
+                        }
+                        // Asymmetric Foaming Impact Spray Burst & Vapor Mist Plume (zero spinning geometric rings!)
+                        vec2 q = (vec2(u, v) - 0.5) * 2.0;
+                        float r = length(q);
+                        float nA = sNoise(q * 2.7 + vec2(phase * 0.32, -phase * 0.24));
+                        float nB = sNoise(q * 5.9 - vec2(phase * 0.52, phase * 0.38));
+                        float splashWarp = r + (nA - 0.5) * 0.40 + (nB - 0.5) * 0.22;
+                        float noiseField = nA * 0.58 + nB * 0.42 + (1.0 - r) * (0.52 - prog * 0.34);
+                        float plume = (1.0 - smoothstep(0.20 + prog * 0.26, 0.96, splashWarp)) * smoothstep(0.08, 0.42, noiseField);
+                        float foamCrest = smoothstep(0.50, 0.86, nB * 0.65 + (1.0 - splashWarp) * 0.55) * (1.0 - prog * 0.62);
+                        float alpha = vColor.a * clamp(plume * (1.0 - prog * 0.80), 0.0, 0.90);
+                        if (alpha < 0.014) discard;
+                        vec3 col = applyRoadLighting(mix(vec3(0.79, 0.86, 0.92), vec3(0.97, 0.99, 1.0), clamp(foamCrest, 0.0, 1.0)));
+                        gl_FragColor = vec4(col, alpha);
+                        return;
+                    }
+                    // Mode D: Procedural Darkened Wet Asphalt / Sidewalk Runoff Puddle w/ Subtle Sky Specular Sheen (vUV.x <= -4.8)
+                    if (vUV.x <= -4.8) {
+                        float u = clamp(vUV.x + 6.0, 0.0, 1.0);
+                        float v = clamp(vUV.y, 0.0, 1.0);
+                        vec2 q = (vec2(u, v) - 0.5) * 2.0;
+                        vec2 wp = vWorldPos.xz;
+                        float edgeNoise = sNoise(wp * 2.6 + 11.3) * 0.65 + sNoise(wp * 6.4 + 29.7) * 0.35;
+                        float dryShrink = clamp(vColor.a * 2.5, 0.28, 1.0);
+                        float dist = length(q) + (edgeNoise - 0.5) * 0.46;
+                        float wetMask = 1.0 - smoothstep(dryShrink * 0.56, dryShrink * 0.96, dist);
+                        if (wetMask < 0.02) discard;
+                        float rim = smoothstep(dryShrink * 0.44, dryShrink * 0.68, dist) * wetMask;
+                        float skySpec = smoothstep(0.62, 0.90, sNoise(wp * 4.4 + uSunDir * 2.0)) * 0.20 + rim * 0.15;
+                        vec3 col = mix(vec3(0.04, 0.06, 0.09), applyRoadLighting(vec3(0.46, 0.55, 0.64)), clamp(skySpec, 0.0, 0.42));
+                        float alpha = clamp(wetMask * vColor.a, 0.0, 0.50);
+                        if (alpha < 0.012) discard;
                         gl_FragColor = vec4(col, alpha);
                         return;
                     }
@@ -7926,6 +7992,14 @@ class RetroRenderer {
         this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -3.0, -3.0, -3.0, -3.0, r, g, b, a, drawOrder);
     }
 
+    pushWaterFxQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, prog, phase, modeType, alpha, drawOrder = 1) {
+        this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -4.5, 0.0, -3.5, 1.0, prog, phase, modeType, alpha, drawOrder);
+    }
+
+    pushWetPuddleQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, alpha, drawOrder = 1) {
+        this.pushSpriteQuad3D(xPx, yPx, zBlocks, wPx, hPx, angleRad, -6.0, 0.0, -5.0, 1.0, 0.06, 0.10, 0.15, alpha, drawOrder);
+    }
+
     /* ========================================================================
        SpriteBatch::SortSprites (SpriteBatch.cpp:201-213)
        Sorts by (mHeight, mDrawOrder) using quantized layer bucket + eSpriteDrawOrder
@@ -10825,12 +10899,8 @@ class RetroRenderer {
             const sg = typeof s.g === "number" ? s.g : 0.08;
             const sb = typeof s.b === "number" ? s.b : 0.10;
             if (s.surface === "WATER_PUDDLE") {
-                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
-                const wRect = objSprs["water_splash_ring"] || objSprs["blood_splat_drop"];
-                if (wRect) {
-                    this.pushAtlasSprite3D(wRect, s.x, s.y, sz, sang, Math.max(0.75, sw / 10.5), SPRITE_DRAW_ORDER.TIRE_MARKS, sr, sg, sb, alpha);
-                    continue;
-                }
+                this.pushWetPuddleQuad3D(s.x, s.y, sz, sw, sh, sang, alpha, SPRITE_DRAW_ORDER.TIRE_MARKS);
+                continue;
             }
             if (s.surface === "BLOOD" || s.surface === "BLOOD_FOOT") {
                 const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
@@ -11602,13 +11672,9 @@ class RetroRenderer {
                     const cAng = Math.cos(ped.angle), sAng = Math.sin(ped.angle);
                     const nozX = ped.x + cAng * 9.5;
                     const nozY = ped.y + sAng * 9.5;
-                    this.pushSolidQuad3D(nozX, nozY, pz + 0.018, 5.8, 2.8, ped.angle, 0.96, 0.80, 0.18, 0.98, pedDrawOrder);
-                    // Pressurized white-water cone erupting directly from the brass nozzle tip
-                    const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
-                    const jRect = objSprs["water_jet_slug"];
-                    if (jRect) {
-                        this.pushAtlasSprite3D(jRect, nozX + cAng * 7.5, nozY + sAng * 7.5, pz + 0.022, ped.angle, 0.78, SPRITE_DRAW_ORDER.PROJECTILES, 0.96, 0.99, 1.0, 0.92);
-                    }
+                    this.pushSolidQuad3D(nozX, nozY, pz + 0.018, 6.2, 2.5, ped.angle, 0.88, 0.72, 0.18, 0.98, pedDrawOrder);
+                    // Tight laminar white-water exit cone erupting from the brass branchpipe nozzle
+                    this.pushWaterFxQuad3D(nozX + cAng * 8.5, nozY + sAng * 8.5, pz + 0.068, 15.0, 4.6, ped.angle, 0.04, this.time * 16.0, 0.0, 0.90, SPRITE_DRAW_ORDER.PROJECTILES);
                 }
             }
 
@@ -12343,18 +12409,18 @@ class RetroRenderer {
                 this.pushSolidQuad3D(bagX - Math.cos(bagAng) * 2.4, bagY - Math.sin(bagAng) * 2.4, bagZ + 0.002, 1.5, 7.2, bagAng, 0.22, 0.24, 0.30, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
                 this.pushSolidQuad3D(bagX + Math.cos(bagAng) * 2.4, bagY + Math.sin(bagAng) * 2.4, bagZ + 0.002, 1.5, 7.2, bagAng, 0.22, 0.24, 0.30, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
                 this.pushSolidQuad3D(bagX, bagY, bagZ + 0.003, 7.8, 1.1, bagAng, 0.88, 0.92, 0.97, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
-            } else if (v.specKey === "FIRE_TRUCK" && (v._sprayingCannonTimer || 0) > 0) {
-                // Rooftop high-pressure water monitor turret + pressurized white-water muzzle cone on VCFD Fire Engine!
+            } else if (!v.destroyed && v.specKey === "FIRE_TRUCK") {
+                // Permanent Chrome/Brass Rooftop Deck-Gun Monitor mounted right behind the forward Fire Engine cab (+22px)!
                 const cAng = typeof v._cannonAngle === "number" ? v._cannonAngle : renderAngle;
                 const cc = Math.cos(cAng), cs = Math.sin(cAng);
-                const turX = v.x + cosA * 8.0;
-                const turY = v.y + sinA * 8.0;
+                const turX = v.x + cosA * 22.0;
+                const turY = v.y + sinA * 22.0;
                 const turZ = vz + airZ + 0.018;
-                this.pushSolidQuad3D(turX + cc * 4.5, turY + cs * 4.5, turZ, 9.5, 3.2, cAng, 0.86, 0.88, 0.94, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
-                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
-                const jRect = objSprs["water_jet_slug"];
-                if (jRect) {
-                    this.pushAtlasSprite3D(jRect, turX + cc * 14.5, turY + cs * 14.5, turZ + 0.004, cAng, 0.95, SPRITE_DRAW_ORDER.PROJECTILES, 0.96, 0.99, 1.0, 0.95);
+                this.pushSolidQuad3D(turX, turY, turZ - 0.001, 5.2, 5.2, renderAngle, 0.22, 0.25, 0.30, 0.96, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(turX + cc * 5.0, turY + cs * 5.0, turZ + 0.001, 10.5, 2.8, cAng, 0.84, 0.87, 0.93, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
+                this.pushSolidQuad3D(turX + cc * 9.8, turY + cs * 9.8, turZ + 0.002, 2.6, 3.6, cAng, 0.92, 0.76, 0.22, 0.98, SPRITE_DRAW_ORDER.CAR_ROOF);
+                if ((v._sprayingCannonTimer || 0) > 0) {
+                    this.pushWaterFxQuad3D(turX + cc * 19.0, turY + cs * 19.0, vz + airZ + 0.155, 20.0, 5.8, cAng, 0.03, this.time * 17.5, 0.0, 0.94, SPRITE_DRAW_ORDER.EXPLOSION);
                 }
             } else if (!v.destroyed && v.heroVariant === "ONLYRAW_SUV") {
                 // Gleaming Chrome Luxury Bullbar / Grille & Brushed Silver Roof Rails on Dre'Quan's Black 4x4 SUV
@@ -13310,35 +13376,37 @@ class RetroRenderer {
                 this.batchObjectSprite3D(String(frameId), pt.x, pt.y, pz + 0.01, 0, 0.75, SPRITE_DRAW_ORDER.EXPLOSION);
             } else if (pt.kind === "WATER_JET") {
                 const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);
-                const arcZ = Math.sin(prog * Math.PI) * (pt.peakZ || 0.12);
-                const jAng = typeof pt.ang === "number" ? pt.ang : Math.atan2(pt.vy || 0, pt.vx || 1);
-                const jScale = (pt.baseScale || 0.78) * (0.85 + prog * 0.55);
-                const jAlpha = Math.min(0.96, (1.0 - prog * 0.22));
-                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
-                const jRect = objSprs["water_jet_slug"];
-                // Subtle shadow under arched pressurized water stream
-                this.pushSolidQuad3D(pt.x + sunCos * (2.0 + arcZ * 12), pt.y + sunSin * (2.0 + arcZ * 12), floorZ + 0.009, 8.5 * jScale, 3.2 * jScale, jAng, 0.02, 0.05, 0.10, 0.22 * (1 - prog * 0.4), SPRITE_DRAW_ORDER.TIRE_MARKS);
-                if (jRect) {
-                    this.pushAtlasSprite3D(jRect, pt.x, pt.y, floorZ + 0.045 + arcZ, jAng, jScale, SPRITE_DRAW_ORDER.EXPLOSION, 0.94, 0.99, 1.0, jAlpha);
-                } else {
-                    this.pushSolidQuad3D(pt.x, pt.y, floorZ + 0.045 + arcZ, 11 * jScale, 4.2 * jScale, jAng, 0.55, 0.88, 1.0, jAlpha, SPRITE_DRAW_ORDER.EXPLOSION);
+                const jetZ = typeof pt.z === "number" ? Math.max(floorZ + 0.02, pt.z) : (floorZ + 0.05 + Math.sin(prog * Math.PI) * (pt.peakZ || 0.14));
+                const elevZ = Math.max(0, jetZ - floorZ);
+                const jAng = Math.atan2(pt.vy || 0, pt.vx || 1);
+                const isDeck = Boolean(pt.isDeckGun);
+                // Stream starts tight & coherent at the nozzle, then widens & atomizes under aerodynamic air shear!
+                const segLen = (isDeck ? 24.0 : 18.5) * (0.90 + prog * 0.48);
+                const segWid = (isDeck ? 4.8 : 3.6) * (0.78 + prog * 1.65);
+                const jAlpha = Math.min(0.92, (1.0 - prog * 0.34) * 0.92);
+                const flowPhase = this.time * 16.5 + (pt.seed || 0);
+                // Soft translucent ground shadow offset along sun direction by actual 3D ballistic elevation!
+                if ((pt.isPrimarySlug || (i & 1) === 0) && elevZ > 0.01) {
+                    const shOff = 1.8 + elevZ * 15.0;
+                    this.pushSolidQuad3D(pt.x + sunCos * shOff, pt.y + sunSin * shOff, floorZ + 0.008, segLen * 0.72, segWid * 0.58, jAng, 0.02, 0.04, 0.07, 0.13 * (1.0 - prog * 0.55), SPRITE_DRAW_ORDER.TIRE_MARKS);
+                }
+                this.pushWaterFxQuad3D(pt.x, pt.y, jetZ, segLen, segWid, jAng, prog, flowPhase, 0.0, jAlpha, SPRITE_DRAW_ORDER.EXPLOSION);
+                // Outer airy mist veil in the second half of flight as high-velocity water atomizes in air
+                if (prog > 0.32 && pt.isPrimarySlug) {
+                    const mistSz = (isDeck ? 14.0 : 10.5) * (0.75 + prog * 1.15);
+                    this.pushWaterFxQuad3D(pt.x, pt.y, jetZ - 0.004, mistSz * 1.25, mistSz, jAng, prog * 0.85, flowPhase * 0.6, 1.0, (prog - 0.25) * (1.0 - prog) * 0.62, SPRITE_DRAW_ORDER.EXPLOSION);
                 }
             } else if (pt.kind === "WATER_SPLASH") {
                 const floorZ = this.map.getHeightAtPixel(pt.x, pt.y, this.camZBlocks);
-                const sScale = (pt.baseScale || 0.65) + prog * 0.95;
-                const sAlpha = (1.0 - prog) * 0.92;
-                const objSprs = (this.gta1Meta && this.gta1Meta.sprites && this.gta1Meta.sprites.objects) || {};
-                const sRect = objSprs["water_splash_ring"];
-                if (sRect) {
-                    this.pushAtlasSprite3D(sRect, pt.x, pt.y, floorZ + 0.055, prog * 1.8 + (pt.rot || 0), sScale, SPRITE_DRAW_ORDER.EXPLOSION, 0.92, 0.98, 1.0, sAlpha);
-                } else {
-                    this.pushSolidQuad3D(pt.x, pt.y, floorZ + 0.055, 10 * sScale, 10 * sScale, prog, 0.72, 0.93, 1.0, sAlpha, SPRITE_DRAW_ORDER.EXPLOSION);
-                }
+                const spZ = typeof pt.z === "number" ? Math.max(floorZ + 0.035, pt.z) : (floorZ + 0.05);
+                const spSz = ((pt.baseScale || 0.75) * 16.0) * (0.72 + prog * 1.28);
+                const spAlpha = (1.0 - prog) * 0.88;
+                this.pushWaterFxQuad3D(pt.x, pt.y, spZ, spSz, spSz, pt.rot || 0, prog, (pt.seed || 0) + prog * 2.4, 1.0, spAlpha, SPRITE_DRAW_ORDER.EXPLOSION);
             } else if (pt.kind === "WATER_DROP" || pt.color === "#38bdf8" || pt.color === "#bae6fd") {
-                // Rebounding water spray droplets & mist (never falls through to yellow bullet sparks!)
-                const dSz = (pt.size || 3.2) * (1.0 - prog * 0.35);
-                const isFoam = pt.color === "#bae6fd" || pt.foam;
-                this.pushSolidQuad3D(pt.x, pt.y, pz + 0.01, dSz * 1.35, dSz * 0.95, pt.rot || 0, isFoam ? 0.82 : 0.32, isFoam ? 0.96 : 0.80, 1.0, (1.0 - prog * 0.65) * 0.90, SPRITE_DRAW_ORDER.EXPLOSION);
+                // Fine translucent silver-white atomized spray droplets (no neon blue blocks!)
+                const dSz = (pt.size || 2.8) * (1.0 - prog * 0.38);
+                const dAng = Math.atan2(pt.vy || 0, pt.vx || 1);
+                this.pushWaterFxQuad3D(pt.x, pt.y, pz + 0.015, dSz * 2.4, dSz * 1.35, dAng, 0.45 + prog * 0.45, (pt.rot || 0) * 3.0, 0.0, (1.0 - prog * 0.72) * 0.74, SPRITE_DRAW_ORDER.EXPLOSION);
             } else if (pt.kind === "SPRAY") {
                 // Black spray-paint aerosol mist from the graffiti can (expands & fades)
                 const sz = (pt.size || 3) * (1.0 + prog * 1.4);

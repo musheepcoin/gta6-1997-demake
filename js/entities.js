@@ -4253,15 +4253,33 @@ class Vehicle {
                         }
                     }
 
-                    // If within rooftop deck-gun range (< 320px), also fire the truck's rooftop water cannon all the way onto the burning target!
-                    if (bestDist < 320) {
-                        this._cannonAngle = ang;
+                    // Rooftop Deck-Gun Monitor (~375px = 31m max reach):
+                    // Fires with hydraulic turret slew when line-of-sight is clear AND our own on-foot firefighter is NOT in the stream cone!
+                    const hasDeckLOS = !map.traceSegment2D || !map.traceSegment2D(this.x, this.y, burningCar.x, burningCar.y, this.z || 2.0).hit;
+                    const fm = this.deployedFireman;
+                    const firemanInLineOfFire = Boolean(
+                        fm && !fm.dead && (
+                            (fm.sprayingHose && Math.hypot(fm.x - burningCar.x, fm.y - burningCar.y) < 145) ||
+                            (Math.hypot(fm.x - this.x, fm.y - this.y) < bestDist &&
+                             Math.abs(this.normalizeAngle(Math.atan2(fm.y - this.y, fm.x - this.x) - ang)) < 0.28)
+                        )
+                    );
+                    if (bestDist < 365 && hasDeckLOS && !firemanInLineOfFire) {
+                        const prevCAng = typeof this._cannonAngle === "number" ? this._cannonAngle : (this.angle || 0);
+                        const cErr = this.normalizeAngle(ang - prevCAng);
+                        this._cannonAngle = prevCAng + Math.max(-6.2 * dt, Math.min(6.2 * dt, cErr));
+                        const cNow = this._cannonAngle;
                         this._sprayingCannonTimer = 0.16;
-                        const nozX = this.x + Math.cos(this.angle || 0) * 8 + Math.cos(ang) * 16;
-                        const nozY = this.y + Math.sin(this.angle || 0) * 8 + Math.sin(ang) * 16;
-                        const reachToTarget = Math.max(22, Math.hypot(burningCar.x - nozX, burningCar.y - nozY) - 10);
-                        if (typeof game.emitPressurizedWaterJet === "function") {
-                            game.emitPressurizedWaterJet(nozX, nozY, ang, reachToTarget, true, burningCar);
+                        const vCos = Math.cos(this.angle || 0), vSin = Math.sin(this.angle || 0);
+                        const nozX = this.x + vCos * 22.0 + Math.cos(cNow) * 12.0;
+                        const nozY = this.y + vSin * 22.0 + Math.sin(cNow) * 12.0;
+                        const reachToTarget = Math.max(24, Math.hypot(burningCar.x - nozX, burningCar.y - nozY) - 10);
+                        if (typeof game.emitPressurizedWaterJet === "function" && Math.abs(cErr) < 0.35) {
+                            game.emitPressurizedWaterJet(nozX, nozY, cNow, reachToTarget, true, burningCar, {
+                                carrierVx: (this.vx || 0) * 0.45,
+                                carrierVy: (this.vy || 0) * 0.45,
+                                sourceVeh: this
+                            });
                         }
                         if (Math.random() < 0.55 && typeof game.spawnParticle === "function") {
                             game.spawnParticle(

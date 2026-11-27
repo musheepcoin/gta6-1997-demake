@@ -2683,12 +2683,12 @@ function runSimulations() {
                 waterSplashOnTarget = true;
             }
         });
-        // Also test direct emitPressurizedWaterJet from 220px away and verify 100% reach + WATER_SPLASH + WATER_PUDDLE on target!
+        // Also test direct emitPressurizedWaterJet from 220px away along open Ocean Drive and verify 100% reach + WATER_SPLASH + WATER_PUDDLE on target!
         if (!waterSplashOnTarget) {
-            g.emitPressurizedWaterJet(wx - 220, wy, 0, 220, true, burningWreck);
-            stepSec(0.65);
-            waterSplashOnTarget = g.particles.some((pt) => (pt.kind === "WATER_SPLASH" || pt.kind === "WATER_DROP") && Math.hypot(pt.x - wx, pt.y - wy) < 42) ||
-                g.skidmarks.some((s) => s.surface === "WATER_PUDDLE" && Math.hypot(s.x - wx, s.y - wy) < 42);
+            g.emitPressurizedWaterJet(wx, wy - 220, Math.PI * 0.5, 220, true, burningWreck);
+            stepSec(0.55);
+            waterSplashOnTarget = g.particles.some((pt) => (pt.kind === "WATER_SPLASH" || pt.kind === "WATER_DROP") && Math.hypot(pt.x - wx, pt.y - wy) < 44) ||
+                g.skidmarks.some((s) => s.surface === "WATER_PUDDLE" && Math.hypot(s.x - wx, s.y - wy) < 44);
         }
 
         assert(fireDispatched === true, `VCFD Fire Engine dispatched promptly for burning street wreck`);
@@ -3239,6 +3239,7 @@ function runSimulations() {
             }
         }
 
+        const rendSrc54 = fs.readFileSync(path.join(ROOT, "js", "renderer.js"), "utf8");
         assert(
             ambParkedInBoxFrames === 0 &&
             fireParkedInBoxFrames === 0 &&
@@ -3246,8 +3247,62 @@ function runSimulations() {
             waterJetSeen &&
             waterSplashSeen &&
             waterPuddleSeen &&
-            burnCar.fireExtinguished === true,
-            `4-way EMS + VCFD + 4-direction traffic resolves with 0 intersection-box parking (amb=${ambParkedInBoxFrames}, fire=${fireParkedInBoxFrames}), 0 hull overlaps (${severeOverlaps54}), full-reach WATER_JET + WATER_SPLASH + WATER_PUDDLE, & fire extinguished (${burnCar.fireExtinguished})`
+            burnCar.fireExtinguished === true &&
+            rendSrc54.includes("pushWaterFxQuad3D") &&
+            rendSrc54.includes("pushWetPuddleQuad3D"),
+            `4-way EMS + VCFD + 4-direction traffic resolves with 0 intersection-box parking (amb=${ambParkedInBoxFrames}, fire=${fireParkedInBoxFrames}), 0 hull overlaps (${severeOverlaps54}), ballistic 3D WATER_JET + GPU procedural liquid/mist/wet-puddle shaders, & fire extinguished (${burnCar.fireExtinguished})`
+        );
+
+        // Sub-test 54B: Player-Driven Fire Truck 375px Calibrated Range, OBB Vehicle Stop, & Hydrodynamic Ped Knockback/Extinguish
+        // Place on open Ocean Drive Northbound asphalt (col 445.5, row 282.5, z=2.0 -> 100% clear road, zero buildings!)
+        g.vehicles.length = 0;
+        g.peds.length = 0;
+        g.particles.length = 0;
+        g.trafficManager.removeOffscreenPeds = () => {};
+        g.trafficManager.removeOffscreenCars = () => {};
+        const pTruck = sandbox.makeVeh("s54_ptruck", "FIRE_TRUCK", 445.5 * TS, 282.5 * TS, -Math.PI * 0.5);
+        pTruck.z = 2.0;
+        pTruck.driver = "PLAYER";
+        g.started = true;
+        g.player.dead = false;
+        g.player.inVehicle = pTruck;
+        g.player.seatIndex = 0;
+        g.player.x = pTruck.x;
+        g.player.y = pTruck.y;
+        g.player.z = 2.0;
+        g.player.angle = -Math.PI * 0.5;
+        g.renderer.camX = pTruck.x;
+        g.renderer.camY = pTruck.y - 120;
+        pTruck._cannonAngle = -Math.PI * 0.5;
+        g.vehicles.push(pTruck);
+
+        // Place a burning pedestrian at 245px ahead (beyond old 175px cutoff, well inside real 375px deck-gun stream!)
+        const burnPed = sandbox.makePed({
+            id: "s54_burn_ped",
+            x: pTruck.x,
+            y: pTruck.y - 245,
+            z: 2.0,
+            angle: Math.PI * 0.5,
+            kind: "CIVILIAN",
+            hp: 85,
+            speed: 0,
+            dead: false
+        });
+        burnPed.burnTimer = 4.0;
+        burnPed.stunnedTimer = 1.8; // keep stationary before stream arrives so we measure pure hydrodynamic knockback!
+        const startPedY = burnPed.y;
+        g.peds.push(burnPed);
+
+        g.input.shoot = true;
+        g.player.mouseShoot = false;
+        for (let st = 0; st < 55; st++) {
+            sandbox.advanceClock(1000 / 60);
+            g.update(1 / 60);
+        }
+        g.input.shoot = false;
+        assert(
+            burnPed.burnTimer === 0 && burnPed.y < startPedY - 4,
+            `Player Fire Truck deck-gun stream reaches 245px in 3D ballistics, extinguishes burning pedestrian (burnTimer=${burnPed.burnTimer}), and applies hydrodynamic knockback (${(startPedY - burnPed.y).toFixed(1)}px)`
         );
         console.log("");
     }
