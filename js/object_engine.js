@@ -13240,6 +13240,34 @@ class WorldObjectEngine {
             }
         };
 
+        // Shared zero-allocation color & offset constants for renderDynamic3DMeshes (eliminates hundreds of per-frame RGB array allocations!)
+        const pal = this._dynMeshPalette || (this._dynMeshPalette = {
+            fwPink: [1.00, 0.30, 0.78], fwCyan: [0.16, 0.94, 1.00], fwGold: [1.00, 0.84, 0.24], fwMagenta: [0.98, 0.36, 0.80],
+            fwRimSteel: [0.94, 0.97, 1.00], fwSpokeSteel: [0.92, 0.95, 0.99], fwSpokeCyan: [0.18, 0.94, 0.98], fwSpokePink: [1.00, 0.36, 0.80],
+            fwCrossbar: [0.88, 0.92, 0.96], fwRoof: [0.98, 0.98, 1.00], fwGlass: [0.22, 0.90, 0.98], fwFloor: [0.18, 0.20, 0.26],
+            cabinPalette: [[0.98, 0.32, 0.74], [0.18, 0.88, 0.96], [1.00, 0.80, 0.22], [0.32, 0.96, 0.76]],
+            spokeFracs: [0.24, 0.48, 0.72, 0.90],
+            paStar1: [1.00, 0.34, 0.80], paStar2: [0.16, 0.94, 0.98], paBulbOn: [1.00, 0.90, 0.32], paBulbOff: [0.98, 0.32, 0.78],
+            mgSail: [0.98, 0.92, 0.68], yWhite: [0.96, 0.98, 1.00], yGlass: [0.14, 0.56, 0.80], yTeak: [0.84, 0.66, 0.44],
+            yPink: [0.98, 0.36, 0.72], yCyan: [0.18, 0.88, 0.96],
+            hydRed: [0.88, 0.22, 0.18], hydCap: [0.94, 0.80, 0.18], hydWater: [0.68, 0.94, 1.0],
+            binRec: [0.12, 0.54, 0.88], binPink: [0.16, 0.56, 0.48], binGrn: [0.14, 0.38, 0.26],
+            lidRec: [0.92, 0.95, 0.99], lidStd: [0.76, 0.80, 0.86], binLiner: [0.95, 0.96, 0.98],
+            trashBagBlk: [0.15, 0.17, 0.20], trashBagWht: [0.92, 0.91, 0.88], canPink: [0.96, 0.28, 0.68], canCyan: [0.18, 0.86, 0.96], boxTan: [0.88, 0.68, 0.36],
+            mtrBase: [0.38, 0.42, 0.48], mtrPoleB: [0.64, 0.68, 0.74], mtrHeadB: [0.22, 0.26, 0.32], mtrCoin: [0.98, 0.82, 0.18],
+            mtrPole: [0.62, 0.66, 0.72], mtrHead: [0.24, 0.28, 0.34], mtrLcd: [0.18, 0.94, 0.68],
+            uspsBlue: [0.10, 0.28, 0.64], uspsTop: [0.14, 0.36, 0.76], uspsTrim: [0.94, 0.96, 0.99], mailEnv: [0.97, 0.98, 1.0],
+            scRailB: [0.42, 0.46, 0.52], scRail: [0.52, 0.56, 0.64], scCyan: [0.16, 0.92, 0.98], scLime: [0.58, 0.96, 0.16], scDeck: [0.18, 0.20, 0.24], scBar: [0.16, 0.18, 0.22],
+            busShard: [0.36, 0.84, 0.96], busWall: [0.28, 0.76, 0.92], busAd: [0.96, 0.36, 0.74], busBench: [0.82, 0.86, 0.92], busRoof: [0.88, 0.92, 0.97], busGlass: [0.22, 0.86, 0.96],
+            fcPink: [0.96, 0.32, 0.68], fcCyan: [0.16, 0.84, 0.94], fcBodyB: [0.86, 0.89, 0.94], fcBox: [0.96, 0.72, 0.18], fcBody: [0.88, 0.91, 0.95], fcPole: [0.78, 0.82, 0.88],
+            mbPink: [0.96, 0.34, 0.74], mbCyan: [0.18, 0.88, 0.96], mbFrmB: [0.22, 0.24, 0.28], mbFrm: [0.20, 0.22, 0.26],
+            vrGold: [0.96, 0.80, 0.22], vrCrimson: [0.88, 0.14, 0.32],
+            sbWoodB: [0.68, 0.46, 0.26], sbTealB: [0.22, 0.78, 0.82], sbWood: [0.72, 0.48, 0.26], sbTeal: [0.24, 0.82, 0.86],
+            tcYel: [0.98, 0.76, 0.12], tcOrg: [0.98, 0.42, 0.08],
+            slPink: [0.96, 0.34, 0.76], slCyan: [0.22, 0.88, 0.96], slPoleB: [0.78, 0.82, 0.88], slHeadB: [0.35, 0.38, 0.44], slPoleD: [0.76, 0.80, 0.86], slPole: [0.82, 0.86, 0.92],
+            ppBlue: [0.22, 0.64, 0.84], nsPink: [0.94, 0.32, 0.58], nsGold: [0.92, 0.64, 0.16], nsPaper: [0.94, 0.95, 0.98]
+        });
+
         // 1. Live Vertically-Rotating Dual-Rim 3D Neon Ferris Wheel & Pier Archway Marquee at Vice Beach Pier
         if (this.landmarks3D && this.landmarks3D.ferrisWheel) {
             const fw = this.landmarks3D.ferrisWheel;
@@ -13259,56 +13287,45 @@ class WorldObjectEngine {
                     const mzElev = hubElev + Math.sin(aMid) * radElev;
                     const imx = fw.x + Math.cos(aMid) * (radPx * 0.72);
                     const imzElev = hubElev + Math.sin(aMid) * (radElev * 0.72);
-                    const neonCol = ((rs + Math.floor(t * 6.0)) % 2 === 0) ? [1.00, 0.30, 0.78] : [0.16, 0.94, 1.00];
-                    const innerCol = ((rs + Math.floor(t * 6.0)) % 2 === 0) ? [1.00, 0.84, 0.24] : [0.98, 0.36, 0.80];
+                    const neonCol = ((rs + Math.floor(t * 6.0)) % 2 === 0) ? pal.fwPink : pal.fwCyan;
+                    const innerCol = ((rs + Math.floor(t * 6.0)) % 2 === 0) ? pal.fwGold : pal.fwMagenta;
 
-                    for (const rimY of [-16, 16]) {
-                        // Outer structural steel rim chord + glowing neon rim tube
-                        emitDynBox(mx, fw.y, 1, 0, 0, rimY, 9.2, 2.8, mzElev - 0.024, mzElev + 0.024, [0.94, 0.97, 1.00], 1.0, 5);
+                    for (let rimY = -16; rimY <= 16; rimY += 32) {
+                        emitDynBox(mx, fw.y, 1, 0, 0, rimY, 9.2, 2.8, mzElev - 0.024, mzElev + 0.024, pal.fwRimSteel, 1.0, 5);
                         emitDynBox(mx, fw.y, 1, 0, 0, rimY + (rimY > 0 ? 1.8 : -1.8), 8.4, 1.8, mzElev - 0.018, mzElev + 0.018, neonCol, 1.0, 10);
-                        // Inner concentric neon star-ring chord at 72% radius
                         emitDynBox(imx, fw.y, 1, 0, 0, rimY, 6.8, 2.0, imzElev - 0.016, imzElev + 0.016, innerCol, 1.0, 10);
                     }
                 }
 
                 // B. 12 Twin-Plane Radial Steel Spokes & 12 Crisp 3D Suspended Passenger Gondola Cabins
                 const numGondolas = 12;
-                const cabinPalette = [
-                    [0.98, 0.32, 0.74], // Flamingo Pink
-                    [0.18, 0.88, 0.96], // South Beach Cyan
-                    [1.00, 0.80, 0.22], // Sunset Gold
-                    [0.32, 0.96, 0.76]  // Tropical Mint
-                ];
+                const cabinPalette = pal.cabinPalette;
+                const spokeFracs = pal.spokeFracs;
                 for (let gi = 0; gi < numGondolas; gi++) {
                     const theta = wheelRot + (gi * Math.PI * 2.0) / numGondolas;
                     const cosT = Math.cos(theta);
                     const sinT = Math.sin(theta);
 
-                    // 1) Slender 3-Step Radial Spokes on BOTH North (offY=-16) & South (offY=+16) Wheel Rims
-                    const spokeNeon = ((gi + Math.floor(t * 4.0)) % 2 === 0) ? [0.18, 0.94, 0.98] : [1.00, 0.36, 0.80];
-                    for (const frac of [0.24, 0.48, 0.72, 0.90]) {
+                    const spokeNeon = ((gi + Math.floor(t * 4.0)) % 2 === 0) ? pal.fwSpokeCyan : pal.fwSpokePink;
+                    for (let fi = 0; fi < 4; fi++) {
+                        const frac = spokeFracs[fi];
                         const sx = fw.x + cosT * (radPx * frac);
                         const szElev = hubElev + sinT * (radElev * frac);
-                        for (const rimY of [-16, 16]) {
-                            emitDynBox(sx, fw.y, 1, 0, 0, rimY, 5.2, 2.2, szElev - 0.020, szElev + 0.020, [0.92, 0.95, 0.99], 1.0, 5);
+                        for (let rimY = -16; rimY <= 16; rimY += 32) {
+                            emitDynBox(sx, fw.y, 1, 0, 0, rimY, 5.2, 2.2, szElev - 0.020, szElev + 0.020, pal.fwSpokeSteel, 1.0, 5);
                             emitDynBox(sx, fw.y, 1, 0, 0, rimY + (rimY > 0 ? 1.4 : -1.4), 4.4, 1.4, szElev - 0.014, szElev + 0.014, spokeNeon, 1.0, 10);
                         }
                     }
 
-                    // 2) 3D Suspended Passenger Gondola Carriage (hanging plumb below its horizontal rim axle pin!)
                     const gx = fw.x + cosT * radPx;
                     const gyElev = hubElev + sinT * radElev;
                     const cCol = cabinPalette[gi % cabinPalette.length];
-                    // Horizontal steel suspension crossbar bridging North (offY=-16) & South (offY=+16) rims
-                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 2.8, 34, gyElev - 0.012, gyElev + 0.012, [0.88, 0.92, 0.96], 1.0, 5);
-                    // Cantilevered white Art Deco cabin sun-canopy roof + neon roof trim
-                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 12.6, 22, gyElev - 0.038, gyElev - 0.012, [0.98, 0.98, 1.00], 1.0, 9);
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 2.8, 34, gyElev - 0.012, gyElev + 0.012, pal.fwCrossbar, 1.0, 5);
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 12.6, 22, gyElev - 0.038, gyElev - 0.012, pal.fwRoof, 1.0, 9);
                     emitDynBox(gx, fw.y, 1, 0, 0, 0, 13.0, 22.6, gyElev - 0.044, gyElev - 0.036, cCol, 1.0, 10);
-                    // Panoramic observation glass window cabin upper section (MAT 7)
-                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 10.4, 19, gyElev - 0.098, gyElev - 0.044, [0.22, 0.90, 0.98], 1.0, 7);
-                    // Glossy pastel gondola carriage body (MAT 9) + dark steel undercarriage floor
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 10.4, 19, gyElev - 0.098, gyElev - 0.044, pal.fwGlass, 1.0, 7);
                     emitDynBox(gx, fw.y, 1, 0, 0, 0, 11.6, 21, gyElev - 0.165, gyElev - 0.098, cCol, 1.0, 9);
-                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 10.8, 19.5, gyElev - 0.182, gyElev - 0.165, [0.18, 0.20, 0.26], 1.0, 5);
+                    emitDynBox(gx, fw.y, 1, 0, 0, 0, 10.8, 19.5, gyElev - 0.182, gyElev - 0.165, pal.fwFloor, 1.0, 5);
                 }
             }
         }
@@ -13321,14 +13338,12 @@ class WorldObjectEngine {
                 const rotStar = t * 1.8;
                 const cs = Math.cos(rotStar);
                 const sn = Math.sin(rotStar);
-                // Rotating 3D Neon Star/Crown atop the Central Portal Cupola (bz+2.14..2.28)
-                emitDynBox(pa.x, pa.y, cs, sn, 0, 0, 16, 5, bz + 2.12, bz + 2.24, [1.00, 0.34, 0.80], 1.0, 10);
-                emitDynBox(pa.x, pa.y, -sn, cs, 0, 0, 16, 5, bz + 2.12, bz + 2.24, [0.16, 0.94, 0.98], 1.0, 10);
-                // Animated Marquee Chase Bulbs along the West & East Portal Arch Fascia
+                emitDynBox(pa.x, pa.y, cs, sn, 0, 0, 16, 5, bz + 2.12, bz + 2.24, pal.paStar1, 1.0, 10);
+                emitDynBox(pa.x, pa.y, -sn, cs, 0, 0, 16, 5, bz + 2.12, bz + 2.24, pal.paStar2, 1.0, 10);
                 for (let bi = -4; bi <= 4; bi++) {
                     const by = bi * 22;
                     const bulbOn = ((bi + 4 + Math.floor(t * 7.0)) % 3 === 0);
-                    const bCol = bulbOn ? [1.00, 0.90, 0.32] : [0.98, 0.32, 0.78];
+                    const bCol = bulbOn ? pal.paBulbOn : pal.paBulbOff;
                     emitDynBox(pa.x, pa.y, 1, 0, -18, by, 3.5, 8, bz + 1.33, bz + 1.37, bCol, 1.0, 10);
                     emitDynBox(pa.x, pa.y, 1, 0,  18, by, 3.5, 8, bz + 1.33, bz + 1.37, bCol, 1.0, 10);
                 }
@@ -13499,9 +13514,9 @@ class WorldObjectEngine {
                 const cosA = Math.cos(pt.ang || 0);
                 const sinA = Math.sin(pt.ang || 0);
                 const bz = (pt.z || 2.0) + Math.sin(t * 1.8 + (pt.seed || i)) * 0.008;
-                const yWhite = [0.96, 0.98, 1.00];
-                const yGlass = [0.14, 0.56, 0.80];
-                const yTeak  = [0.84, 0.66, 0.44];
+                const yWhite = pal.yWhite;
+                const yGlass = pal.yGlass;
+                const yTeak  = pal.yTeak;
                 // Stepped White Superyacht Hull & Flared Bow Prow above water surface
                 emitDynBox(pt.x, pt.y, cosA, sinA, -6 * sc, 0, 68 * sc, 29 * sc, bz + 0.048, bz + 0.17, yWhite, 1.0, 5);
                 emitDynBox(pt.x, pt.y, cosA, sinA, 29 * sc, 0, 14 * sc, 21 * sc, bz + 0.048, bz + 0.18, yWhite, 1.0, 5);
@@ -13514,8 +13529,8 @@ class WorldObjectEngine {
                 emitDynBox(pt.x, pt.y, cosA, sinA, -5 * sc, 0, 44 * sc, 22 * sc, bz + 0.36, bz + 0.41, yWhite, 1.0, 9);
                 emitDynBox(pt.x, pt.y, cosA, sinA, -8 * sc, 0, 22 * sc, 16 * sc, bz + 0.41, bz + 0.52, yGlass, 1.0, 7);
                 emitDynBox(pt.x, pt.y, cosA, sinA, -12 * sc, 0, 9 * sc, 18 * sc, bz + 0.52, bz + 0.68, yWhite, 1.0, 9);
-                emitDynBox(pt.x, pt.y, cosA, sinA, 24 * sc, -4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.98, 0.36, 0.72], 1.0, 9);
-                emitDynBox(pt.x, pt.y, cosA, sinA, 24 * sc,  4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, [0.18, 0.88, 0.96], 1.0, 9);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 24 * sc, -4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, pal.yPink, 1.0, 9);
+                emitDynBox(pt.x, pt.y, cosA, sinA, 24 * sc,  4.5 * sc, 11 * sc, 5.5 * sc, bz + 0.19, bz + 0.23, pal.yCyan, 1.0, 9);
             }
         }
 
@@ -13533,201 +13548,178 @@ class WorldObjectEngine {
 
                 if (sp.kind === "HYDRANT") {
                     if (sp.broken) {
-                        // Toppled hydrant body flying / lying on street
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 7, bz, bz + 0.07, [0.88, 0.22, 0.18], 1.0, 5);
-                        // High-pressure 3D Water Geyser erupting from homeX, homeY!
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 7, bz, bz + 0.07, pal.hydRed, 1.0, 5);
                         if (sp.geyserTimer > 0) {
                             for (let w = 0; w < 5; w++) {
                                 const phase = ((t * 3.8 + w * 0.2) % 1.0);
                                 const wyElev = 2.02 + phase * 0.78;
                                 const spread = 5.0 + phase * 14.0;
-                                emitDynBox(sp.homeX, sp.homeY, 1, 0, 0, 0, spread, spread, wyElev, wyElev + 0.11, [0.68, 0.94, 1.0], 0.78 - phase * 0.45, 7);
+                                emitDynBox(sp.homeX, sp.homeY, 1, 0, 0, 0, spread, spread, wyElev, wyElev + 0.11, pal.hydWater, 0.78 - phase * 0.45, 7);
                             }
                         }
                     } else {
-                        emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 7, 7, bz, bz + 0.12, [0.88, 0.22, 0.18], 1.0, 5);
-                        emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 9, 5, bz + 0.06, bz + 0.09, [0.94, 0.80, 0.18], 1.0, 5);
+                        emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 7, 7, bz, bz + 0.12, pal.hydRed, 1.0, 5);
+                        emitDynBox(sp.x, sp.y, 1, 0, 0, 0, 9, 5, bz + 0.06, bz + 0.09, pal.hydCap, 1.0, 5);
                     }
                 } else if (sp.kind === "TRASH_CAN" || sp.kind === "RECYCLE_BIN") {
                     const isRec = sp.kind === "RECYCLE_BIN";
-                    const binCol = isRec
-                        ? [0.12, 0.54, 0.88]
-                        : (sp.neonPink ? [0.16, 0.56, 0.48] : [0.14, 0.38, 0.26]);
-                    const lidCol = isRec ? [0.92, 0.95, 0.99] : [0.76, 0.80, 0.86];
+                    const binCol = isRec ? pal.binRec : (sp.neonPink ? pal.binPink : pal.binGrn);
+                    const lidCol = isRec ? pal.lidRec : pal.lidStd;
                     if (sp.broken) {
-                        // Knocked-over 3D trash can body + detached dome lid + scattered 3D garbage bags, soda cans & litter!
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 9.5, bz, bz + 0.085, binCol, 1.0, 6);
                         emitDynBox(sp.x, sp.y, cosA, sinA, 8.5, 2.5, 4.5, 8.5, bz, bz + 0.065, lidCol, 1.0, 9);
                         const mx = (sp.homeX + sp.x) * 0.5;
                         const my = (sp.homeY + sp.y) * 0.5;
-                        // Black/white spilled garbage bags & colorful crushed cans strewn across sidewalk/street
-                        emitDynBox(mx - 6, my + 5, cosA, sinA, 0, 0, 6.5, 5.5, 2.01, 2.055, [0.15, 0.17, 0.20], 1.0, 6);
-                        emitDynBox(mx + 7, my - 4, -sinA, cosA, 0, 0, 5.5, 4.8, 2.01, 2.050, [0.92, 0.91, 0.88], 1.0, 6);
-                        emitDynBox(sp.x - cosA * 10, sp.y - sinA * 10, cosA, sinA, 0, 3, 3.4, 2.2, 2.01, 2.035, [0.96, 0.28, 0.68], 1.0, 6);
-                        emitDynBox(sp.x - cosA * 6, sp.y - sinA * 6, -sinA, cosA, 0, -4, 3.4, 2.2, 2.01, 2.035, [0.18, 0.86, 0.96], 1.0, 6);
-                        emitDynBox(mx + 3, my + 8, 1, 0, 0, 0, 4.8, 4.2, 2.01, 2.030, [0.88, 0.68, 0.36], 1.0, 6);
+                        emitDynBox(mx - 6, my + 5, cosA, sinA, 0, 0, 6.5, 5.5, 2.01, 2.055, pal.trashBagBlk, 1.0, 6);
+                        emitDynBox(mx + 7, my - 4, -sinA, cosA, 0, 0, 5.5, 4.8, 2.01, 2.050, pal.trashBagWht, 1.0, 6);
+                        emitDynBox(sp.x - cosA * 10, sp.y - sinA * 10, cosA, sinA, 0, 3, 3.4, 2.2, 2.01, 2.035, pal.canPink, 1.0, 6);
+                        emitDynBox(sp.x - cosA * 6, sp.y - sinA * 6, -sinA, cosA, 0, -4, 3.4, 2.2, 2.01, 2.035, pal.canCyan, 1.0, 6);
+                        emitDynBox(mx + 3, my + 8, 1, 0, 0, 0, 4.8, 4.2, 2.01, 2.030, pal.boxTan, 1.0, 6);
                     } else {
-                        // Upright 3D Miami Beach municipal trash receptacle / recycling bin with white liner bag rim & domed hood
                         emitDynCylinder(sp.x, sp.y, 0, 0, 4.6, 5.0, bz, bz + 0.13, 8, binCol, 6, true);
-                        emitDynCylinder(sp.x, sp.y, 0, 0, 5.2, 5.1, bz + 0.125, bz + 0.142, 8, [0.95, 0.96, 0.98], 6, true);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 5.2, 5.1, bz + 0.125, bz + 0.142, 8, pal.binLiner, 6, true);
                         emitDynCylinder(sp.x, sp.y, 0, 0, 5.0, 3.4, bz + 0.142, bz + 0.182, 8, lidCol, 9, true);
                     }
                 } else if (sp.kind === "PARKING_METER") {
                     if (sp.broken) {
-                        // Snapped curb flange + toppled meter pole & scattered golden coins
-                        emitDynCylinder(sp.homeX, sp.homeY, 0, 0, 2.4, 2.0, 2.0, 2.03, 6, [0.38, 0.42, 0.48], 9, true);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 2.4, bz, bz + 0.035, [0.64, 0.68, 0.74], 1.0, 9);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 6.5, 0, 5.5, 4.2, bz, bz + 0.055, [0.22, 0.26, 0.32], 1.0, 9);
-                        emitDynBox(sp.homeX + 5, sp.homeY - 4, 1, 0, 0, 0, 2.4, 2.4, 2.01, 2.025, [0.98, 0.82, 0.18], 1.0, 10);
-                        emitDynBox(sp.x - 4, sp.y + 4, 1, 0, 0, 0, 2.4, 2.4, 2.01, 2.025, [0.98, 0.82, 0.18], 1.0, 10);
+                        emitDynCylinder(sp.homeX, sp.homeY, 0, 0, 2.4, 2.0, 2.0, 2.03, 6, pal.mtrBase, 9, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 2.4, bz, bz + 0.035, pal.mtrPoleB, 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 6.5, 0, 5.5, 4.2, bz, bz + 0.055, pal.mtrHeadB, 1.0, 9);
+                        emitDynBox(sp.homeX + 5, sp.homeY - 4, 1, 0, 0, 0, 2.4, 2.4, 2.01, 2.025, pal.mtrCoin, 1.0, 10);
+                        emitDynBox(sp.x - 4, sp.y + 4, 1, 0, 0, 0, 2.4, 2.4, 2.01, 2.025, pal.mtrCoin, 1.0, 10);
                     } else {
-                        // Slim 3D steel post + twin solar digital parking meter head with glowing green/cyan display
-                        emitDynCylinder(sp.x, sp.y, 0, 0, 1.5, 1.4, bz, bz + 0.16, 6, [0.62, 0.66, 0.72], 9, true);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 3.8, 5.4, bz + 0.15, bz + 0.215, [0.24, 0.28, 0.34], 1.0, 9);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0.4, 0, 3.2, 4.0, bz + 0.175, bz + 0.205, [0.18, 0.94, 0.68], 1.0, 10);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 1.5, 1.4, bz, bz + 0.16, 6, pal.mtrPole, 9, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 3.8, 5.4, bz + 0.15, bz + 0.215, pal.mtrHead, 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0.4, 0, 3.2, 4.0, bz + 0.175, bz + 0.205, pal.mtrLcd, 1.0, 10);
                     }
                 } else if (sp.kind === "MAILBOX") {
-                    const uspsBlue = [0.10, 0.28, 0.64];
                     if (sp.broken) {
-                        // Toppled USPS blue mailbox + scattered white airmail envelopes on pavement
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 15, 10, bz, bz + 0.095, uspsBlue, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 15, 10, bz, bz + 0.095, pal.uspsBlue, 1.0, 6);
                         const mx = (sp.homeX + sp.x) * 0.5;
                         const my = (sp.homeY + sp.y) * 0.5;
-                        emitDynBox(mx - 5, my + 4, cosA, sinA, 0, 0, 4.2, 2.8, 2.01, 2.022, [0.97, 0.98, 1.0], 1.0, 6);
-                        emitDynBox(mx + 6, my - 5, -sinA, cosA, 0, 0, 4.2, 2.8, 2.01, 2.022, [0.97, 0.98, 1.0], 1.0, 6);
-                        emitDynBox(sp.x - 7, sp.y + 6, 1, 0, 0, 0, 4.0, 2.8, 2.01, 2.022, [0.97, 0.98, 1.0], 1.0, 6);
+                        emitDynBox(mx - 5, my + 4, cosA, sinA, 0, 0, 4.2, 2.8, 2.01, 2.022, pal.mailEnv, 1.0, 6);
+                        emitDynBox(mx + 6, my - 5, -sinA, cosA, 0, 0, 4.2, 2.8, 2.01, 2.022, pal.mailEnv, 1.0, 6);
+                        emitDynBox(sp.x - 7, sp.y + 6, 1, 0, 0, 0, 4.0, 2.8, 2.01, 2.022, pal.mailEnv, 1.0, 6);
                     } else {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10.5, 10.5, bz, bz + 0.16, uspsBlue, 1.0, 6);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10.8, 9.2, bz + 0.15, bz + 0.195, [0.14, 0.36, 0.76], 1.0, 6);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 11.0, 10.8, bz + 0.12, bz + 0.135, [0.94, 0.96, 0.99], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10.5, 10.5, bz, bz + 0.16, pal.uspsBlue, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10.8, 9.2, bz + 0.15, bz + 0.195, pal.uspsTop, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 11.0, 10.8, bz + 0.12, bz + 0.135, pal.uspsTrim, 1.0, 6);
                     }
                 } else if (sp.kind === "ESCOOTER_RACK") {
                     if (sp.broken) {
-                        // Smashed docking rail + 3 scattered neon lime & cyan rental e-scooters lying on the ground
-                        emitDynBox(sp.homeX, sp.homeY, cosA, sinA, 0, 0, 6, 22, 2.0, 2.03, [0.42, 0.46, 0.52], 1.0, 9);
+                        emitDynBox(sp.homeX, sp.homeY, cosA, sinA, 0, 0, 6, 22, 2.0, 2.03, pal.scRailB, 1.0, 9);
                         for (let s = -1; s <= 1; s++) {
-                            const scCol = (s === 0) ? [0.16, 0.92, 0.98] : [0.58, 0.96, 0.16];
+                            const scCol = (s === 0) ? pal.scCyan : pal.scLime;
                             const sx = sp.x + s * 8 * sinA + s * 4 * cosA;
                             const sy = sp.y - s * 8 * cosA + s * 4 * sinA;
-                            emitDynBox(sx, sy, cosA, sinA, 0, 0, 13, 3.2, bz, bz + 0.035, [0.18, 0.20, 0.24], 1.0, 6);
+                            emitDynBox(sx, sy, cosA, sinA, 0, 0, 13, 3.2, bz, bz + 0.035, pal.scDeck, 1.0, 6);
                             emitDynBox(sx, sy, -sinA, cosA, 4, 0, 12, 2.0, bz + 0.01, bz + 0.045, scCol, 1.0, 10);
                         }
                     } else {
-                        // Sidewalk docking bar + 3 upright Miami rental e-scooters (deck + vertical stem + handlebars + LED headlight)
-                        emitDynBox(sp.x, sp.y, cosA, sinA, -4, 0, 3.2, 22, bz, bz + 0.04, [0.52, 0.56, 0.64], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -4, 0, 3.2, 22, bz, bz + 0.04, pal.scRail, 1.0, 9);
                         for (let s = -1; s <= 1; s++) {
                             const syOff = s * 7.0;
-                            const scCol = (s === 0) ? [0.16, 0.92, 0.98] : [0.58, 0.96, 0.16];
-                            emitDynBox(sp.x, sp.y, cosA, sinA, 1.5, syOff, 11.5, 3.2, bz, bz + 0.032, [0.18, 0.20, 0.24], 1.0, 6);
+                            const scCol = (s === 0) ? pal.scCyan : pal.scLime;
+                            emitDynBox(sp.x, sp.y, cosA, sinA, 1.5, syOff, 11.5, 3.2, bz, bz + 0.032, pal.scDeck, 1.0, 6);
                             emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, syOff, 2.0, 2.0, bz + 0.03, bz + 0.175, scCol, 1.0, 9);
-                            emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, syOff, 2.0, 6.2, bz + 0.165, bz + 0.182, [0.16, 0.18, 0.22], 1.0, 9);
+                            emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, syOff, 2.0, 6.2, bz + 0.165, bz + 0.182, pal.scBar, 1.0, 9);
                         }
                     }
                 } else if (sp.kind === "BUS_STOP_SHELTER") {
                     if (sp.broken) {
-                        // Shattered glass transit shelter: twisted aluminum roof frame + translucent cyan glass shards on ground
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 30, bz, bz + 0.055, [0.76, 0.80, 0.86], 1.0, 9);
-                        emitDynBox(sp.homeX - 5, sp.homeY + 6, cosA, sinA, 0, 0, 10, 12, 2.01, 2.035, [0.36, 0.84, 0.96], 0.72, 7);
-                        emitDynBox(sp.x + 6, sp.y - 7, -sinA, cosA, 0, 0, 11, 9, 2.01, 2.035, [0.36, 0.84, 0.96], 0.72, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 30, bz, bz + 0.055, pal.lidStd, 1.0, 9);
+                        emitDynBox(sp.homeX - 5, sp.homeY + 6, cosA, sinA, 0, 0, 10, 12, 2.01, 2.035, pal.busShard, 0.72, 7);
+                        emitDynBox(sp.x + 6, sp.y - 7, -sinA, cosA, 0, 0, 11, 9, 2.01, 2.035, pal.busShard, 0.72, 7);
                     } else {
-                        // 3D Miami-Dade Metrobus Glass Shelter: rear glass wall, illuminated ad/map panel, bench & overhanging cyan canopy roof
-                        emitDynBox(sp.x, sp.y, cosA, sinA, -5.5, 0, 2.2, 28, bz, bz + 0.27, [0.28, 0.76, 0.92], 0.78, 7);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, -13.2, 11, 2.2, bz, bz + 0.27, [0.96, 0.36, 0.74], 0.95, 10);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, -2.2, 2.0, 5.0, 16, bz + 0.05, bz + 0.08, [0.82, 0.86, 0.92], 1.0, 9);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 31, bz + 0.27, bz + 0.305, [0.88, 0.92, 0.97], 1.0, 9);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 28, bz + 0.305, bz + 0.32, [0.22, 0.86, 0.96], 0.85, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -5.5, 0, 2.2, 28, bz, bz + 0.27, pal.busWall, 0.78, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, -13.2, 11, 2.2, bz, bz + 0.27, pal.busAd, 0.95, 10);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -2.2, 2.0, 5.0, 16, bz + 0.05, bz + 0.08, pal.busBench, 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 31, bz + 0.27, bz + 0.305, pal.busRoof, 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 28, bz + 0.305, bz + 0.32, pal.busGlass, 0.85, 7);
                     }
                 } else if (sp.kind === "FOOD_CART") {
-                    const isPinkCart = sp.neonPink;
-                    const umbCol = isPinkCart ? [0.96, 0.32, 0.68] : [0.16, 0.84, 0.94];
+                    const umbCol = sp.neonPink ? pal.fcPink : pal.fcCyan;
                     if (sp.broken) {
-                        // Overturned street-food cart + toppled striped umbrella + spilled food boxes
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 20, 13, bz, bz + 0.095, [0.86, 0.89, 0.94], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 20, 13, bz, bz + 0.095, pal.fcBodyB, 1.0, 9);
                         emitDynBox(sp.x, sp.y, -sinA, cosA, 11, 4, 18, 18, bz, bz + 0.06, umbCol, 1.0, 6);
-                        emitDynBox(sp.homeX + 6, sp.homeY - 5, 1, 0, 0, 0, 4.5, 4.5, 2.01, 2.04, [0.96, 0.72, 0.18], 1.0, 6);
+                        emitDynBox(sp.homeX + 6, sp.homeY - 5, 1, 0, 0, 0, 4.5, 4.5, 2.01, 2.04, pal.fcBox, 1.0, 6);
                     } else {
-                        // Stainless-steel & neon Miami street food / Cafe Cubano cart + canopy umbrella
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 19, bz, bz + 0.145, [0.88, 0.91, 0.95], 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 19, bz, bz + 0.145, pal.fcBody, 1.0, 9);
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12.6, 19.6, bz + 0.06, bz + 0.10, umbCol, 1.0, 10);
-                        emitDynCylinder(sp.x, sp.y, 0, 0, 1.3, 1.3, bz + 0.145, bz + 0.29, 6, [0.78, 0.82, 0.88], 9, true);
+                        emitDynCylinder(sp.x, sp.y, 0, 0, 1.3, 1.3, bz + 0.145, bz + 0.29, 6, pal.fcPole, 9, true);
                         emitDynCylinder(sp.x, sp.y, 0, 0, 11.5, 2.5, bz + 0.27, bz + 0.34, 8, umbCol, 6, true);
                     }
                 } else if (sp.kind === "MENU_BOARD") {
-                    const brdCol = sp.neonPink ? [0.96, 0.34, 0.74] : [0.18, 0.88, 0.96];
+                    const brdCol = sp.neonPink ? pal.mbPink : pal.mbCyan;
                     if (sp.broken) {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 13, 9, bz, bz + 0.04, [0.22, 0.24, 0.28], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 13, 9, bz, bz + 0.04, pal.mbFrmB, 1.0, 6);
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 10, 7, bz + 0.04, bz + 0.05, brdCol, 1.0, 10);
                     } else {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 6.5, 9.5, bz, bz + 0.145, [0.20, 0.22, 0.26], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 6.5, 9.5, bz, bz + 0.145, pal.mbFrm, 1.0, 6);
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 7.2, 8.0, bz + 0.03, bz + 0.13, brdCol, 1.0, 10);
                     }
                 } else if (sp.kind === "VELVET_ROPE") {
                     if (sp.broken) {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, -4, 0, 14, 2.5, bz, bz + 0.035, [0.96, 0.80, 0.22], 1.0, 9);
-                        emitDynBox(sp.x, sp.y, -sinA, cosA, 5, 3, 14, 2.5, bz, bz + 0.035, [0.96, 0.80, 0.22], 1.0, 9);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 2.2, bz, bz + 0.028, [0.88, 0.14, 0.32], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -4, 0, 14, 2.5, bz, bz + 0.035, pal.vrGold, 1.0, 9);
+                        emitDynBox(sp.x, sp.y, -sinA, cosA, 5, 3, 14, 2.5, bz, bz + 0.035, pal.vrGold, 1.0, 9);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 2.2, bz, bz + 0.028, pal.vrCrimson, 1.0, 6);
                     } else {
-                        // Twin gold brass VIP stanchion posts + crimson velvet rope
-                        emitDynCylinder(sp.x, sp.y, -sinA * 8, cosA * 8, 2.4, 1.5, bz, bz + 0.14, 6, [0.96, 0.80, 0.22], 9, true);
-                        emitDynCylinder(sp.x, sp.y, sinA * 8, -cosA * 8, 2.4, 1.5, bz, bz + 0.14, 6, [0.96, 0.80, 0.22], 9, true);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 2.2, 16, bz + 0.085, bz + 0.115, [0.88, 0.14, 0.32], 1.0, 6);
+                        emitDynCylinder(sp.x, sp.y, -sinA * 8, cosA * 8, 2.4, 1.5, bz, bz + 0.14, 6, pal.vrGold, 9, true);
+                        emitDynCylinder(sp.x, sp.y, sinA * 8, -cosA * 8, 2.4, 1.5, bz, bz + 0.14, 6, pal.vrGold, 9, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 2.2, 16, bz + 0.085, bz + 0.115, pal.vrCrimson, 1.0, 6);
                     }
                 } else if (sp.kind === "STREET_BENCH") {
                     if (sp.broken) {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, -4, 8, 20, bz, bz + 0.045, [0.68, 0.46, 0.26], 1.0, 6);
-                        emitDynBox(sp.x, sp.y, -sinA, cosA, 4, 5, 6, 18, bz, bz + 0.045, [0.22, 0.78, 0.82], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, -4, 8, 20, bz, bz + 0.045, pal.sbWoodB, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, -sinA, cosA, 4, 5, 6, 18, bz, bz + 0.045, pal.sbTealB, 1.0, 6);
                     } else {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 8.5, 22, bz, bz + 0.075, [0.72, 0.48, 0.26], 1.0, 6);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, 0, 2.4, 22, bz + 0.075, bz + 0.135, [0.24, 0.82, 0.86], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 8.5, 22, bz, bz + 0.075, pal.sbWood, 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, -3.2, 0, 2.4, 22, bz + 0.075, bz + 0.135, pal.sbTeal, 1.0, 6);
                     }
                 } else if (sp.kind === "TRAFFIC_CONE_SET") {
                     if (sp.broken) {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 18, 3.5, bz, bz + 0.04, [0.98, 0.76, 0.12], 1.0, 6);
-                        emitDynBox(sp.x - 7, sp.y + 5, cosA, sinA, 0, 0, 8, 5, bz, bz + 0.045, [0.98, 0.42, 0.08], 1.0, 6);
-                        emitDynBox(sp.homeX + 6, sp.homeY - 6, -sinA, cosA, 0, 0, 8, 5, 2.0, 2.045, [0.98, 0.42, 0.08], 1.0, 6);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 18, 3.5, bz, bz + 0.04, pal.tcYel, 1.0, 6);
+                        emitDynBox(sp.x - 7, sp.y + 5, cosA, sinA, 0, 0, 8, 5, bz, bz + 0.045, pal.tcOrg, 1.0, 6);
+                        emitDynBox(sp.homeX + 6, sp.homeY - 6, -sinA, cosA, 0, 0, 8, 5, 2.0, 2.045, pal.tcOrg, 1.0, 6);
                     } else {
-                        // Striped yellow/black A-frame road horse barricade + 2 orange/white reflective traffic cones
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 3.5, 16, bz + 0.04, bz + 0.11, [0.98, 0.76, 0.12], 1.0, 6);
-                        emitDynCylinder(sp.x, sp.y, -sinA * 10, cosA * 10, 3.6, 1.2, bz, bz + 0.11, 6, [0.98, 0.42, 0.08], 6, true);
-                        emitDynCylinder(sp.x, sp.y, sinA * 10, -cosA * 10, 3.6, 1.2, bz, bz + 0.11, 6, [0.98, 0.42, 0.08], 6, true);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 3.5, 16, bz + 0.04, bz + 0.11, pal.tcYel, 1.0, 6);
+                        emitDynCylinder(sp.x, sp.y, -sinA * 10, cosA * 10, 3.6, 1.2, bz, bz + 0.11, 6, pal.tcOrg, 6, true);
+                        emitDynCylinder(sp.x, sp.y, sinA * 10, -cosA * 10, 3.6, 1.2, bz, bz + 0.11, 6, pal.tcOrg, 6, true);
                     }
                 } else if (sp.kind === "STREETLIGHT_NEON") {
-                    const neonCol = sp.neonPink ? [0.96, 0.34, 0.76] : [0.22, 0.88, 0.96];
+                    const neonCol = sp.neonPink ? pal.slPink : pal.slCyan;
                     if (sp.broken) {
-                        // Knocked-down 3D streetlight pole lying horizontal on the ground
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 38, 4, bz, bz + 0.05, [0.78, 0.82, 0.88], 1.0, 5);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 16, 0, 10, 6, bz, bz + 0.06, [0.35, 0.38, 0.44], 1.0, 5);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 38, 4, bz, bz + 0.05, pal.slPoleB, 1.0, 5);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 16, 0, 10, 6, bz, bz + 0.06, pal.slHeadB, 1.0, 5);
                     } else if (sp.damaged) {
-                        // Bent / damaged 3D Art Deco pole + flickering neon arm
                         const tx = sp.tiltDx || 5.0;
                         const ty = sp.tiltDy || 0.0;
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.24, [0.76, 0.80, 0.86], 1.0, 5);
-                        emitDynBox(sp.x + tx * 0.65, sp.y + ty * 0.65, cosA, sinA, 0, 0, 4.5, 4.5, bz + 0.22, bz + 0.46, [0.76, 0.80, 0.86], 1.0, 5);
-                        emitDynBox(sp.x + tx, sp.y + ty, cosA, sinA, 9, 0, 18, 4.0, bz + 0.43, bz + 0.47, [0.76, 0.80, 0.86], 1.0, 5);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.24, pal.slPoleD, 1.0, 5);
+                        emitDynBox(sp.x + tx * 0.65, sp.y + ty * 0.65, cosA, sinA, 0, 0, 4.5, 4.5, bz + 0.22, bz + 0.46, pal.slPoleD, 1.0, 5);
+                        emitDynBox(sp.x + tx, sp.y + ty, cosA, sinA, 9, 0, 18, 4.0, bz + 0.43, bz + 0.47, pal.slPoleD, 1.0, 5);
                         if (Math.sin(t * 28.0 + sp.x) > -0.25) {
                             emitDynBox(sp.x + tx, sp.y + ty, cosA, sinA, 14, 0, 10, 6.0, bz + 0.40, bz + 0.44, neonCol, 1.0, 7);
                         }
                     } else {
-                        // Vertical 3D Art Deco pole + cantilevered glowing neon luminary arm
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.54, [0.82, 0.86, 0.92], 1.0, 5);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 9, 0, 18, 4.0, bz + 0.50, bz + 0.54, [0.82, 0.86, 0.92], 1.0, 5);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 4.5, 4.5, bz, bz + 0.54, pal.slPole, 1.0, 5);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 9, 0, 18, 4.0, bz + 0.50, bz + 0.54, pal.slPole, 1.0, 5);
                         emitDynBox(sp.x, sp.y, cosA, sinA, 14, 0, 10, 6.0, bz + 0.47, bz + 0.51, neonCol, 1.0, 7);
                     }
                 } else if (sp.kind === "PAYPHONE_BOOTH") {
                     if (sp.broken) {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 22, 12, bz, bz + 0.09, [0.22, 0.64, 0.84], 1.0, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 22, 12, bz, bz + 0.09, pal.ppBlue, 1.0, 7);
                     } else {
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 14, bz, bz + 0.28, [0.22, 0.64, 0.84], 1.0, 7);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 16, bz + 0.28, bz + 0.32, [0.94, 0.96, 0.99], 1.0, 5);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 14, bz, bz + 0.28, pal.ppBlue, 1.0, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 16, 16, bz + 0.28, bz + 0.32, pal.uspsTrim, 1.0, 5);
                     }
                 } else if (sp.kind === "NEWS_STAND") {
-                    const newsCol = sp.neonPink ? [0.94, 0.32, 0.58] : [0.92, 0.64, 0.16];
+                    const newsCol = sp.neonPink ? pal.nsPink : pal.nsGold;
                     if (sp.broken) {
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 14, 10, bz, bz + 0.07, newsCol, 1.0, 6);
-                        emitDynBox(sp.homeX + 5, sp.homeY - 4, cosA, sinA, 0, 0, 5.5, 4.5, 2.01, 2.022, [0.94, 0.95, 0.98], 1.0, 6);
+                        emitDynBox(sp.homeX + 5, sp.homeY - 4, cosA, sinA, 0, 0, 5.5, 4.5, 2.01, 2.022, pal.nsPaper, 1.0, 6);
                     } else {
                         emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz, bz + 0.16, newsCol, 1.0, 6);
-                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz + 0.11, bz + 0.16, [0.94, 0.95, 0.98], 1.0, 7);
+                        emitDynBox(sp.x, sp.y, cosA, sinA, 0, 0, 12, 10, bz + 0.11, bz + 0.16, pal.nsPaper, 1.0, 7);
                     }
                 }
             }

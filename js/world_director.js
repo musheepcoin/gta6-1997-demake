@@ -576,24 +576,25 @@ class ViceWorldDirector {
         };
     }
 
-    findNearestTrunkVehicle(maxDist = 56) {
+    findNearestTrunkVehicle(maxDist = 56, useSpatialGrid = false) {
         const g = this.game;
         if (!g || !g.player || g.player.dead || g.player.inVehicle || g.activeInterior) return null;
         if (!Array.isArray(g.vehicles)) return null;
         const p = g.player;
-        const noTrunkSpecs = new Set(["BMX_BIKE", "E_SCOOTER", "JETSKI", "AIRBOAT", "SPEEDBOAT", "YACHT", "SWAMP_BOAT", "MICRO_KART"]);
+        const noTrunkSpecs = this._noTrunkSpecs || (this._noTrunkSpecs = new Set([
+            "BMX_BIKE", "E_SCOOTER", "JETSKI", "AIRBOAT", "SPEEDBOAT", "YACHT", "SWAMP_BOAT", "MICRO_KART"
+        ]));
         let bestVeh = null;
         let bestScore = Infinity;
 
-        for (let i = 0; i < g.vehicles.length; i++) {
-            const v = g.vehicles[i];
-            if (!v || v.destroyed || v.isMotorcycle || v.waterOnly || noTrunkSpecs.has(v.specKey)) continue;
-            if (Math.abs(v.speed || 0) > 22) continue;
+        const evalVeh = (v) => {
+            if (!v || v.destroyed || v.isMotorcycle || v.waterOnly || noTrunkSpecs.has(v.specKey)) return;
+            if (Math.abs(v.speed || 0) > 22) return;
             const dx = p.x - v.x;
             const dy = p.y - v.y;
-            if (Math.abs(dx) > maxDist || Math.abs(dy) > maxDist) continue;
+            if (dx > maxDist || dx < -maxDist || dy > maxDist || dy < -maxDist) return;
             const dCenter = Math.hypot(dx, dy);
-            if (dCenter > maxDist) continue;
+            if (dCenter > maxDist) return;
 
             // Compute rear trunk world position of the vehicle (prefer unlooted trunks when two cars are adjacent)
             const halfLen = (v.w || 48) * 0.5;
@@ -604,6 +605,25 @@ class ViceWorldDirector {
             if (score < bestScore) {
                 bestScore = score;
                 bestVeh = v;
+            }
+        };
+
+        const vHead = useSpatialGrid ? g._vehGridHead : null;
+        const vNext = useSpatialGrid ? g._vehGridNext : null;
+        if (vHead && vNext) {
+            const gx0 = Math.max(0, (p.x - maxDist) >> 8), gx1 = Math.min(127, (p.x + maxDist) >> 8);
+            const gy0 = Math.max(0, (p.y - maxDist) >> 8), gy1 = Math.min(127, (p.y + maxDist) >> 8);
+            for (let gy = gy0; gy <= gy1; gy++) {
+                const rowOff = gy << 7;
+                for (let gx = gx0; gx <= gx1; gx++) {
+                    for (let vi = vHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = vNext[vi]) {
+                        evalVeh(g.vehicles[vi]);
+                    }
+                }
+            }
+        } else {
+            for (let i = 0; i < g.vehicles.length; i++) {
+                evalVeh(g.vehicles[i]);
             }
         }
         return bestVeh;
@@ -709,7 +729,7 @@ class ViceWorldDirector {
             this._openCarryWarned = false;
             return;
         }
-        const heavyWeapons = new Set(["SHOTGUN", "ROCKET", "FLAMETHROWER", "ELECTRO"]);
+        const heavyWeapons = this._heavyWeaponsSet || (this._heavyWeaponsSet = new Set(["SHOTGUN", "ROCKET", "FLAMETHROWER", "ELECTRO"]));
         const isOpenCarryHeavy = Boolean(p.weapon && heavyWeapons.has(p.weapon));
         if (isOpenCarryHeavy && this.hasCopWitnessNear(p.x, p.y, 195, false)) {
             this.openCarryWarnTimer = (this.openCarryWarnTimer || 0) + dt;
@@ -781,16 +801,42 @@ class ViceWorldDirector {
         const py = v ? v.y : p.y;
         const pz = (v ? v.z : p.z) || 2.0;
 
-        for (let i = 0; i < g.peds.length; i++) {
-            const ped = g.peds[i];
-            if (!ped || ped.dead || ped.kind !== "CIVILIAN" || (ped.calling911Timer || 0) > 0 || (ped.filmingViralTimer || 0) > 0 || (ped.surrenderTimer || 0) > 0) continue;
-            const d = Math.hypot(ped.x - px, ped.y - py);
-            if (d > 38 && d < 240 && this.hasLineOfSight(ped.x, ped.y, px, py, pz, 38)) {
-                ped.filmingViralTimer = 2.2;
-                ped.angle = Math.atan2(py - ped.y, px - ped.x);
-                this.viralClipCooldown = 14.0;
-                g.addFloatingText(ped.x, ped.y - 22, "📱 FILMING LEONIDA CLIP!", "#f472b6");
-                break;
+        const pHead = g._pedGridHead;
+        const pNext = g._pedGridNext;
+        if (pHead && pNext && g._pedGridLastLen === g.peds.length) {
+            const gx0 = Math.max(0, (px - 240) >> 8), gx1 = Math.min(127, (px + 240) >> 8);
+            const gy0 = Math.max(0, (py - 240) >> 8), gy1 = Math.min(127, (py + 240) >> 8);
+            let startedFilming = false;
+            for (let gy = gy0; gy <= gy1 && !startedFilming; gy++) {
+                const rowOff = gy << 7;
+                for (let gx = gx0; gx <= gx1 && !startedFilming; gx++) {
+                    for (let pi = pHead[rowOff | gx]; pi !== undefined && pi !== -1; pi = pNext[pi]) {
+                        const ped = g.peds[pi];
+                        if (!ped || ped.dead || ped.kind !== "CIVILIAN" || (ped.calling911Timer || 0) > 0 || (ped.filmingViralTimer || 0) > 0 || (ped.surrenderTimer || 0) > 0) continue;
+                        const d = Math.hypot(ped.x - px, ped.y - py);
+                        if (d > 38 && d < 240 && this.hasLineOfSight(ped.x, ped.y, px, py, pz, 38)) {
+                            ped.filmingViralTimer = 2.2;
+                            ped.angle = Math.atan2(py - ped.y, px - ped.x);
+                            this.viralClipCooldown = 14.0;
+                            g.addFloatingText(ped.x, ped.y - 22, "📱 FILMING LEONIDA CLIP!", "#f472b6");
+                            startedFilming = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } else {
+            for (let i = 0; i < g.peds.length; i++) {
+                const ped = g.peds[i];
+                if (!ped || ped.dead || ped.kind !== "CIVILIAN" || (ped.calling911Timer || 0) > 0 || (ped.filmingViralTimer || 0) > 0 || (ped.surrenderTimer || 0) > 0) continue;
+                const d = Math.hypot(ped.x - px, ped.y - py);
+                if (d > 38 && d < 240 && this.hasLineOfSight(ped.x, ped.y, px, py, pz, 38)) {
+                    ped.filmingViralTimer = 2.2;
+                    ped.angle = Math.atan2(py - ped.y, px - ped.x);
+                    this.viralClipCooldown = 14.0;
+                    g.addFloatingText(ped.x, ped.y - 22, "📱 FILMING LEONIDA CLIP!", "#f472b6");
+                    break;
+                }
             }
         }
     }
@@ -1925,11 +1971,13 @@ class ViceWorldDirector {
     allowVehicleSnap(v, durationMs = 500) {
         if (!v || !v.id) return;
         const now = this.nowMs();
-        let entry = this.vehicleLedger.get(v.id);
+        let entry = (v._wdLedger && v._wdLedgerId === v.id && !v._wdLedger._evicted) ? v._wdLedger : this.vehicleLedger.get(v.id);
         if (!entry) {
-            entry = { lastX: v.x, lastY: v.y, lastDryX: v.x, lastDryY: v.y, owner: this.getVehicleAuthority(v), lastSyncMs: now, allowSnapUntilMs: 0 };
+            entry = { lastX: v.x, lastY: v.y, lastDryX: v.x, lastDryY: v.y, owner: this.getVehicleAuthority(v), lastSyncMs: now, allowSnapUntilMs: 0, _evicted: false };
             this.vehicleLedger.set(v.id, entry);
         }
+        v._wdLedger = entry;
+        v._wdLedgerId = v.id;
         entry.allowSnapUntilMs = now + durationMs;
         entry.lastX = v.x;
         entry.lastY = v.y;
@@ -1939,16 +1987,16 @@ class ViceWorldDirector {
         const g = this.game;
         if (!g) return 0;
         let healed = 0;
-        const boatSpecs = new Set(["AIRBOAT", "SPEEDBOAT", "JETSKI", "YACHT", "SWAMP_BOAT"]);
+        const boatSpecs = this._boatSpecsSet || (this._boatSpecsSet = new Set(["AIRBOAT", "SPEEDBOAT", "JETSKI", "YACHT", "SWAMP_BOAT"]));
 
         if (Array.isArray(g.vehicles)) {
             for (let i = 0; i < g.vehicles.length; i++) {
                 const v = g.vehicles[i];
                 if (!v) continue;
-                const entry = v.id ? this.vehicleLedger.get(v.id) : null;
 
-                // 1. Heal NaN vehicle kinematics
+                // 1. Heal NaN vehicle kinematics (lazy ledger lookup only on actual anomaly!)
                 if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.z || 0) || !Number.isFinite(v.angle || 0)) {
+                    const entry = (v._wdLedger && v._wdLedgerId === v.id && !v._wdLedger._evicted) ? v._wdLedger : (v.id ? this.vehicleLedger.get(v.id) : null);
                     v.x = (entry && Number.isFinite(entry.lastX)) ? entry.lastX : ((g.player && Number.isFinite(g.player.x)) ? g.player.x : 16384);
                     v.y = (entry && Number.isFinite(entry.lastY)) ? entry.lastY : ((g.player && Number.isFinite(g.player.y)) ? g.player.y : 16384);
                     v.z = 2.0;
@@ -1984,6 +2032,7 @@ class ViceWorldDirector {
                     g.map.isWaterAtPixel(v.x, v.y) &&
                     !(g.map.bridgeMask && g.map.bridgeMask[Math.floor(v.y / 64) * g.map.cols + Math.floor(v.x / 64)] > 0)
                 ) {
+                    const entry = (v._wdLedger && v._wdLedgerId === v.id && !v._wdLedger._evicted) ? v._wdLedger : (v.id ? this.vehicleLedger.get(v.id) : null);
                     if (entry && Number.isFinite(entry.lastDryX) && Number.isFinite(entry.lastDryY) && !g.map.isWaterAtPixel(entry.lastDryX, entry.lastDryY)) {
                         v.x = entry.lastDryX;
                         v.y = entry.lastDryY;
@@ -2040,22 +2089,46 @@ class ViceWorldDirector {
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
             if (!v || !v.id) continue;
-            const auth = this.getVehicleAuthority(v);
-            const isDry = !(g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(v.x, v.y));
-            let entry = this.vehicleLedger.get(v.id);
+            let entry = (v._wdLedger && v._wdLedgerId === v.id && !v._wdLedger._evicted) ? v._wdLedger : null;
             if (!entry) {
-                this.vehicleLedger.set(v.id, {
-                    lastX: v.x,
-                    lastY: v.y,
-                    lastDryX: isDry ? v.x : undefined,
-                    lastDryY: isDry ? v.y : undefined,
-                    owner: auth,
-                    lastSyncMs: now,
-                    allowSnapUntilMs: now + 350
-                });
+                entry = this.vehicleLedger.get(v.id);
+                if (!entry) {
+                    const authNew = this.getVehicleAuthority(v);
+                    const isDryNew = !(g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(v.x, v.y));
+                    entry = {
+                        lastX: v.x,
+                        lastY: v.y,
+                        lastDryX: isDryNew ? v.x : undefined,
+                        lastDryY: isDryNew ? v.y : undefined,
+                        owner: authNew,
+                        lastSyncMs: now,
+                        allowSnapUntilMs: now + 350,
+                        _evicted: false
+                    };
+                    this.vehicleLedger.set(v.id, entry);
+                    v._wdLedger = entry;
+                    v._wdLedgerId = v.id;
+                    continue;
+                }
+                v._wdLedger = entry;
+                v._wdLedgerId = v.id;
+            }
+
+            // O(1) fast-skip for motionless parked/idle vehicles (550+ cars/frame!)
+            if (v.x === entry.lastX && v.y === entry.lastY) {
+                entry.lastSyncMs = now;
+                if (v._wdLastDrv !== v.driver || v._wdLastRemote !== v._linkedRemoteId || p && p.inVehicle === v) {
+                    entry.owner = this.getVehicleAuthority(v);
+                    v._wdLastDrv = v.driver;
+                    v._wdLastRemote = v._linkedRemoteId;
+                }
                 continue;
             }
 
+            const auth = this.getVehicleAuthority(v);
+            v._wdLastDrv = v.driver;
+            v._wdLastRemote = v._linkedRemoteId;
+            const isDry = !(g.map && typeof g.map.isWaterAtPixel === "function" && g.map.isWaterAtPixel(v.x, v.y));
             const jumpDist = Math.hypot(v.x - entry.lastX, v.y - entry.lastY);
             const maxPhysStep = Math.max(this.config.maxFrameTeleportAllowancePx, (Math.abs(v.speed || 0) + 480) * Math.max(0.016, dt * 4.5));
             const wasOnScreen = Math.abs(entry.lastX - camX) < 620 && Math.abs(entry.lastY - camY) < 420;
@@ -2095,6 +2168,7 @@ class ViceWorldDirector {
         if (this.vehicleLedger.size > g.vehicles.length + 48) {
             for (const [vid, entry] of this.vehicleLedger.entries()) {
                 if (!entry || (now - (entry.lastSyncMs || 0)) > 15000) {
+                    if (entry) entry._evicted = true;
                     this.vehicleLedger.delete(vid);
                 }
             }

@@ -1253,10 +1253,25 @@ class Vehicle {
     }
 
     getOccupiedSeats(game) {
-        const list = [];
-        if (!game) return list;
+        if (!Vehicle._emptySeats) Vehicle._emptySeats = Object.freeze([]);
+        if (!game) return Vehicle._emptySeats;
         const p = game.player;
-        if (p && !p.dead && p.inVehicle === this) {
+        const localInThis = Boolean(p && !p.dead && p.inVehicle === this);
+        let anyRemoteInThis = false;
+        const rpMap = game.net && game.net.remotePlayers;
+        if (rpMap && rpMap.size > 0) {
+            for (const rp of rpMap.values()) {
+                if (rp && !rp.isBot && !rp.dead && rp.veh && rp.veh.id === this.id) {
+                    anyRemoteInThis = true;
+                    break;
+                }
+            }
+        }
+        if (!localInThis && !anyRemoteInThis && !this.hasJason) {
+            return Vehicle._emptySeats;
+        }
+        const list = [];
+        if (localInThis) {
             list.push({
                 seat: p.seatIndex || 0,
                 isLocal: true,
@@ -1267,7 +1282,7 @@ class Vehicle {
                 muzzleTimer: p.muzzleTimer || 0
             });
         }
-        if (game.net && typeof game.net.getHumanRemotePlayers === "function") {
+        if (anyRemoteInThis && game.net && typeof game.net.getHumanRemotePlayers === "function") {
             for (const rp of game.net.getHumanRemotePlayers()) {
                 if (!rp.dead && rp.veh && rp.veh.id === this.id) {
                     const rSeat = typeof rp.veh.seat === "number" ? rp.veh.seat : 0;
@@ -1295,7 +1310,7 @@ class Vehicle {
                 muzzleTimer: (game.jason && game.jason.muzzleTimer) || 0
             });
         }
-        list.sort((a, b) => a.seat - b.seat);
+        if (list.length > 1) list.sort((a, b) => a.seat - b.seat);
         return list;
     }
 
@@ -5121,15 +5136,31 @@ class Vehicle {
             if (this.specKey === "FIRE_TRUCK" && !this.destroyed && game && Array.isArray(game.vehicles) && typeof game.emitPressurizedWaterJet === "function") {
                 let srvBurnTarget = null;
                 let srvBestDist = 365;
-                for (let ovi = 0; ovi < game.vehicles.length; ovi++) {
-                    const ov = game.vehicles[ovi];
-                    if (!ov || ov === this || ov.specKey === "BMX_BIKE" || ov.specKey === "E_SCOOTER") continue;
+                const evalBurnTarget = (ov) => {
+                    if (!ov || ov === this || ov.specKey === "BMX_BIKE" || ov.specKey === "E_SCOOTER") return;
                     const isBurn = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
-                    if (!isBurn) continue;
+                    if (!isBurn) return;
                     const d = Math.hypot(ov.x - this.x, ov.y - this.y);
                     if (d < srvBestDist && (!map.traceSegment2D || !map.traceSegment2D(this.x, this.y, ov.x, ov.y, this.z || 2.0).hit)) {
                         srvBestDist = d;
                         srvBurnTarget = ov;
+                    }
+                };
+                if (game._vehGridHead && game._vehGridNext) {
+                    const vHead = game._vehGridHead, vNext = game._vehGridNext;
+                    const gx0 = Math.max(0, (this.x - 365) >> 8), gx1 = Math.min(127, (this.x + 365) >> 8);
+                    const gy0 = Math.max(0, (this.y - 365) >> 8), gy1 = Math.min(127, (this.y + 365) >> 8);
+                    for (let gy = gy0; gy <= gy1; gy++) {
+                        const rowOff = gy << 7;
+                        for (let gx = gx0; gx <= gx1; gx++) {
+                            for (let ovi = vHead[rowOff | gx]; ovi !== undefined && ovi !== -1; ovi = vNext[ovi]) {
+                                evalBurnTarget(game.vehicles[ovi]);
+                            }
+                        }
+                    }
+                } else {
+                    for (let ovi = 0; ovi < game.vehicles.length; ovi++) {
+                        evalBurnTarget(game.vehicles[ovi]);
                     }
                 }
                 if (srvBurnTarget) {

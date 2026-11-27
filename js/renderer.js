@@ -39,7 +39,9 @@ class RetroRenderer {
         this.isMobileInit = isMobileInit;
         this.showCheatsWindow = !isMobileInit;
         this.cheatsCollapsed = true;
-        this.cheatButtons = [];
+        if (!this.cheatButtons) this.cheatButtons = [];
+        else this.cheatButtons.length = 0;
+        this._cheatBtnUsed = 0;
         this.cameraMode = "follow";
 
         // Track vehicle banner popup when player enters a vehicle
@@ -7770,8 +7772,7 @@ class RetroRenderer {
         const W = Math.max(1, this.canvas.width);
         const H = Math.max(1, this.canvas.height);
         const aspect = W / H;
-        const fovyRad = (55.0 * Math.PI) / 180.0;
-        const f = 1.0 / Math.tan(fovyRad * 0.5); // ~1.92098
+        const f = 1.9209821265511695; // 1.0 / Math.tan((55.0 * Math.PI) / 360.0)
 
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
@@ -7789,39 +7790,48 @@ class RetroRenderer {
         const sx = f / aspect;
         const sy = -f;
 
-        // Column-major 4x4 ViewProjection matrix mapping (x_east, y_elev, z_south, 1):
-        // clipX = (x - camXBlocks) * sx
-        // clipY = (z_south - camYBlocks) * sy  (so North z < camY is +Y top of screen)
-        // clipZ = A * (camElev - y_elev) + B
-        // clipW = (camElev - y_elev)
-        return new Float32Array([
-            sx,  0,   0,  0,
-            0,   0,  -A, -1,
-            0,   sy,  0,  0,
-            -camXBlocks * sx, -camYBlocks * sy, A * camElev + B, camElev
-        ]);
+        // Cache projection constants for ultra-fast worldToScreen() calls throughout the frame!
+        this._projW = W;
+        this._projH = H;
+        this._projF = f;
+        this._projFx = sx;
+        this._projCamXBlocks = camXBlocks;
+        this._projCamYBlocks = camYBlocks;
+        this._projCamElev = camElev;
+        this._projValid = true;
+
+        const m = this._viewProjMat || (this._viewProjMat = new Float32Array(16));
+        m[0] = sx;  m[1] = 0;   m[2] = 0;   m[3] = 0;
+        m[4] = 0;   m[5] = 0;   m[6] = -A;  m[7] = -1;
+        m[8] = 0;   m[9] = sy;  m[10] = 0;  m[11] = 0;
+        m[12] = -camXBlocks * sx;
+        m[13] = -camYBlocks * sy;
+        m[14] = A * camElev + B;
+        m[15] = camElev;
+        return m;
     }
 
     worldToScreen(px, py, zBlocks = 2.0) {
         const W = this.canvas.width;
         const H = this.canvas.height;
-        const aspect = W / Math.max(1, H);
-        const f = 1.0 / Math.tan((55.0 * Math.PI) / 360.0);
-
-        const xBlocks = px / TILE_SIZE;
-        const yBlocks = py / TILE_SIZE;
-        const camXBlocks = this.camX / TILE_SIZE;
-        const camYBlocks = this.camY / TILE_SIZE;
+        const f = 1.9209821265511695;
+        const invTile = 1.0 / TILE_SIZE;
+        const fx = (this._projValid && this._projW === W && this._projH === H)
+            ? this._projFx
+            : (f / (W / Math.max(1, H)));
+        const camXBlocks = this.camX * invTile;
+        const camYBlocks = this.camY * invTile;
         const camElev = this.currentCamElev || (this.camZBlocks + this.followHeightBlocks);
         const w = Math.max(0.25, camElev - zBlocks);
+        const invW = 1.0 / w;
 
-        const ndcX = ((xBlocks - camXBlocks) * (f / aspect)) / w;
-        const ndcY = (-(yBlocks - camYBlocks) * f) / w;
+        const ndcX = ((px * invTile - camXBlocks) * fx) * invW;
+        const ndcY = (-(py * invTile - camYBlocks) * f) * invW;
 
         return {
             x: (ndcX * 0.5 + 0.5) * W,
             y: (0.5 - ndcY * 0.5) * H,
-            scale: f / w
+            scale: f * invW
         };
     }
 
@@ -7864,7 +7874,8 @@ class RetroRenderer {
         if (!this.spriteQueue) this.spriteQueue = [];
         if (!this.spritePool) this.spritePool = [];
         const seq = this.spriteQueue.length;
-        if (seq >= this.maxSprites) return;
+        const maxSpr = this.maxSprites || 16384;
+        if (seq >= maxSpr) return;
         let slot = this.spritePool[seq];
         const sortKey = ((drawOrder >= 14 ? 1 : 0) * 1e9) +
             (Math.round(zBlocks * 2.0) * 1e6) +
@@ -8005,22 +8016,96 @@ class RetroRenderer {
        Sorts by (mHeight, mDrawOrder) using quantized layer bucket + eSpriteDrawOrder
        ======================================================================== */
     sortAndBuildSpriteBatch() {
-        if (!this.spriteQueue || this.spriteQueue.length === 0) {
+        const queue = this.spriteQueue;
+        if (!queue || queue.length === 0) {
             this.spriteCount = 0;
             this.skySpriteStartIdx = 0;
             return;
         }
-        const cmp = this._spriteSortCmp || (this._spriteSortCmp = (lhs, rhs) => lhs.sortKey - rhs.sortKey);
-        this.spriteQueue.sort(cmp);
+        const maxSpr = this.maxSprites || 16384;
+        const count = Math.min(maxSpr, queue.length);
+        const cap = Math.max(maxSpr, count);
+        if (!this._spriteSortIdx || this._spriteSortIdx.length < cap) {
+            this._spriteSortIdx = new Int32Array(cap);
+            this._spriteMergeIdx = new Int32Array(cap);
+            this._spriteSortKeys = new Float64Array(cap);
+            this._spriteQueueSnap = new Array(cap);
+        }
+        const idxArr = this._spriteSortIdx;
+        const tmpIdx = this._spriteMergeIdx;
+        const keys = this._spriteSortKeys;
+        const snap = this._spriteQueueSnap;
 
-        const verts = this.spriteVerts;
+        let alreadySorted = true;
+        let prevKey = -Infinity;
+        for (let i = 0; i < count; i++) {
+            const sp = queue[i];
+            const k = sp.sortKey;
+            idxArr[i] = i;
+            keys[i] = k;
+            snap[i] = sp;
+            if (k < prevKey) alreadySorted = false;
+            prevKey = k;
+        }
+
+        let sortedIdx = idxArr;
+        if (!alreadySorted && count > 1) {
+            // Zero-allocation stable bottom-up Tim/Merge sort (16-item insertion sort + pre-allocated Int32Array ping-pong)
+            const RUN = 16;
+            for (let start = 0; start < count; start += RUN) {
+                const end = Math.min(start + RUN, count);
+                for (let i = start + 1; i < end; i++) {
+                    const curIdx = idxArr[i];
+                    const curKey = keys[curIdx];
+                    let j = i - 1;
+                    while (j >= start && keys[idxArr[j]] > curKey) {
+                        idxArr[j + 1] = idxArr[j];
+                        j--;
+                    }
+                    idxArr[j + 1] = curIdx;
+                }
+            }
+            let src = idxArr;
+            let dst = tmpIdx;
+            for (let width = RUN; width < count; width <<= 1) {
+                const step = width << 1;
+                for (let left = 0; left < count; left += step) {
+                    const mid = Math.min(left + width, count);
+                    const right = Math.min(left + step, count);
+                    if (mid >= right || keys[src[mid - 1]] <= keys[src[mid]]) {
+                        for (let k = left; k < right; k++) dst[k] = src[k];
+                        continue;
+                    }
+                    let p = left, q = mid, out = left;
+                    while (p < mid && q < right) {
+                        const idxP = src[p];
+                        const idxQ = src[q];
+                        if (keys[idxP] <= keys[idxQ]) {
+                            dst[out++] = idxP;
+                            p++;
+                        } else {
+                            dst[out++] = idxQ;
+                            q++;
+                        }
+                    }
+                    while (p < mid) dst[out++] = src[p++];
+                    while (q < right) dst[out++] = src[q++];
+                }
+                const swap = src;
+                src = dst;
+                dst = swap;
+            }
+            sortedIdx = src;
+        }
+
+        const verts = this.spriteVerts || (this.spriteVerts = new Float32Array(cap * 54));
         let offset = 0;
-        const count = Math.min(this.maxSprites, this.spriteQueue.length);
         const invTile = 1.0 / TILE_SIZE;
         let skyStart = count;
 
         for (let i = 0; i < count; i++) {
-            const s = this.spriteQueue[i];
+            const s = snap[sortedIdx[i]];
+            queue[i] = s;
             if (skyStart === count && s.drawOrder >= 14) {
                 skyStart = i;
             }
@@ -8177,8 +8262,9 @@ class RetroRenderer {
                 this.camZBlocks = 2.0;
                 this._wasInInterior = true;
             } else {
-                this.camX += (targetCamX - this.camX) * Math.min(1, dt * 8.5);
-                this.camY += (targetCamY - this.camY) * Math.min(1, dt * 8.5);
+                const camAlphaInt = 1.0 - Math.exp(-8.5 * dt);
+                this.camX += (targetCamX - this.camX) * camAlphaInt;
+                this.camY += (targetCamY - this.camY) * camAlphaInt;
                 this.camZBlocks = 2.0;
             }
             effectiveViewProj = this.computeInteriorViewProjMatrix(intr);
@@ -8187,13 +8273,21 @@ class RetroRenderer {
             if (this._wasInInterior) {
                 this.camX = target.x;
                 this.camY = target.y;
+                this._camLeadX = 0;
+                this._camLeadY = 0;
+                this._camSpeedZoom = 0;
                 this._wasInInterior = false;
             }
-            const leadX = curVeh ? Math.cos(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
-            const leadY = curVeh ? Math.sin(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
+            // Framerate-independent exponential damping on velocity look-ahead & camera follow (eliminates 60/120/144Hz judder & crash camera snap!)
+            const rawLeadX = curVeh ? Math.cos(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
+            const rawLeadY = curVeh ? Math.sin(curVeh.angle) * Math.abs(curVeh.speed) * 0.18 : 0;
+            const leadAlpha = 1.0 - Math.exp(-6.5 * dt);
+            this._camLeadX = (this._camLeadX || 0) + (rawLeadX - (this._camLeadX || 0)) * leadAlpha;
+            this._camLeadY = (this._camLeadY || 0) + (rawLeadY - (this._camLeadY || 0)) * leadAlpha;
 
-            this.camX += (target.x + leadX - this.camX) * Math.min(1, dt * 8.5);
-            this.camY += (target.y + leadY - this.camY) * Math.min(1, dt * 8.5);
+            const camAlpha = 1.0 - Math.exp(-8.5 * dt);
+            this.camX += (target.x + this._camLeadX - this.camX) * camAlpha;
+            this.camY += (target.y + this._camLeadY - this.camY) * camAlpha;
 
             if (game.creationEngine && game.creationEngine.studioActive && game.creationEngine.freeCamActive) {
                 this.camX = game.creationEngine.camX;
@@ -8203,11 +8297,13 @@ class RetroRenderer {
             const rawTargetZ = target.z !== undefined
                 ? target.z
                 : this.map.getHeightAtPixel(target.x, target.y, this.camZBlocks);
-            this.camZBlocks += (rawTargetZ - this.camZBlocks) * Math.min(1, dt * 6.0);
+            const zAlpha = 1.0 - Math.exp(-6.0 * dt);
+            this.camZBlocks += (rawTargetZ - this.camZBlocks) * zAlpha;
 
-            // Velocity zoom-out when driving fast (FollowCameraController.cpp mStartupSpeedMax)
-            const speedZoomBlocks = curVeh ? Math.min(1.6, Math.abs(curVeh.speed) / 260.0) : 0.0;
-            effectiveViewProj = this.computeViewProjMatrixWithSpeed(speedZoomBlocks);
+            // Smooth velocity zoom-out when driving fast (FollowCameraController.cpp mStartupSpeedMax)
+            const rawSpeedZoom = curVeh ? Math.min(1.6, Math.abs(curVeh.speed) / 260.0) : 0.0;
+            this._camSpeedZoom = (this._camSpeedZoom || 0) + (rawSpeedZoom - (this._camSpeedZoom || 0)) * (1.0 - Math.exp(-5.0 * dt));
+            effectiveViewProj = this.computeViewProjMatrixWithSpeed(this._camSpeedZoom);
         }
 
         const ctx = this.ctx;
@@ -8290,7 +8386,9 @@ class RetroRenderer {
             this.renderDebugWireframe(ctx, game);
         }
 
-        this.cheatButtons = [];
+        if (!this.cheatButtons) this.cheatButtons = [];
+        else this.cheatButtons.length = 0;
+        this._cheatBtnUsed = 0;
 
         // World 2D Prompts for Enterable Venue Doors & Stunt Jumps (or Active Interior Room!)
         if (game.activeInterior) {
@@ -8372,12 +8470,41 @@ class RetroRenderer {
         const sx = f / aspect;
         const sy = -f;
 
-        return new Float32Array([
-            sx,  0,   0,  0,
-            0,   0,  -A, -1,
-            0,   sy,  0,  0,
-            -camXBlocks * sx, -camYBlocks * sy, A * camElev + B, camElev
-        ]);
+        const m = this._interiorViewProjMat || (this._interiorViewProjMat = new Float32Array(16));
+        this._projW = W;
+        this._projH = H;
+        this._projF = f;
+        this._projFx = sx;
+        this._projCamXBlocks = camXBlocks;
+        this._projCamYBlocks = camYBlocks;
+        this._projCamElev = camElev;
+        this._projValid = true;
+        m[0] = sx;  m[1] = 0;   m[2] = 0;   m[3] = 0;
+        m[4] = 0;   m[5] = 0;   m[6] = -A;  m[7] = -1;
+        m[8] = 0;   m[9] = sy;  m[10] = 0;  m[11] = 0;
+        m[12] = -camXBlocks * sx;
+        m[13] = -camYBlocks * sy;
+        m[14] = A * camElev + B;
+        m[15] = camElev;
+        return m;
+    }
+
+    _pushCheatButton(id, x, y, w, h) {
+        if (!this._cheatBtnPool) this._cheatBtnPool = [];
+        const idx = this._cheatBtnUsed || 0;
+        this._cheatBtnUsed = idx + 1;
+        let btn = this._cheatBtnPool[idx];
+        if (!btn) {
+            btn = { id, x, y, w, h };
+            this._cheatBtnPool[idx] = btn;
+        } else {
+            btn.id = id;
+            btn.x = x;
+            btn.y = y;
+            btn.w = w;
+            btn.h = h;
+        }
+        this.cheatButtons.push(btn);
     }
 
     getWindowLitFactor(game) {
@@ -10092,7 +10219,7 @@ class RetroRenderer {
             }
 
             // 10.5 Outdoor Prison Weightlifting Benches ("gym_bench") in Central Plaza (r=97..101) & Upper Exercise Lawn (r=108..114)
-            const prisonGymBenches = [
+            const prisonGymBenches = this._prisonGymBenches || (this._prisonGymBenches = [
                 { x: 58.6 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: 0 },
                 { x: 65.4 * TILE_SIZE, y: 99.2 * TILE_SIZE,  ang: Math.PI },
                 { x: 59.2 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
@@ -10100,7 +10227,7 @@ class RetroRenderer {
                 { x: 64.8 * TILE_SIZE, y: 109.5 * TILE_SIZE, ang: 0 },
                 { x: 60.5 * TILE_SIZE, y: 113.5 * TILE_SIZE, ang: Math.PI },
                 { x: 63.5 * TILE_SIZE, y: 113.5 * TILE_SIZE, ang: Math.PI }
-            ];
+            ]);
             for (let bi = 0; bi < prisonGymBenches.length; bi++) {
                 const gb = prisonGymBenches[bi];
                 if (gb.x < minX - 64 || gb.x > maxX + 64 || gb.y < minY - 64 || gb.y > maxY + 64) continue;
@@ -11052,13 +11179,16 @@ class RetroRenderer {
 
         // 2B. Enterable Venue Interior Doors & Unique Stunt Jump Ramps in 3D
         if (Array.isArray(this.map.interiors)) {
-            for (const intr of this.map.interiors) {
+            const doorFnvMap = this._doorFnvMap || (this._doorFnvMap = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] });
+            const defDoorRgb = this._defDoorRgb || (this._defDoorRgb = [0.96, 0.25, 0.65]);
+            for (let ii = 0; ii < this.map.interiors.length; ii++) {
+                const intr = this.map.interiors[ii];
                 if (intr.doorX < minX || intr.doorX > maxX || intr.doorY < minY || intr.doorY > maxY) continue;
                 const dz = this.map.getHeightAtPixel(intr.doorX, intr.doorY, 2.0) + 0.03;
-                const mrgb = intr.matRGB || [0.96, 0.25, 0.65];
+                const mrgb = intr.matRGB || defDoorRgb;
                 if (intr.facing) {
                     // Real door: vertical quads standing against the facade the door belongs to (any of 4 sides)
-                    const fnv = { S: [0, 1], N: [0, -1], E: [1, 0], W: [-1, 0] }[intr.facing] || [0, 1];
+                    const fnv = doorFnvMap[intr.facing] || doorFnvMap.S;
                     const tcx = intr.isEstatePortico ? intr.doorX : (Math.floor(intr.doorX / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5);
                     const tcy = intr.isEstatePortico ? intr.doorY : (Math.floor(intr.doorY / TILE_SIZE) * TILE_SIZE + TILE_SIZE * 0.5);
                     const dAng = fnv[0] !== 0 ? Math.PI * 0.5 : 0;
@@ -11066,12 +11196,10 @@ class RetroRenderer {
                         const wx0 = tcx - fnv[0] * TILE_SIZE * 0.5 + fnv[0] * 1.6;
                         const wy0 = tcy - fnv[1] * TILE_SIZE * 0.5 + fnv[1] * 1.6;
                         const gz = dz - 0.03;
-                        const vq = (w, zc, halfH, rr, gg, bb, aa, off = 0) =>
-                            this.pushSpriteQuad3D(wx0 + fnv[0] * off, wy0 + fnv[1] * off, gz + zc, w, 0.4, dAng, -1, -1, -1, -1, rr, gg, bb, aa, SPRITE_DRAW_ORDER.MAP_OBJECT, halfH);
-                        vq(48, 1.02, 0.11, mrgb[0], mrgb[1], mrgb[2], 1.0, 0.00); // sign band
-                        vq(38, 0.48, 0.50, 0.20, 0.15, 0.12, 1.0, 0.02);           // door frame
-                        vq(31, 0.46, 0.46, 0.0, 0.0, 0.0, 1.0, 0.05);              // black doorway
-                        vq(3, 0.42, 0.04, 0.95, 0.80, 0.25, 1.0, 0.08);           // brass handle
+                        this.pushSpriteQuad3D(wx0, wy0, gz + 1.02, 48, 0.4, dAng, -1, -1, -1, -1, mrgb[0], mrgb[1], mrgb[2], 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT, 0.11);
+                        this.pushSpriteQuad3D(wx0 + fnv[0] * 0.02, wy0 + fnv[1] * 0.02, gz + 0.48, 38, 0.4, dAng, -1, -1, -1, -1, 0.20, 0.15, 0.12, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT, 0.50);
+                        this.pushSpriteQuad3D(wx0 + fnv[0] * 0.05, wy0 + fnv[1] * 0.05, gz + 0.46, 31, 0.4, dAng, -1, -1, -1, -1, 0.0, 0.0, 0.0, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT, 0.46);
+                        this.pushSpriteQuad3D(wx0 + fnv[0] * 0.08, wy0 + fnv[1] * 0.08, gz + 0.42, 3, 0.4, dAng, -1, -1, -1, -1, 0.95, 0.80, 0.25, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT, 0.04);
                         // Subtle dark stone threshold step flush against the doorway
                         this.pushSolidQuad3D(tcx - fnv[0] * 24, tcy - fnv[1] * 24, dz, 36, 8, dAng, 0.12, 0.10, 0.09, 1.0, SPRITE_DRAW_ORDER.MAP_OBJECT);
                     }
@@ -11142,7 +11270,7 @@ class RetroRenderer {
         // 4. Living Pedestrians, Monks, Cops, Jason Duval & Lucia Caminos (eSpriteDrawOrder_Pedestrian / JumpingPedestrian)
         // GTA 2 (1999) fuller top-down 3D pedestrian presence (pedScale = 1.34 so peds stay crisp & readable even when zoomed out!) + RemapPed outfit variety!
         const pedScale = 1.34;
-        const pedRemapTints = [
+        const pedRemapTints = this._pedRemapTints || (this._pedRemapTints = [
             [1.00, 1.00, 1.00], // Classic Original
             [0.86, 1.04, 1.12], // Vice Pastel Cyan
             [1.10, 0.88, 0.96], // Flamingo Rose
@@ -11151,7 +11279,14 @@ class RetroRenderer {
             [0.96, 0.90, 1.12], // Lavender Neon
             [1.10, 0.94, 0.84], // Coral Peach
             [0.90, 0.98, 1.10]  // Biscayne Blue
-        ];
+        ]);
+        const beachPool = this._beachPedPool || (this._beachPedPool = [
+            "bikini_pink", "bikini_cyan", "bikini_yellow",
+            "bikini_red", "bikini_white",
+            "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
+            "vc_bodybuilder", "vc_jogger"
+        ]);
+        const civTypes = this._civTypesPool || (this._civTypesPool = ["gang", "civ0", "civ1", "civ2", "civ3"]);
         for (let pi = 0; pi < visPeds.length; pi++) {
             const ped = visPeds[pi];
             if (ped.dead) continue;
@@ -11182,12 +11317,6 @@ class RetroRenderer {
                 pedType = "g2_medic";
                 ped.g24Type = "g2_medic";
             } else if (ped.kind === "CIVILIAN" && isBeachZone && (!pedType || pedType.startsWith("civ") || pedType === "gang")) {
-                const beachPool = [
-                    "bikini_pink", "bikini_cyan", "bikini_yellow",
-                    "bikini_red", "bikini_white",
-                    "surfer_guy", "beach_guy_red", "beach_guy_yellow", "beach_guy_lime",
-                    "vc_bodybuilder", "vc_jogger"
-                ];
                 const bh = Math.abs(Math.floor((ped.turnSeed || 1) * 17 + ped.animSeed * 313)) % beachPool.length;
                 pedType = beachPool[bh];
                 ped.g24Type = pedType;
@@ -11208,7 +11337,6 @@ class RetroRenderer {
                 else if (ped.kind === "MEDIC") pedType = "g2_medic";
                 else if (ped.kind === "HOSTILE" || ped.kind === "CRIMINAL" || ped.archetype === "PAULY" || ped.archetype === "DELL") pedType = "gang";
                 else {
-                    const civTypes = ["gang", "civ0", "civ1", "civ2", "civ3"];
                     const h = Math.abs(Math.floor(ped.x * 0.13 + ped.y * 0.07)) % civTypes.length;
                     pedType = civTypes[h];
                     ped.g24Type = pedType;
@@ -12450,7 +12578,7 @@ class RetroRenderer {
                 const frontDist = isVcpdCharger ? 26.0 : ((v.w || 48) * 0.45);
                 const rearDist = isVcpdCharger ? -29.5 : (-(v.w || 48) * 0.45);
                 const latSpread = mapInfo.isMotorcycle ? 0 : (isVcpdCharger ? 10.2 : ((v.h || 24) * 0.29));
-                const lampOffsets = mapInfo.isMotorcycle ? [0] : [-latSpread, latSpread];
+                const lampCount = mapInfo.isMotorcycle ? 1 : 2;
                 const isDriven = Boolean(v.driver);
                 const isBraking = isDriven && (
                     (v.driver === "PLAYER" && (game.input.down || game.input.handbrake)) ||
@@ -12467,7 +12595,8 @@ class RetroRenderer {
                 const blinkOn = turnSig !== 0 && Math.sin(this.time * 11.5 + (v.sirenPhase || 0)) > 0;
                 const highBeamFlash = isDriven && (v.aiFlashHeadlightsTimer || 0) > 0 && Math.sin(this.time * 24.0) > -0.15;
 
-                for (const lat of lampOffsets) {
+                for (let li = 0; li < lampCount; li++) {
+                    const lat = lampCount === 1 ? 0 : (li === 0 ? -latSpread : latSpread);
                     const isBlinkSide = blinkOn && lat !== 0 && (
                         turnSig === 2 ||
                         (turnSig < 0 && lat < 0) ||
@@ -12566,14 +12695,14 @@ class RetroRenderer {
                     const isScooter = v.specKey === "E_SCOOTER";
                     const isBicycle = v.specKey === "BMX_BIKE";
                     const bikerTypes = (isScooter || isBicycle)
-                        ? ["vc_jogger", "vc_tourist", "bikini_cyan", "g2_civ_pink", "vc_tommy", "kid_skater"]
-                        : ["vc_tommy", "vc_crockett", "vc_hawaiian_red", "g2_civ_aqua", "gang", "civ0"];
+                        ? (this._pedalBikerPool || (this._pedalBikerPool = ["vc_jogger", "vc_tourist", "bikini_cyan", "g2_civ_pink", "vc_tommy", "kid_skater"]))
+                        : (this._motoBikerPool || (this._motoBikerPool = ["vc_tommy", "vc_crockett", "vc_hawaiian_red", "g2_civ_aqua", "gang", "civ0"]));
 
                     // Animated 3D Pedaling Feet on South Beach Cruiser Bike vs. Planted Deck Stance + Stem Display on E-Scooter!
                     const absSpd = Math.abs(v.speed || 0);
                     if (isBicycle) {
                         const pedalPhase = (absSpd > 6 ? (this.time * (7.5 + absSpd * 0.032)) : 0) + idHash;
-                        for (const side of [-1, 1]) {
+                        for (let side = -1; side <= 1; side += 2) {
                             const pLong = -1.5 + Math.sin(pedalPhase + (side > 0 ? Math.PI : 0)) * (absSpd > 6 ? 3.4 : 1.8);
                             const pLat = side * 5.2;
                             const pxW = v.x + cosA * pLong - sinA * pLat;
@@ -14003,9 +14132,10 @@ class RetroRenderer {
                 });
             }
 
-            // Front Headlight Bulbs (Dual for cars, Single central bow searchlight for motorcycles & boats)
-            const headOffsets = (v.isMotorcycle || isWaterCraft) ? [0] : [-latSpread, latSpread];
-            for (const lat of headOffsets) {
+            // Front Headlight Bulbs (Dual for cars, Single central bow searchlight for motorcycles & boats — zero array allocation!)
+            const headCount = (v.isMotorcycle || isWaterCraft) ? 1 : 2;
+            for (let hi = 0; hi < headCount; hi++) {
+                const lat = headCount === 1 ? 0 : (hi === 0 ? -latSpread : latSpread);
                 const hx = v.x + cosA * frontDist - sinA * lat;
                 const hy = v.y + sinA * frontDist + cosA * lat;
                 const hSc = this.worldToScreen(hx, hy, vz);
@@ -14033,7 +14163,8 @@ class RetroRenderer {
                     isBraking ? "rgba(255, 40, 65, 0.88)" : "rgba(235, 30, 55, 0.58)",
                     "rgba(180, 15, 35, 0.22)"
                 );
-                for (const lat of headOffsets) {
+                for (let ti = 0; ti < headCount; ti++) {
+                    const lat = headCount === 1 ? 0 : (ti === 0 ? -latSpread : latSpread);
                     const tx = v.x + cosA * rearDist - sinA * lat;
                     const ty = v.y + sinA * rearDist + cosA * lat;
                     const tSc = this.worldToScreen(tx, ty, vz);
@@ -14966,8 +15097,9 @@ class RetroRenderer {
             ctx.fillText(cLbl, cSc.x, cSc.y - 14);
         }
         if (!p.inVehicle && Array.isArray(game.vehicles)) {
-            for (let vi = 0; vi < game.vehicles.length; vi++) {
-                const v = game.vehicles[vi];
+            const nearSaluteVehs = this._queryVehiclesInBox(game, p.x - 72, p.y - 72, p.x + 72, p.y + 72);
+            for (let vi = 0; vi < nearSaluteVehs.length; vi++) {
+                const v = nearSaluteVehs[vi];
                 if (!v || v.destroyed || v.driver !== null || (!v.createdByEngine && !(v.respectCount > 0))) continue;
                 if (Math.hypot(v.x - p.x, v.y - p.y) < 68) {
                     const vSc = this.worldToScreen(v.x, v.y, v.z || 2.0);
@@ -14983,8 +15115,9 @@ class RetroRenderer {
 
         // 5B. Diegetic Overhead Capsule Badge for Active In-Game VCPD Traffic Warden / Road Ranger Entity
         if (Array.isArray(game.peds)) {
-            for (let pi = 0; pi < game.peds.length; pi++) {
-                const ped = game.peds[pi];
+            const nearWardenPeds = this._queryPedsInBox(game, pObj.x - 465, pObj.y - 465, pObj.x + 465, pObj.y + 465);
+            for (let pi = 0; pi < nearWardenPeds.length; pi++) {
+                const ped = nearWardenPeds[pi];
                 if (!ped || ped.dead || !ped.isTrafficWarden) continue;
                 if (Math.hypot(ped.x - pObj.x, ped.y - pObj.y) > 460) continue;
                 const wSc = this.worldToScreen(ped.x, ped.y, (ped.z || 2.0) + 0.18);
@@ -15094,8 +15227,9 @@ class RetroRenderer {
         const isLocalKing = typeof game.isCurrentDistrictControlledByMe === "function" && game.isCurrentDistrictControlledByMe();
         const mySynCol = isLocalKing ? "#fde047" : ((game.net && game.net.syndicate === "CYAN") ? "#00f0ff" : "#ff2a85");
         if (Array.isArray(game.vehicles)) {
-            for (let i = 0; i < game.vehicles.length; i++) {
-                const v = game.vehicles[i];
+            const nearUnderglowVehs = this._queryVehiclesInBox(game, pObj.x - 820, pObj.y - 620, pObj.x + 820, pObj.y + 620);
+            for (let i = 0; i < nearUnderglowVehs.length; i++) {
+                const v = nearUnderglowVehs[i];
                 if (!v || v.destroyed) continue;
                 const isCustomTunedCar = Boolean(v.createdByEngine || (v.respectCount || 0) > 0);
                 if (!isCustomTunedCar) continue;
@@ -18505,20 +18639,31 @@ class RetroRenderer {
 
             const fitHudCapsuleLeft = (text, x, y, maxW, startPx = 9.0, minPx = 7.2) => {
                 const raw = String(text || "");
-                let sz = startPx;
-                ctx.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
-                while (sz > minPx && ctx.measureText(raw).width > maxW) {
-                    sz = Math.round((sz - 0.3) * 10) / 10;
-                    ctx.font = `bold ${sz}px Consolas, 'Courier New', monospace`;
-                }
-                let out = raw;
-                if (ctx.measureText(out).width > maxW) {
-                    while (out.length > 5 && ctx.measureText(out + "…").width > maxW) {
-                        out = out.slice(0, -1).trimEnd();
+                const cache = this._hudFitTextCache || (this._hudFitTextCache = new Map());
+                const cKey = `${raw}|${Math.round(maxW)}|${startPx}|${minPx}`;
+                let fit = cache.get(cKey);
+                if (!fit) {
+                    let sz = startPx;
+                    let fontStr = `bold ${sz}px Consolas, 'Courier New', monospace`;
+                    ctx.font = fontStr;
+                    while (sz > minPx && ctx.measureText(raw).width > maxW) {
+                        sz = Math.round((sz - 0.3) * 10) / 10;
+                        fontStr = `bold ${sz}px Consolas, 'Courier New', monospace`;
+                        ctx.font = fontStr;
                     }
-                    out = out + "…";
+                    let out = raw;
+                    if (ctx.measureText(out).width > maxW) {
+                        while (out.length > 5 && ctx.measureText(out + "…").width > maxW) {
+                            out = out.slice(0, -1).trimEnd();
+                        }
+                        out = out + "…";
+                    }
+                    fit = { fontStr, out };
+                    if (cache.size > 256) cache.clear();
+                    cache.set(cKey, fit);
                 }
-                ctx.fillText(out, x, y);
+                if (ctx.font !== fit.fontStr) ctx.font = fit.fontStr;
+                ctx.fillText(fit.out, x, y);
             };
 
             // 0. 🔥 Active Flash District Magnet & 🦩 vs ⚡ Syndicate Crew Tug-of-War Capsule
@@ -18656,7 +18801,7 @@ class RetroRenderer {
             ctx.strokeRect(iconX - 1, leftY - 1, mugW + 2, mugH + 2);
             ctx.restore();
         }
-        this.cheatButtons.push({ id: "OPEN_CHAR_SELECT", x: iconX, y: leftY, w: mugW, h: mugH + 10 });
+        this._pushCheatButton("OPEN_CHAR_SELECT", iconX, leftY, mugW, mugH + 10);
         // Health Bar right below Player's Mugshot
         ctx.fillStyle = "rgba(10, 12, 20, 0.88)";
         ctx.fillRect(iconX, leftY + mugH + 2, mugW, 6);
@@ -18672,7 +18817,7 @@ class RetroRenderer {
             else if (p.weapon === "FLAMETHROWER") weapSpr = "33";
 
             const wDim = this.drawHudSprite(ctx, weapSpr, iconX, leftY, iconScale);
-            this.cheatButtons.push({ id: "CYCLE_WEAPON", x: iconX, y: leftY, w: wDim.w, h: wDim.h });
+            this._pushCheatButton("CYCLE_WEAPON", iconX, leftY, wDim.w, wDim.h);
             if (p.weapon === "ELECTRO") {
                 // GTA 2 ElectroGun HUD tint: crackling cyan glow over the pistol icon
                 ctx.save();
@@ -18688,7 +18833,7 @@ class RetroRenderer {
             }
             iconX += wDim.w + (isPhonePortrait ? 4 : 6);
         } else {
-            this.cheatButtons.push({ id: "CYCLE_WEAPON", x: iconX, y: leftY, w: 36, h: mugH });
+            this._pushCheatButton("CYCLE_WEAPON", iconX, leftY, 36, mugH);
         }
 
         if ((p.armor || 0) > 0) {
@@ -18874,8 +19019,21 @@ class RetroRenderer {
         } else if (p.inVehicle && (p.inVehicle.gpsTrackerTimer || 0) > 0) {
             const jamLabel = `[B] JAM EXOTIC GPS TRACKER (${Math.ceil(p.inVehicle.gpsTrackerTimer)}S LEFT)`;
             this.drawGta1FontString(ctx, "SUB2", jamLabel, W * 0.5, H - 24 * s, s * 0.85, "center");
-        } else if (game.director && typeof game.director.findNearestTrunkVehicle === "function") {
-            const nearTrunkVeh = game.director.findNearestTrunkVehicle(54);
+        } else if (!p.inVehicle && game.director && typeof game.director.findNearestTrunkVehicle === "function") {
+            let nearTrunkVeh = this._hudTrunkVeh;
+            if (
+                this._hudTrunkCacheAt === undefined ||
+                Math.abs((this.time || 0) - this._hudTrunkCacheAt) > 0.06 ||
+                Math.abs(p.x - (this._hudTrunkPx || 0)) > 4 ||
+                Math.abs(p.y - (this._hudTrunkPy || 0)) > 4 ||
+                (nearTrunkVeh && (nearTrunkVeh.destroyed || nearTrunkVeh.driver !== null))
+            ) {
+                nearTrunkVeh = game.director.findNearestTrunkVehicle(54, true);
+                this._hudTrunkVeh = nearTrunkVeh;
+                this._hudTrunkCacheAt = this.time || 0;
+                this._hudTrunkPx = p.x;
+                this._hudTrunkPy = p.y;
+            }
             if (nearTrunkVeh) {
                 const trunkLabel = nearTrunkVeh._trunkLooted
                     ? "[B] OPEN TRUNK: SWAP OUTFIT DISGUISE"
@@ -18939,20 +19097,22 @@ class RetroRenderer {
             }
 
             if (Array.isArray(game.peds)) {
-                ctx.save();
-                ctx.font = "bold 9px Consolas, 'Courier New', monospace";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                for (let i = 0; i < game.peds.length; i++) {
-                    const ped = game.peds[i];
-                    if (!ped || ped.dead) continue;
-                    const d = Math.hypot(ped.x - p.x, ped.y - p.y);
-                    if (d > 380) continue;
-                    const isThreat = (ped.kind === "COP" || ped.kind === "CRIMINAL" || ped.kind === "HOSTILE" || ped.kind === "GATOR");
-                    const isCalling911 = (ped.calling911Timer || 0) > 0;
-                    const isSurrendered = (ped.surrenderTimer || 0) > 0;
-                    const isFilming = (ped.filmingViralTimer || 0) > 0;
-                    if (!focusOn && !isCalling911 && !isSurrendered && !isFilming) continue;
+                const hudVisPeds = this._queryPedsInBox(game, p.x - 385, p.y - 385, p.x + 385, p.y + 385);
+                if (hudVisPeds.length > 0) {
+                    ctx.save();
+                    ctx.font = "bold 9px Consolas, 'Courier New', monospace";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    for (let i = 0; i < hudVisPeds.length; i++) {
+                        const ped = hudVisPeds[i];
+                        if (!ped || ped.dead) continue;
+                        const isThreat = (ped.kind === "COP" || ped.kind === "CRIMINAL" || ped.kind === "HOSTILE" || ped.kind === "GATOR");
+                        const isCalling911 = (ped.calling911Timer || 0) > 0;
+                        const isSurrendered = (ped.surrenderTimer || 0) > 0;
+                        const isFilming = (ped.filmingViralTimer || 0) > 0;
+                        if (!focusOn && !isCalling911 && !isSurrendered && !isFilming) continue;
+                        const d = Math.hypot(ped.x - p.x, ped.y - p.y);
+                        if (d > 380) continue;
 
                     const scr = this.worldToScreen(ped.x, ped.y, (ped.z || 2.0) + 0.25);
                     if (scr.x < -30 || scr.x > W + 30 || scr.y < -30 || scr.y > H + 30) continue;
@@ -18993,8 +19153,9 @@ class RetroRenderer {
                         ctx.fillStyle = tagCol;
                         ctx.fillText(tagTxt, scr.x, scr.y - 19.5);
                     }
+                    }
+                    ctx.restore();
                 }
-                ctx.restore();
             }
         }
 

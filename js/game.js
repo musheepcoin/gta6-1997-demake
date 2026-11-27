@@ -13690,7 +13690,10 @@ class LeonidaGame {
         // Pre-filter active priority siren vehicles, hazard/speeding vehicles, and available taxis once per frame
         // AND build the 128x128 (256px cell) vehicle & pedestrian spatial grids so AI radar & collisions never scan 580+ distant entities!
         this.rebuildVehicleSpatialGrid();
-        this.rebuildPedSpatialGrid();
+        if (!this._pedGridHead || this._pedGridLastLen !== this.peds.length) {
+            this.rebuildPedSpatialGrid();
+        this._pedGridLastLen = this.peds.length;
+        }
         const hazardVehicles = this._hazardVehicles || (this._hazardVehicles = []);
         const prioritySirenVehicles = this._prioritySirenVehicles || (this._prioritySirenVehicles = []);
         const activeTaxis = this._activeTaxis || (this._activeTaxis = []);
@@ -17606,16 +17609,24 @@ class LeonidaGame {
                         ped.turnSeed = (ped.turnSeed || 1) + 1;
 
                         {
-                            const navContext = {
-                                isCrossingRoad: Boolean(ped.isCrossingRoad),
-                                crossDirX: ped.crossDirX || 0,
-                                crossDirY: ped.crossDirY || 0,
-                                allowCrosswalk: ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && (ped.crosswalkCooldown || 0) <= 0,
-                                nsGreen: nsGreenNow,
-                                ewGreen: ewGreenNow,
-                                threatX: (ped.panicTimer || 0) > 0 ? ped.threatX : undefined,
-                                threatY: (ped.panicTimer || 0) > 0 ? ped.threatY : undefined
-                            };
+                            const navContext = this._pedNavCtx || (this._pedNavCtx = {
+                                isCrossingRoad: false,
+                                crossDirX: 0,
+                                crossDirY: 0,
+                                allowCrosswalk: false,
+                                nsGreen: true,
+                                ewGreen: false,
+                                threatX: undefined,
+                                threatY: undefined
+                            });
+                            navContext.isCrossingRoad = Boolean(ped.isCrossingRoad);
+                            navContext.crossDirX = ped.crossDirX || 0;
+                            navContext.crossDirY = ped.crossDirY || 0;
+                            navContext.allowCrosswalk = ped.kind === "CIVILIAN" && (ped.panicTimer || 0) <= 0 && (ped.crosswalkCooldown || 0) <= 0;
+                            navContext.nsGreen = nsGreenNow;
+                            navContext.ewGreen = ewGreenNow;
+                            navContext.threatX = (ped.panicTimer || 0) > 0 ? ped.threatX : undefined;
+                            navContext.threatY = (ped.panicTimer || 0) > 0 ? ped.threatY : undefined;
 
                             // Choose next sidewalk block while avoiding 3D structures, Lummus Park grass, stopped vehicles, and threats
                             // Purposeful PedNav path-following first (far destinations, signalised crossings, flee routes); legacy tile walker as fallback
@@ -17995,6 +18006,7 @@ class LeonidaGame {
             }
         }
         this.rebuildPedSpatialGrid();
+        this._pedGridLastLen = this.peds.length;
 
         // 6B. Pedestrian-to-Pedestrian Mutual Separation & Reciprocal Collision Avoidance (RVO)
         // Eliminates conga lines, stacking, clumping, and ghost pass-throughs (Accelerated via 256px Spatial Grid!)
@@ -19137,15 +19149,15 @@ class LeonidaGame {
                     pt.y = nextY;
                 }
 
-                // B. Physical Vehicle OBB Impact & Pedagogical/Hydrodynamic Effects (checked on primary slugs via spatial grid!)
+                // B. Physical Vehicle OBB Impact & Pedagogical/Hydrodynamic Effects (checked on primary slugs via spatial grid — zero per-particle closure!)
                 if (!impacted && pt.isPrimarySlug && Array.isArray(this.vehicles)) {
                     const gHead = this._vehGridHead;
                     const gNext = this._vehGridNext;
-                    const testVehHit = (ov) => {
+                    const checkWaterVeh = (ov) => {
                         if (!ov || ov === pt.sourceVeh) return false;
                         const dx = pt.x - ov.x;
                         const dy = pt.y - ov.y;
-                        if (Math.abs(dx) > 68 || Math.abs(dy) > 68) return false;
+                        if (dx > 68 || dx < -68 || dy > 68 || dy < -68) return false;
                         const ovZ = ov.z !== undefined ? ov.z : 2.0;
                         if (typeof pt.z === "number" && pt.z > ovZ + 0.24) return false;
                         const cA = Math.cos(ov.angle || 0), sA = Math.sin(ov.angle || 0);
@@ -19157,10 +19169,8 @@ class LeonidaGame {
                             const dLen = Math.hypot(dx, dy) || 1;
                             impNx = dx / dLen;
                             impNy = dy / dLen;
-                            // Wash blood off stained tires when hosed down!
                             if (ov._bloodDistLeft) ov._bloodDistLeft *= 0.82;
                             if (ov._bloodDistRight) ov._bloodDistRight *= 0.82;
-                            // Hydrodynamic push on light 2-wheelers / micro-karts at close-to-medium range!
                             const pressRatio = Math.max(0.1, 1.0 - (pt.traveled || 0) / (pt.maxReach || 375));
                             if ((ov.isMotorcycle || ov.specKey === "MICRO_KART") && ov.driver !== "PLAYER" && pressRatio > 0.35) {
                                 const jLen = Math.hypot(pt.vx, pt.vy) || 1;
@@ -19196,13 +19206,13 @@ class LeonidaGame {
                         return false;
                     };
                     if (gHead && gNext) {
-                        const gx0 = Math.max(0, (pt.x >> 8) - 1), gx1 = Math.min(127, (pt.x >> 8) + 1);
-                        const gy0 = Math.max(0, (pt.y >> 8) - 1), gy1 = Math.min(127, (pt.y >> 8) + 1);
+                        const gx0 = Math.max(0, (pt.x - 70) >> 8), gx1 = Math.min(127, (pt.x + 70) >> 8);
+                        const gy0 = Math.max(0, (pt.y - 70) >> 8), gy1 = Math.min(127, (pt.y + 70) >> 8);
                         for (let gy = gy0; gy <= gy1 && !impacted; gy++) {
                             const rowOff = gy << 7;
                             for (let gx = gx0; gx <= gx1 && !impacted; gx++) {
                                 for (let vi = gHead[rowOff | gx]; vi !== undefined && vi !== -1; vi = gNext[vi]) {
-                                    if (testVehHit(this.vehicles[vi])) {
+                                    if (checkWaterVeh(this.vehicles[vi])) {
                                         impacted = true;
                                         break;
                                     }
@@ -19211,7 +19221,7 @@ class LeonidaGame {
                         }
                     } else {
                         for (let vi = 0; vi < this.vehicles.length; vi++) {
-                            if (testVehHit(this.vehicles[vi])) {
+                            if (checkWaterVeh(this.vehicles[vi])) {
                                 impacted = true;
                                 break;
                             }
@@ -19219,19 +19229,22 @@ class LeonidaGame {
                     }
                 }
 
-                // C. Physical Pedestrian Hydrodynamic Knockback & Flame Dousing in Flight (spray cone widens naturally with distance!)
+                // C. Physical Pedestrian Hydrodynamic Knockback & Flame Dousing in Flight (spatialized via 256px ped grid!)
                 if (!impacted && pt.isPrimarySlug && Array.isArray(this.peds)) {
                     const distFrac = Math.min(1.0, (pt.traveled || 0) / (pt.maxReach || 375));
                     const pressRatio = Math.max(0.12, 1.0 - distFrac * 0.85);
                     const sprayRad = 11.5 + distFrac * 13.5;
+                    const sprayRadSq = sprayRad * sprayRad;
                     const jSpd = Math.hypot(pt.vx, pt.vy) || 1;
                     const jCos = pt.vx / jSpd, jSin = pt.vy / jSpd;
-                    for (let pi = 0; pi < this.peds.length; pi++) {
-                        const ped = this.peds[pi];
-                        if (!ped || ped.dead || (ped.kind === "FIREMAN" && !pt.fromPlayer)) continue;
-                        if (Math.abs(ped.x - pt.x) > sprayRad || Math.abs(ped.y - pt.y) > sprayRad) continue;
-                        if (Math.hypot(ped.x - pt.x, ped.y - pt.y) > sprayRad) continue;
-                        if (typeof pt.z === "number" && pt.z > (ped.z || 2.0) + 0.28) continue;
+                    const pHeadW = this._pedGridHead;
+                    const pNextW = this._pedGridNext;
+                    const hitWaterPed = (ped) => {
+                        if (!ped || ped.dead || (ped.kind === "FIREMAN" && !pt.fromPlayer)) return false;
+                        const pdx = ped.x - pt.x, pdy = ped.y - pt.y;
+                        if (pdx > sprayRad || pdx < -sprayRad || pdy > sprayRad || pdy < -sprayRad) return false;
+                        if (pdx * pdx + pdy * pdy > sprayRadSq) return false;
+                        if (typeof pt.z === "number" && pt.z > (ped.z || 2.0) + 0.28) return false;
                         const wasPedOnFire = (ped.burnTimer || 0) > 0;
                         if (wasPedOnFire) {
                             hitHot = true;
@@ -19263,8 +19276,30 @@ class LeonidaGame {
                             }
                             impNx = -jCos;
                             impNy = -jSin;
-                            impacted = true;
-                            break;
+                            return true;
+                        }
+                        return false;
+                    };
+                    if (pHeadW && pNextW && this._pedGridLastLen === this.peds.length) {
+                        const px0 = Math.max(0, (pt.x - 28) >> 8), px1 = Math.min(127, (pt.x + 28) >> 8);
+                        const py0 = Math.max(0, (pt.y - 28) >> 8), py1 = Math.min(127, (pt.y + 28) >> 8);
+                        for (let py = py0; py <= py1 && !impacted; py++) {
+                            const rowOff = py << 7;
+                            for (let px = px0; px <= px1 && !impacted; px++) {
+                                for (let pi = pHeadW[rowOff | px]; pi !== undefined && pi !== -1; pi = pNextW[pi]) {
+                                    if (hitWaterPed(this.peds[pi])) {
+                                        impacted = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        for (let pi = 0; pi < this.peds.length; pi++) {
+                            if (hitWaterPed(this.peds[pi])) {
+                                impacted = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -19678,62 +19713,54 @@ class LeonidaGame {
         let sirenDoppler = 1.0;
 
         const audioVehList = this.vehicles || [];
-        for (let i = 0; i < audioVehList.length; i++) {
-
-            const v = audioVehList[i];
-
-            if (!v || v.destroyed) continue;
-
+        const aHead = this._vehGridHead;
+        const aNext = this._vehGridNext;
+        const scanAudioVeh = (v) => {
+            if (!v || v.destroyed) return;
             const dx = v.x - p.x;
             const dy = v.y - p.y;
-            if (Math.abs(dx) > 940 || Math.abs(dy) > 940) continue;
-
+            if (dx > 940 || dx < -940 || dy > 940 || dy < -940) return;
             const d = Math.hypot(dx, dy);
-
             const parkedOnSceneRig = Math.abs(v.speed || 0) < 5 && Boolean(v.deployedMedic || v.deployedFireman);
             if (!parkedOnSceneRig && v.specKey !== "TOW_TRUCK" && (v.sirenActive || (this.wantedLevel > 0 && v.isPolice && v.driver === "AI_COP")) && v.driver && v.driver !== "AI_TOW" && d < nearestSirenDist) {
-
                 nearestSirenDist = d;
-
                 nearestSirenType = v.specKey === "MEDIC_AMBULANCE"
-
                     ? "MEDIC"
-
                     : (v.specKey === "FIRE_TRUCK" ? "FIRE" : "POLICE");
-
                 if (d > 1) {
                     const sRadVel = -((v.vx || 0) * (dx / d) + (v.vy || 0) * (dy / d));
                     sirenDoppler = 1.0 + Math.max(-0.12, Math.min(0.12, sRadVel / 650));
                 } else {
                     sirenDoppler = 1.0;
                 }
-
             }
-
-            if (v === p.inVehicle || !v.driver) continue;
-
-            if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
-
+            if (v === p.inVehicle || !v.driver) return;
+            if (v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") return;
             const vSpd = Math.abs(v.speed || 0);
-
-            if (vSpd < 10) continue;
-
+            if (vSpd < 10) return;
             if (d < nearestTrafficDist && d > 1) {
-
                 nearestTrafficDist = d;
-
                 nearestTrafficSpeed = vSpd;
-
                 trafficIsMoto = Boolean(v.isMotorcycle);
-
-                // Radial velocity toward player for realistic Doppler pitch shift
-
                 const radialVel = -((v.vx || 0) * (dx / d) + (v.vy || 0) * (dy / d));
-
                 trafficDoppler = 1.0 + Math.max(-0.22, Math.min(0.24, radialVel / 650));
-
             }
-
+        };
+        if (aHead && aNext) {
+            const ax0 = Math.max(0, (p.x - 940) >> 8), ax1 = Math.min(127, (p.x + 940) >> 8);
+            const ay0 = Math.max(0, (p.y - 940) >> 8), ay1 = Math.min(127, (p.y + 940) >> 8);
+            for (let ay = ay0; ay <= ay1; ay++) {
+                const rowOff = ay << 7;
+                for (let ax = ax0; ax <= ax1; ax++) {
+                    for (let vi = aHead[rowOff | ax]; vi !== undefined && vi !== -1; vi = aNext[vi]) {
+                        scanAudioVeh(audioVehList[vi]);
+                    }
+                }
+            }
+        } else {
+            for (let i = 0; i < audioVehList.length; i++) {
+                scanAudioVeh(audioVehList[i]);
+            }
         }
 
 
@@ -19784,51 +19811,29 @@ class LeonidaGame {
             ? (1.0 + Math.sin((this.policeHeli.orbitAngle || 0) * 2.0) * 0.045)
             : 1.0;
 
-        this.audio.update(dt, {
-
-            inVehicle: Boolean(pVeh),
-
-            vehicleSpeed: pVeh ? pVeh.speed : 0,
-
-            vehicleSpecKey: pVeh ? pVeh.specKey : null,
-
-            vehicleMaxSpeed: pVeh ? pVeh.maxSpeed : 420,
-
-            vehicleThrottle: playerThrottle,
-
-            vehicleDrifting: Boolean(pVeh && pVeh.drifting),
-
-            turretSpinSpeed: pVeh ? (pVeh.turretSpinSpeed || 0) : 0,
-
-            playerSirenActive: Boolean(pVeh && pVeh.sirenActive),
-
-            wantedLevel: this.wantedLevel,
-
-            nearestCopDist: nearestCopDist,
-
-            nearestSirenDist,
-
-            nearestSirenType: (pVeh && pVeh.sirenActive) ? playerSirenType : nearestSirenType,
-
-            sirenDoppler,
-
-            nearestHeliDist,
-
-            heliDoppler,
-
-            nearestTrafficDist,
-
-            nearestTrafficSpeed,
-
-            trafficDoppler,
-
-            trafficIsMoto,
-
-            waterProximity,
-
-            nightFactor: this.renderer ? (this.renderer.nightFactor || 0) : 0
-
-        });
+        const audioState = this._audioStateObj || (this._audioStateObj = {});
+        audioState.inVehicle = Boolean(pVeh);
+        audioState.vehicleSpeed = pVeh ? pVeh.speed : 0;
+        audioState.vehicleSpecKey = pVeh ? pVeh.specKey : null;
+        audioState.vehicleMaxSpeed = pVeh ? pVeh.maxSpeed : 420;
+        audioState.vehicleThrottle = playerThrottle;
+        audioState.vehicleDrifting = Boolean(pVeh && pVeh.drifting);
+        audioState.turretSpinSpeed = pVeh ? (pVeh.turretSpinSpeed || 0) : 0;
+        audioState.playerSirenActive = Boolean(pVeh && pVeh.sirenActive);
+        audioState.wantedLevel = this.wantedLevel;
+        audioState.nearestCopDist = nearestCopDist;
+        audioState.nearestSirenDist = nearestSirenDist;
+        audioState.nearestSirenType = (pVeh && pVeh.sirenActive) ? playerSirenType : nearestSirenType;
+        audioState.sirenDoppler = sirenDoppler;
+        audioState.nearestHeliDist = nearestHeliDist;
+        audioState.heliDoppler = heliDoppler;
+        audioState.nearestTrafficDist = nearestTrafficDist;
+        audioState.nearestTrafficSpeed = nearestTrafficSpeed;
+        audioState.trafficDoppler = trafficDoppler;
+        audioState.trafficIsMoto = trafficIsMoto;
+        audioState.waterProximity = waterProximity;
+        audioState.nightFactor = this.renderer ? (this.renderer.nightFactor || 0) : 0;
+        this.audio.update(dt, audioState);
         }
 
         if (this.director && typeof this.director.updateAndAuditFrame === "function") {
@@ -20955,12 +20960,22 @@ class LeonidaGame {
 
     loop() {
         let last = performance.now();
+        let smoothedDt = 1 / 60;
 
         const stepSimulation = (now, doRender) => {
-            let dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+            const rawDt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+            let dt;
             if (this._resetLoopClock) {
                 this._resetLoopClock = false;
-                dt = 0.016;
+                dt = 1 / 60;
+                smoothedDt = dt;
+            } else if (Math.abs(rawDt - smoothedDt) <= smoothedDt * 0.20) {
+                // VSync cadence stabilizer (60/90/120/144/165/240 Hz): filters browser rAF timestamp jitter without lagging on real frame drops!
+                smoothedDt = smoothedDt * 0.82 + rawDt * 0.18;
+                dt = smoothedDt;
+            } else {
+                smoothedDt = rawDt;
+                dt = rawDt;
             }
             last = now;
 

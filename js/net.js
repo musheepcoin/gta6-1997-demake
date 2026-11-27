@@ -3038,7 +3038,9 @@ class ViceNetworkManager {
 
             // Link remote player's driven or passenger vehicle directly to the unified world vehicle in game.vehicles!
             if (rp.veh && rp.veh.id && this.game && Array.isArray(this.game.vehicles)) {
-                let wv = this.game.vehicles.find((v) => v.id === rp.veh.id);
+                let wv = (rp._cachedWorldVeh && rp._cachedWorldVeh.id === rp.veh.id && this.game.vehicles.includes(rp._cachedWorldVeh))
+                    ? rp._cachedWorldVeh
+                    : this.game.vehicles.find((v) => v.id === rp.veh.id);
                 if (!wv && typeof Vehicle === "function") {
                     wv = new Vehicle(rp.veh.id, rp.veh.specKey || "MINT_STALLION", rp.x, rp.y, rp.angle);
                     this.game.vehicles.push(wv);
@@ -3046,10 +3048,13 @@ class ViceNetworkManager {
                         this.game.rebuildVehicleSpatialGrid();
                     }
                 }
+                rp._cachedWorldVeh = wv || null;
                 const rSeat = typeof rp.veh.seat === "number" ? rp.veh.seat : 0;
                 const localIsDriver = Boolean(wv && this.game.player.inVehicle === wv && (this.game.player.seatIndex || 0) === 0);
 
                 if (wv && rSeat === 0 && !localIsDriver) {
+                    if (!this._linkedRemoteVehicles) this._linkedRemoteVehicles = new Set();
+                    this._linkedRemoteVehicles.add(wv);
                     wv._linkedRemoteId = rp.id;
                     wv.driver = "REMOTE";
                     wv.remotePedType = rp.pedType || "gang";
@@ -3087,33 +3092,37 @@ class ViceNetworkManager {
                     rp._linkedWorldVeh = false;
                 }
             } else {
+                rp._cachedWorldVeh = null;
                 rp._linkedWorldVeh = false;
             }
         }
 
-        // Release any world vehicle whose remote driver exited or disconnected
-        if (this.game && Array.isArray(this.game.vehicles)) {
-            for (const v of this.game.vehicles) {
-                if (v._linkedRemoteId || v.driver === "REMOTE") {
-                    let owner = v._linkedRemoteId ? this.remotePlayers.get(v._linkedRemoteId) : null;
-                    if (!owner) {
-                        for (const rp of this.remotePlayers.values()) {
-                            if (rp && rp.veh && rp.veh.id === v.id && (rp.veh.seat || 0) === 0) {
-                                owner = rp;
-                                v._linkedRemoteId = rp.id;
-                                break;
-                            }
+        // Release any world vehicle whose remote driver exited or disconnected (O(activeLinked) instead of scanning 650 cars/frame!)
+        if (this._linkedRemoteVehicles && this._linkedRemoteVehicles.size > 0) {
+            for (const v of this._linkedRemoteVehicles) {
+                if (!v || (!v._linkedRemoteId && v.driver !== "REMOTE")) {
+                    this._linkedRemoteVehicles.delete(v);
+                    continue;
+                }
+                let owner = v._linkedRemoteId ? this.remotePlayers.get(v._linkedRemoteId) : null;
+                if (!owner) {
+                    for (const rp of this.remotePlayers.values()) {
+                        if (rp && rp.veh && rp.veh.id === v.id && (rp.veh.seat || 0) === 0) {
+                            owner = rp;
+                            v._linkedRemoteId = rp.id;
+                            break;
                         }
                     }
-                    if (!owner || !owner.veh || owner.veh.id !== v.id || (owner.veh.seat || 0) !== 0) {
-                        v._linkedRemoteId = null;
-                        if (v.driver === "REMOTE") {
-                            v.driver = null;
-                            v.vx = 0;
-                            v.vy = 0;
-                            v.speed = 0;
-                        }
+                }
+                if (!owner || !owner.veh || owner.veh.id !== v.id || (owner.veh.seat || 0) !== 0) {
+                    v._linkedRemoteId = null;
+                    if (v.driver === "REMOTE") {
+                        v.driver = null;
+                        v.vx = 0;
+                        v.vy = 0;
+                        v.speed = 0;
                     }
+                    this._linkedRemoteVehicles.delete(v);
                 }
             }
         }
@@ -3135,7 +3144,13 @@ class ViceNetworkManager {
         //    - Solo on Persistent Server (visible tab): 0.67 Hz STATE (1.5s) + 0.33 Hz WORLD_SYNC (3.0s) -> cuts solo bandwidth by ~90%!
         //    - Minimized / Background tab (document.hidden): throttled to 2 Hz (multiplayer) or 0.25 Hz (solo)
         if (this.game.started) {
-            const hasRemoteHumans = this.getHumanRemotePlayers().length > 0;
+            let hasRemoteHumans = false;
+            for (const rp of this.remotePlayers.values()) {
+                if (rp && !rp.isBot && !rp.isHidden) {
+                    hasRemoteHumans = true;
+                    break;
+                }
+            }
             const isTabHidden = Boolean(typeof document !== "undefined" && document.hidden);
             if (isTabHidden) {
                 this._localHiddenTimer = (this._localHiddenTimer || 0) + dt;

@@ -5727,26 +5727,30 @@ class LeonidaMap {
     }
 
     getAllowedRoadDirections(bx, by, zBlocks = 2.0) {
+        if (!this._cardinals) {
+            const u = Object.freeze({ key: "U", dx: 0, dy: -1, angle: -Math.PI * 0.5 });
+            const d = Object.freeze({ key: "D", dx: 0, dy: 1, angle: Math.PI * 0.5 });
+            const l = Object.freeze({ key: "L", dx: -1, dy: 0, angle: Math.PI });
+            const r = Object.freeze({ key: "R", dx: 1, dy: 0, angle: 0 });
+            this._cardinals = Object.freeze({ u, d, l, r, list: Object.freeze([u, d, l, r]) });
+        }
         const blk = this.getNavigationBlock(bx, by, zBlocks);
         const dirs = [];
         if (!blk || blk.isParkingBay) return dirs;
-        if (blk.up) dirs.push({ key: "U", dx: 0, dy: -1, angle: -Math.PI * 0.5 });
-        if (blk.down) dirs.push({ key: "D", dx: 0, dy: 1, angle: Math.PI * 0.5 });
-        if (blk.left) dirs.push({ key: "L", dx: -1, dy: 0, angle: Math.PI });
-        if (blk.right) dirs.push({ key: "R", dx: 1, dy: 0, angle: 0 });
+        const c = this._cardinals;
+        if (blk.up) dirs.push(c.u);
+        if (blk.down) dirs.push(c.d);
+        if (blk.left) dirs.push(c.l);
+        if (blk.right) dirs.push(c.r);
 
         // Fallback if a road tile has no explicit arrow bitmask: check adjacent road tiles
         if (dirs.length === 0) {
-            const cardinals = [
-                { key: "U", dx: 0, dy: -1, angle: -Math.PI * 0.5 },
-                { key: "D", dx: 0, dy: 1, angle: Math.PI * 0.5 },
-                { key: "L", dx: -1, dy: 0, angle: Math.PI },
-                { key: "R", dx: 1, dy: 0, angle: 0 }
-            ];
-            for (const c of cardinals) {
-                const nb = this.getNavigationBlock(bx + c.dx, by + c.dy, zBlocks);
+            const cardList = c.list;
+            for (let i = 0; i < 4; i++) {
+                const cd = cardList[i];
+                const nb = this.getNavigationBlock(bx + cd.dx, by + cd.dy, zBlocks);
                 if (nb && nb.groundType === GROUND_TYPE.ROAD && !nb.isParkingBay) {
-                    dirs.push(c);
+                    dirs.push(cd);
                 }
             }
         }
@@ -6914,12 +6918,49 @@ class LeonidaMap {
     }
 
     isSwimmingPoolAt(px, py) {
-        if (this.objectEngine && Array.isArray(this.objectEngine.instances)) {
-            // Cache the (few) villa instances that own a pool: this is queried per pedestrian per frame
-            if (!this._poolInstCache || this._poolInstCacheLen !== this.objectEngine.instances.length) {
-                this._poolInstCache = this.objectEngine.instances.filter((q) => q && q.pool);
-                this._poolInstCacheLen = this.objectEngine.instances.length;
+        const tc = px >> 6;
+        const tr = py >> 6;
+        if (tc < 0 || tc >= this.cols || tr < 0 || tr >= this.rows) return false;
+        const instArr = (this.objectEngine && Array.isArray(this.objectEngine.instances)) ? this.objectEngine.instances : null;
+        const instLen = instArr ? instArr.length : 0;
+        const rpLen = Array.isArray(this.rooftopParties) ? this.rooftopParties.length : 0;
+        if (!this._poolTileMask || this._poolInstCacheLen !== instLen || this._poolRpCacheLen !== rpLen) {
+            this._poolInstCache = instArr ? instArr.filter((q) => q && q.pool) : [];
+            this._poolInstCacheLen = instLen;
+            this._poolRpCacheLen = rpLen;
+            if (!this._poolTileMask || this._poolTileMask.length !== this.cols * this.rows) {
+                this._poolTileMask = new Uint8Array(this.cols * this.rows);
+            } else {
+                this._poolTileMask.fill(0);
             }
+            const mask = this._poolTileMask;
+            for (let i = 0; i < this._poolInstCache.length; i++) {
+                const inst = this._poolInstCache[i];
+                const ic = inst.x >> 6, ir = inst.y >> 6;
+                const r0 = Math.max(0, ir - 3), r1 = Math.min(this.rows - 1, ir + 3);
+                const c0 = Math.max(0, ic - 3), c1 = Math.min(this.cols - 1, ic + 3);
+                for (let rr = r0; rr <= r1; rr++) {
+                    const rowOff = rr * this.cols;
+                    for (let cc = c0; cc <= c1; cc++) mask[rowOff + cc] = 1;
+                }
+            }
+            if (rpLen > 0) {
+                for (let i = 0; i < rpLen; i++) {
+                    const rp = this.rooftopParties[i];
+                    const rc = rp.x >> 6, rr0 = rp.y >> 6;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        const ry = rr0 + dr;
+                        if (ry < 0 || ry >= this.rows) continue;
+                        for (let dc = -1; dc <= 1; dc++) {
+                            const rx = rc + dc;
+                            if (rx >= 0 && rx < this.cols) mask[ry * this.cols + rx] = 1;
+                        }
+                    }
+                }
+            }
+        }
+        if (this._poolTileMask[tr * this.cols + tc] === 0) return false;
+        if (this._poolInstCache && this._poolInstCache.length > 0) {
             const poolInsts = this._poolInstCache;
             for (let i = 0; i < poolInsts.length; i++) {
                 const inst = poolInsts[i];
@@ -7557,7 +7598,13 @@ class LeonidaMap {
     }
 
     resolveCircleFloraCollision(x, y, radius = 8) {
-        if (!this.floraGrid || this.floraGrid.size === 0) return { hit: false, x, y };
+        const out = this._floraColOut || (this._floraColOut = { hit: false, x: 0, y: 0 });
+        if (!this.floraGrid || this.floraGrid.size === 0) {
+            out.hit = false;
+            out.x = x;
+            out.y = y;
+            return out;
+        }
         const cx = Math.floor(x / TILE_SIZE);
         const cy = Math.floor(y / TILE_SIZE);
         let nx = x;
@@ -7606,7 +7653,10 @@ class LeonidaMap {
                 }
             }
         }
-        return { hit, x: nx, y: ny };
+        out.hit = hit;
+        out.x = nx;
+        out.y = ny;
+        return out;
     }
 
     /**

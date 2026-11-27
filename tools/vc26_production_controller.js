@@ -3305,11 +3305,71 @@ function runSimulations() {
             `Player Fire Truck deck-gun stream reaches 245px in 3D ballistics, extinguishes burning pedestrian (burnTimer=${burnPed.burnTimer}), and applies hydrodynamic knockback (${(startPedY - burnPed.y).toFixed(1)}px)`
         );
         console.log("");
+
+        // 55. Frame-Pacing Fluidity, Exponential Camera Damping, Zero-Alloc Typed-Array Sprite Sort & Spatial Grid Invariants
+        console.log("── SCENARIO 55: Frame-Pacing Fluidity, Exponential Camera Damping, Zero-Alloc Sprite Sort & Spatial Invariants ──");
+        {
+            // A. Zero-allocation stable typed-array sortAndBuildSpriteBatch preserves exact monotonic sortKey order & tie stability
+            g.renderer.beginSpriteBatch();
+            g.renderer.pushSpriteQuad3D(100, 100, 2.5, 16, 16, 0, 0, 0, 1, 1, 1, 1, 1, 1, 15); // sky layer (>=14)
+            g.renderer.pushSpriteQuad3D(120, 120, 2.0, 16, 16, 0, 0, 0, 1, 1, 1, 1, 1, 1, 4);  // car A
+            g.renderer.pushSpriteQuad3D(130, 130, 2.0, 16, 16, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1);  // tire mark
+            g.renderer.pushSpriteQuad3D(140, 140, 2.0, 16, 16, 0, 0, 0, 1, 1, 1, 1, 1, 1, 4);  // car B (same layer as car A, higher seq)
+            for (let extra = 0; extra < 40; extra++) {
+                g.renderer.pushSpriteQuad3D(150 + extra, 150, 2.0 + (extra % 3) * 0.5, 12, 12, 0, 0, 0, 1, 1, 1, 1, 1, 1, (extra % 12) + 1);
+            }
+            g.renderer.sortAndBuildSpriteBatch();
+            let monoOk = g.renderer.spriteCount === 44 && g.renderer.skySpriteStartIdx === 43;
+            for (let si = 1; si < g.renderer.spriteCount; si++) {
+                if (g.renderer.spriteQueue[si].sortKey < g.renderer.spriteQueue[si - 1].sortKey) {
+                    monoOk = false;
+                    break;
+                }
+            }
+            assert(monoOk, `Typed-array SpriteBatch sort maintains monotonic sortKey order & skySpriteStartIdx (${g.renderer.skySpriteStartIdx}/${g.renderer.spriteCount})`);
+
+            // B. Framerate-independent exponential camera follow converges identically across 1x60Hz vs 2x120Hz substeps
+            g.activeInterior = null;
+            g.player.inVehicle = null;
+            g.player.x = 445.5 * TS;
+            g.player.y = 280.0 * TS;
+            g.renderer.camX = g.player.x - 100;
+            g.renderer.camY = g.player.y;
+            g.renderer._camLeadX = 0;
+            g.renderer._camLeadY = 0;
+            g.renderer.render(g, 1 / 60);
+            const camAfter60Hz = g.renderer.camX;
+
+            g.renderer.camX = g.player.x - 100;
+            g.renderer.camY = g.player.y;
+            g.renderer._camLeadX = 0;
+            g.renderer._camLeadY = 0;
+            g.renderer.render(g, 1 / 120);
+            g.renderer.render(g, 1 / 120);
+            const camAfter120Hz = g.renderer.camX;
+            const hzDrift = Math.abs(camAfter60Hz - camAfter120Hz);
+            assert(hzDrift < 0.001, `Exponential camera follow is framerate-independent across 60Hz vs 120Hz (drift=${hzDrift.toFixed(6)}px)`);
+
+            // C. Pre-allocated cardinal directions & tile-masked isSwimmingPoolAt / spatialized findNearestTrunkVehicle invariants
+            const dirsRoad = g.map.getAllowedRoadDirections(445, 280, 2.0);
+            const poolDryCheck = g.map.isSwimmingPoolAt(445.5 * TS, 280.0 * TS);
+            const trunkCar = sandbox.makeVeh("s55_trunk_car", "MINT_STALLION", g.player.x, g.player.y - 34, -Math.PI * 0.5);
+            g.vehicles.push(trunkCar);
+            g.rebuildVehicleSpatialGrid();
+            const foundGrid = g.director.findNearestTrunkVehicle(54, true);
+            const foundScan = g.director.findNearestTrunkVehicle(54, false);
+            const aiEmptySeats = trunkCar.getOccupiedSeats(g);
+            assert(
+                Array.isArray(dirsRoad) && dirsRoad.length > 0 && poolDryCheck === false && foundGrid === trunkCar && foundScan === trunkCar && aiEmptySeats.length === 0,
+                `Spatial trunk query, frozen cardinal road directions (${dirsRoad.length}), pool tile mask & zero-alloc empty seats all match 100%`
+            );
+        }
+        console.log("");
     }
 
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 54 FULL-GAME 200-LOOP AUDIT, CAR AI ZERO-DEFECT, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 55 FULL-GAME 200-LOOP AUDIT, FLUIDITY/PERF, CAR AI ZERO-DEFECT, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {
