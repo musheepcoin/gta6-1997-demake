@@ -2357,7 +2357,7 @@ function snapStationToNearestRoad(wx, wy) {
 const FLEET_DEFS = {
     EMS:  { spec: "MEDIC_AMBULANCE", station: "MEDIC", count: 8, hp: 160, drv: 3 },
     FIRE: { spec: "FIRE_TRUCK",      station: "FIRE",  count: 5, hp: 220, drv: 3 },
-    TOW:  { spec: "TOW_TRUCK",       station: "TOW",   count: 6, hp: 180, drv: 6 }
+    TOW:  { spec: "TOW_TRUCK",       station: "TOW",   count: 8, hp: 180, drv: 6 }
 };
 
 function fleetUnitId(role, k) {
@@ -2688,60 +2688,128 @@ function tickAutonomousRoom(roomCode, room, dt = 0.10) {
             }
         }
 
-        // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck from Municipal Impound (tow_hq) for wrecks
-        // Prioritize wrecks closest to active online players and skip unreachable gated/off-road wrecks so fleet units NEVER deadlock!
-        const wreckList = Object.entries(room.modifiedVehs || {}).filter(([, vrow]) => Array.isArray(vrow) && (vrow[10] & 1));
-        wreckList.sort((a, b) => {
-            const da = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot(a[1][2] - p.x, a[1][3] - p.y)), 999999);
-            const db = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot(b[1][2] - p.x, b[1][3] - p.y)), 999999);
+        // 3B. VCFD Fire Engine Dispatch from Central Fire Station (vcfd_hq) & Tow Truck / Impound Clearance from Municipal Impound (tow_hq)
+        // Handles BOTH Destroyed Wrecks (flags & 1) AND Intact/Damaged Driverless Abandoned Vehicles (drv === 0) across modifiedVehs & orphan room.vehs!
+        if (!room.modifiedVehTs) room.modifiedVehTs = {};
+        const protectedCeVehicles = new Map();
+        if (room.creationOps && typeof room.creationOps === "object") {
+            for (const cop of Object.values(room.creationOps)) {
+                if (cop && cop.action === "SPAWN_VEHICLE" && cop.id) {
+                    protectedCeVehicles.set(String(cop.id), { x: Number(cop.x) || 0, y: Number(cop.y) || 0 });
+                }
+            }
+        }
+        const clearanceMap = new Map();
+        for (const [vid, vrow] of Object.entries(room.modifiedVehs || {})) {
+            if (Array.isArray(vrow)) clearanceMap.set(vid, vrow);
+        }
+        for (const [vid, vrow] of Object.entries(room.vehs || {})) {
+            if (!Array.isArray(vrow) || clearanceMap.has(vid)) continue;
+            if (String(vid).startsWith("fleet_") || String(vid).startsWith("srv_trf_")) continue;
+            if ((vrow[8] || 0) === 0 || (vrow[10] & 1)) {
+                clearanceMap.set(vid, vrow);
+            }
+        }
+        const clearanceList = [];
+        for (const [vid, vrow] of clearanceMap.entries()) {
+            const isDestroyedRow = Boolean(vrow[10] & 1);
+            if (!isDestroyedRow && (vrow[8] || 0) !== 0) continue;
+            if (!isDestroyedRow && protectedCeVehicles.has(vid)) {
+                const ceOrigin = protectedCeVehicles.get(vid);
+                if (Math.hypot((vrow[2] || 0) - ceOrigin.x, (vrow[3] || 0) - ceOrigin.y) <= 36) {
+                    continue;
+                }
+            }
+            if (!room.modifiedVehTs[vid]) {
+                room.modifiedVehTs[vid] = nowMs;
+            }
+            clearanceList.push([vid, vrow]);
+        }
+        clearanceList.sort((a, b) => {
+            const jctA = Boolean(serverMap.doesVehicleOverlapCrosswalkOrBox && serverMap.doesVehicleOverlapCrosswalkOrBox(a[1][2] || 0, a[1][3] || 0, a[1][5] || 0, 30, 13, true));
+            const jctB = Boolean(serverMap.doesVehicleOverlapCrosswalkOrBox && serverMap.doesVehicleOverlapCrosswalkOrBox(b[1][2] || 0, b[1][3] || 0, b[1][5] || 0, 30, 13, true));
+            if (jctA !== jctB) return jctA ? -1 : 1;
+            const da = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot((a[1][2] || 0) - p.x, (a[1][3] || 0) - p.y)), 999999);
+            const db = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot((b[1][2] || 0) - p.x, (b[1][3] || 0) - p.y)), 999999);
             return da - db;
         });
-        for (const [vid, vrow] of wreckList) {
-            if ((vrow[9] || 0) > 0) {
-                vrow[9] = 0;
-                if (room.vehs && room.vehs[vid]) room.vehs[vid][9] = 0;
-                isDirty = true;
-            }
+        const purgeVehicleAndBroadcast = (targetVid) => {
+            if (room.modifiedVehs) delete room.modifiedVehs[targetVid];
+            if (room.modifiedVehTs) delete room.modifiedVehTs[targetVid];
+            if (room.vehs) delete room.vehs[targetVid];
+            if (room.vehNav) delete room.vehNav[targetVid];
+            isDirty = true;
+            broadcastToRoom(roomCode, {
+                t: "WORLD_EVENT",
+                kind: "VEH_EXIT",
+                vehId: targetVid,
+                x: -9999,
+                y: -9999,
+                z: -99,
+                a: 0,
+                hp: 0,
+                flags: 0
+            });
+        };
+        let launchedTowThisTick = 0;
+        for (const [vid, vrow] of clearanceList) {
             const wx = vrow[2];
             const wy = vrow[3];
             if (!Number.isFinite(wx) || !Number.isFinite(wy) || wx < 128 || wy < 128) continue;
+            const spec = String(vrow[1] || "MINT_STALLION");
             const wbx = Math.floor(wx / TS), wby = Math.floor(wy / TS);
             const inNoTraffic = serverMap.isRestrictedNoTrafficZone && serverMap.isRestrictedNoTrafficZone(wbx, wby);
             const inWater = serverMap.isWaterAtPixel && serverMap.isWaterAtPixel(wx, wy);
             const snappedGoal = snapStationToNearestRoad(wx, wy);
             const roadReachable = !inNoTraffic && !inWater && Math.hypot(snappedGoal.x - wx, snappedGoal.y - wy) <= 185;
-            const wreckAgeMs = nowMs - ((room.modifiedVehTs && room.modifiedVehTs[vid]) || nowMs);
-            if (!(vrow[10] & 128)) {
-                if (!roadReachable) {
-                    if (wreckAgeMs > 35000) {
-                        vrow[10] |= 128;
-                        if (room.vehs && room.vehs[vid]) room.vehs[vid][10] |= 128;
-                        isDirty = true;
-                    }
-                    continue;
+            const isTowableLandVeh = roadReachable && spec !== "JETSKI" && spec !== "SPEEDBOAT" && spec !== "AIRBOAT" && spec !== "PANZER_TANK";
+            const ageMs = nowMs - (room.modifiedVehTs[vid] || nowMs);
+            const isDestroyedRow = Boolean(vrow[10] & 1);
+
+            if (isDestroyedRow) {
+                if ((vrow[9] || 0) > 0) {
+                    vrow[9] = 0;
+                    if (room.vehs && room.vehs[vid]) room.vehs[vid][9] = 0;
+                    isDirty = true;
                 }
-                const hasFireUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "FIRE" && nv.targetId === vid);
-                if (!hasFireUnit) launchFleetUnit(room, "FIRE", vid, snappedGoal.x, snappedGoal.y);
-            } else if (roadReachable) {
-                const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
-                if (!hasTowUnit && wreckAgeMs > 120000) launchFleetUnit(room, "TOW", vid, snappedGoal.x, snappedGoal.y);
-            } else if (wreckAgeMs > 120000) {
-                // Municipal clearance of off-road / compound / water extinguished wrecks after 2 minutes so world_state.json never clogs!
-                delete room.modifiedVehs[vid];
-                if (room.modifiedVehTs) delete room.modifiedVehTs[vid];
-                delete room.vehs[vid];
-                isDirty = true;
-                broadcastToRoom(roomCode, {
-                    t: "WORLD_EVENT",
-                    kind: "VEH_EXIT",
-                    vehId: vid,
-                    x: -9999,
-                    y: -9999,
-                    z: -99,
-                    a: 0,
-                    hp: 0,
-                    flags: 0
-                });
+                if (!(vrow[10] & 128)) {
+                    if (!roadReachable) {
+                        if (ageMs > 25000) {
+                            vrow[10] |= 128;
+                            if (room.vehs && room.vehs[vid]) room.vehs[vid][10] |= 128;
+                            isDirty = true;
+                        }
+                        continue;
+                    }
+                    const hasFireUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "FIRE" && nv.targetId === vid);
+                    if (!hasFireUnit) launchFleetUnit(room, "FIRE", vid, snappedGoal.x, snappedGoal.y);
+                } else if (isTowableLandVeh && ageMs <= 165000) {
+                    const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
+                    if (!hasTowUnit && ageMs > 20000 && launchedTowThisTick < 4) {
+                        if (launchFleetUnit(room, "TOW", vid, snappedGoal.x, snappedGoal.y)) launchedTowThisTick++;
+                    }
+                } else if (ageMs > 60000) {
+                    purgeVehicleAndBroadcast(vid);
+                }
+                continue;
+            }
+
+            // Intact or dented driverless abandoned vehicle (drv === 0 && !(flags & 1)):
+            const inJctOrCw = Boolean(
+                serverMap.doesVehicleOverlapCrosswalkOrBox &&
+                serverMap.doesVehicleOverlapCrosswalkOrBox(wx, wy, vrow[5] || 0, 30, 13, true)
+            );
+            const minPlayerDist = roomPlayerPts.reduce((m, p) => Math.min(m, Math.hypot(wx - p.x, wy - p.y)), 999999);
+            const reqTowMs = inJctOrCw ? 22000 : (minPlayerDist < 85 ? 75000 : 40000);
+            if (ageMs < reqTowMs) continue;
+
+            const hasTowUnit = Object.values(room.vehNav).some((nv) => nv && nv.role === "TOW" && nv.targetId === vid);
+            if (isTowableLandVeh && ageMs <= 195000) {
+                if (!hasTowUnit && launchedTowThisTick < 4) {
+                    if (launchFleetUnit(room, "TOW", vid, snappedGoal.x, snappedGoal.y)) launchedTowThisTick++;
+                }
+            } else if (!hasTowUnit && ageMs >= Math.max(reqTowMs, isTowableLandVeh ? 195000 : 55000)) {
+                purgeVehicleAndBroadcast(vid);
             }
         }
     }

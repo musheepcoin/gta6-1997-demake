@@ -1497,7 +1497,8 @@ class ViceWorldDirector {
 
         for (let i = 0; i < g.vehicles.length; i++) {
             const v = g.vehicles[i];
-            if (!v || v === pVeh || v.towedByTruck || v.isStaticParked || v.isCurbParked || v.isEstateCar) continue;
+            if (!v || v === pVeh || v.towedByTruck || v.isEstateCar) continue;
+            if ((v.isStaticParked || v.isCurbParked) && !v._worldModified && !v.lastPlayerDriven && !v.destroyed) continue;
             const bx = Math.floor(v.x / tileSize);
             const by = Math.floor(v.y / tileSize);
             const vz = v.z || 2.0;
@@ -1882,11 +1883,11 @@ class ViceWorldDirector {
                     if ((v.aiLaneChangeCooldown || 0) <= 0 && typeof v.tryAdjacentLaneChange === "function") {
                         v.tryAdjacentLaneChange(vbx, vby, v.z || 2.0, g.map, g);
                     }
-                    const rawOff = clearSide * 13;
-                    const targetOff = typeof v.clampSafeInLaneOffset === "function"
+                    const rawOff = (v.isHeavyVehicle || (v.w || 62) >= 85 || (v.aiChosenDir && v.aiChosenDir.isTurn)) ? 0 : (clearSide * 13);
+                    const targetOff = rawOff === 0 ? 0 : (typeof v.clampSafeInLaneOffset === "function"
                         ? v.clampSafeInLaneOffset(rawOff, vbx, vby, Math.round(fCos), Math.round(fSin), v.z || 2.0, g.map)
-                        : rawOff;
-                    if (Math.abs((v.aiPullOverOffset || 0) - targetOff) > 2 || (v.aiPullOverTimer || 0) < 1.2) {
+                        : rawOff);
+                    if (targetOff !== 0 && (Math.abs((v.aiPullOverOffset || 0) - targetOff) > 2 || (v.aiPullOverTimer || 0) < 1.2)) {
                         v.aiPullOverOffset = targetOff;
                         v.aiPullOverTimer = Math.max(v.aiPullOverTimer || 0, 2.6);
                         v.aiTurnSignal = clearSide;
@@ -1933,10 +1934,18 @@ class ViceWorldDirector {
                 obsVeh.noDeployCooldown = 5.2;
                 obsVeh.wasCriminalCar = false;
                 obsVeh.lastPlayerDriven = false;
+                obsVeh.isStaticParked = false;
+                obsVeh.isCurbParked = false;
                 obsVeh.abandonedTimer = 0;
                 obsVeh.doorOpenTimer = 0.44;
                 obsVeh.aiPullOverOffset = 0;
                 obsVeh.aiPullOverTimer = 0;
+                if (obsVeh._worldModified) {
+                    obsVeh._worldModified = false;
+                    if (g.net && typeof g.net.broadcastVehicleRemoved === "function" && obsVeh.id) {
+                        g.net.broadcastVehicleRemoved(obsVeh.id);
+                    }
+                }
                 ped._boardedVehicle = true;
                 ped.dead = true;
                 this.laneTracker.totalWardenDirectives++;

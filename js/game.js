@@ -6392,6 +6392,7 @@ class LeonidaGame {
 
             v._worldModified = true;
             v.isStaticParked = false;
+            v.isCurbParked = false;
             v.lastPlayerDriven = true;
 
             if (this.net) {
@@ -6701,6 +6702,7 @@ class LeonidaGame {
 
         closest._worldModified = true;
         closest.isStaticParked = false;
+        closest.isCurbParked = false;
         closest.lastPlayerDriven = true;
         if (freeSeat === 0 && this.director && typeof this.director.onPlayerEnteredVehicle === "function") {
             this.director.onPlayerEnteredVehicle(closest, Boolean(wasOccupied));
@@ -10159,6 +10161,7 @@ class LeonidaGame {
 
         v._worldModified = true;
         v.isStaticParked = false;
+        v.isCurbParked = false;
 
         if (!fromNetwork && this.net && typeof this.net.broadcastWorldEvent === "function") {
 
@@ -11906,11 +11909,11 @@ class LeonidaGame {
         const scanDt = this._towScanAccum;
         this._towScanAccum = 0;
 
-        // Scan for a wrecked or abandoned vehicle blocking a road near the player (75px < dist < 760px)
+        // Scan for a wrecked or abandoned vehicle blocking a road or intersection in the district (< 1550px)
 
         let targetBlockedCar = null;
 
-        let bestDist = 760;
+        let bestDist = 1550;
 
         let activeTowTrucks = 0;
 
@@ -11938,13 +11941,20 @@ class LeonidaGame {
 
         for (const v of this.vehicles) {
 
-            if (v === p.inVehicle || v.towedByTruck || v.isStaticParked || v.isEstateCar || v.missionTag) continue;
+            if (v === p.inVehicle || v.towedByTruck || v.isEstateCar || v.missionTag) continue;
+            if ((v.isStaticParked || v.isCurbParked) && !v._worldModified && !v.lastPlayerDriven && !v.destroyed) continue;
+
+            const inJctOrCw = Boolean(
+                this.map &&
+                typeof this.map.doesVehicleOverlapCrosswalkOrBox === "function" &&
+                this.map.doesVehicleOverlapCrosswalkOrBox(v.x, v.y, v.angle || 0, (v.w || 62) * 0.48, (v.h || 26) * 0.44, true)
+            );
 
             // Coherent Physical VCPD Cruiser & Crime-Scene Getaway Car Recovery (Zero ghost-car self-driving!):
             // If an intact police cruiser or bandit car is left driverless on the street after a chase,
             // a free officer on scene or a relief officer spawned strictly off-screen physically walks/jogs down the sidewalk
             // all the way to the car door (`bestCarDist < boardDist`), opens the door, climbs in, and drives it back on patrol!
-            const reliefThreshold = (this.wantedLevel || 0) > 0 ? 14.0 : 10.0;
+            const reliefThreshold = inJctOrCw ? 4.0 : ((this.wantedLevel || 0) > 0 ? 8.5 : 5.5);
             if ((v.isPolice || v.wasCriminalCar) && !v.destroyed && v.driver === null && (v.abandonedTimer || 0) > reliefThreshold) {
                 let assignedCop = null;
                 for (let pi = 0; pi < this.peds.length; pi++) {
@@ -11954,7 +11964,8 @@ class LeonidaGame {
                         assignedCop = pd;
                         break;
                     }
-                    if (!pd.inCombat && !pd._boardingVeh && Math.hypot(pd.x - v.x, pd.y - v.y) < 520) {
+                    if (!pd.inCombat && !pd._boardingVeh && Math.hypot(pd.x - v.x, pd.y - v.y) < 560) {
+                        pd.isReliefDriver = true;
                         pd._boardingVeh = v;
                         pd.homeCruiser = v;
                         assignedCop = pd;
@@ -11962,7 +11973,7 @@ class LeonidaGame {
                     }
                 }
                 const nowReliefMs = performance.now();
-                if (!assignedCop && this.peds.length < 165 && (nowReliefMs - (v._reliefCopSpawnedAt || 0)) > 25000) {
+                if (!assignedCop && this.peds.length < 175 && (nowReliefMs - (v._reliefCopSpawnedAt || 0)) > 14000) {
                     v._reliefCopSpawnedAt = nowReliefMs;
                     const cz = v.z || 2.0;
                     const camX = (this.renderer && this.renderer.camX !== undefined) ? this.renderer.camX : p.x;
@@ -11991,7 +12002,7 @@ class LeonidaGame {
                         const nav = this.map.getNavigationBlock ? this.map.getNavigationBlock(sbx, sby, cz) : null;
                         if (
                             nav &&
-                            (nav.groundType === GROUND_TYPE.PAWEMENT || nav.groundType === GROUND_TYPE.ROAD) &&
+                            (nav.groundType === GROUND_TYPE.PAWEMENT || nav.groundType === GROUND_TYPE.ROAD || nav.groundType === GROUND_TYPE.FIELD) &&
                             (!this.map.isWaterAtPixel || !this.map.isWaterAtPixel(sx, sy)) &&
                             (!this.map.resolveCircleBuildingCollision || !this.map.resolveCircleBuildingCollision(sx, sy, 10, cz).hit)
                         ) {
@@ -12017,23 +12028,27 @@ class LeonidaGame {
                 }
             }
 
-            const towWreckDelay = Math.max(12.0, Math.min(45.0, this.wreckTowDelay || 45.0));
+            const towWreckDelay = Math.max(8.0, Math.min(24.0, this.wreckTowDelay || 14.0));
             const isCooledForTow = Boolean(v.fireExtinguished || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER");
             const isWreck = v.destroyed && isCooledForTow && (v.abandonedTimer || 0) > towWreckDelay;
 
+            const reqAbandonedSec = inJctOrCw
+                ? (v.lastPlayerDriven ? 14.0 : 9.0)
+                : (v.lastPlayerDriven ? 24.0 : (v.isPolice ? 18.0 : 13.0));
             const isAbandoned = !v.destroyed &&
                 v.driver === null &&
                 (v.burnTimer || 0) <= 0 &&
-                (v.hp || 100) > 50 &&
-                (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 38.0 : (v.isPolice ? 42.0 : 18.0));
+                (v.hp || 100) > 30 &&
+                (v.abandonedTimer || 0) > reqAbandonedSec;
 
             if (!isWreck && !isAbandoned) continue;
 
             if (this.map.isWaterAtPixel && this.map.isWaterAtPixel(v.x, v.y)) continue;
 
             const dPlayer = this.getDistanceToNearestHumanPlayer(v.x, v.y);
+            const effScoreDist = inJctOrCw ? (dPlayer * 0.35) : dPlayer;
 
-            if ((!isWreck && dPlayer < 42) || dPlayer >= bestDist) continue;
+            if ((!isWreck && !inJctOrCw && dPlayer < 38) || effScoreDist >= bestDist || dPlayer >= 1550) continue;
 
 
 
@@ -12047,9 +12062,9 @@ class LeonidaGame {
 
             if (typeof this.map.getNavigationBlock === "function") {
 
-                for (let dy = -1; dy <= 1 && !nearRoad; dy++) {
+                for (let dy = -2; dy <= 2 && !nearRoad; dy++) {
 
-                    for (let dx = -1; dx <= 1; dx++) {
+                    for (let dx = -2; dx <= 2; dx++) {
 
                         const nb = this.map.getNavigationBlock(bx + dx, by + dy, v.z || 2.0);
 
@@ -12075,13 +12090,12 @@ class LeonidaGame {
             const alreadyTargeted = this.vehicles.some(
                 (tv) => !tv.destroyed && tv.driver === "AI_TOW" && (
                     tv.towTarget === v ||
-                    tv.towingVehicle === v ||
-                    Math.hypot(tv.x - v.x, tv.y - v.y) < 380
+                    tv.towingVehicle === v
                 )
             );
             if (alreadyTargeted) continue;
 
-            bestDist = dPlayer;
+            bestDist = effScoreDist;
             targetBlockedCar = v;
         }
 
@@ -12091,12 +12105,12 @@ class LeonidaGame {
         }
 
         this.towDispatchTimer = (this.towDispatchTimer || 0) + scanDt;
-        if (this.towDispatchTimer < 6.0) return;
-        this.towDispatchTimer = 3.0; // retry ~3s later if no road spawn block found
+        if (this.towDispatchTimer < 2.5) return;
+        this.towDispatchTimer = 1.2; // retry ~1.3s later if no road spawn block found
 
-        // Persistent World Priority #1: If an idle Tow Truck is already patrolling in the district (< 1850px), assign it via radio without teleporting!
+        // Persistent World Priority #1: If an idle Tow Truck is already patrolling in the district (< 2200px), assign it via radio without teleporting!
         let idlePatrolTow = null;
-        let bestPatrolDist = 1850;
+        let bestPatrolDist = 2200;
         for (const tv of this.vehicles) {
             if (!tv.destroyed && tv.driver === "AI_TOW" && !tv.towingVehicle && !tv.towTarget) {
                 const d = Math.hypot(tv.x - targetBlockedCar.x, tv.y - targetBlockedCar.y);
@@ -12115,8 +12129,8 @@ class LeonidaGame {
             return;
         }
 
-        // Persistent World Priority #2: Depart from the Central Municipal Impound Yard (up to 3 Tow Trucks in the fleet!)
-        if (activeTowTrucks < 3) {
+        // Persistent World Priority #2: Depart from the Central Municipal Impound Yard (up to 4 Tow Trucks in the fleet!)
+        if (activeTowTrucks < 4) {
             const pz = targetBlockedCar.z || 2.0;
             const spawnInfo = this.findStationDispatchSpawn("TOW", targetBlockedCar.x, targetBlockedCar.y, pz);
             if (spawnInfo) {
@@ -13756,6 +13770,21 @@ class LeonidaGame {
                 Math.abs(sv.vy || 0) < 0.05 &&
                 Math.abs(sv.angularVelocity || 0) < 0.01
             ) {
+                if ((sv.isCurbParked || sv.isStaticParked) && !sv.isEstateCar && !sv.missionTag) {
+                    const bayRef = (sv.curbBayIndex !== undefined && this.map && Array.isArray(this.map.curbParkingBays))
+                        ? this.map.curbParkingBays[sv.curbBayIndex]
+                        : null;
+                    const displacedFromBay = Boolean(
+                        bayRef && (
+                            Math.hypot(sv.x - bayRef.x, sv.y - bayRef.y) > 20 ||
+                            Math.abs(Math.sin((sv.angle || 0) - (bayRef.angle || 0))) > 0.38
+                        )
+                    );
+                    if (sv._worldModified || sv.lastPlayerDriven || displacedFromBay) {
+                        sv.isCurbParked = false;
+                        sv.isStaticParked = false;
+                    }
+                }
                 if (!sv.isStaticParked && !sv.isCurbParked && !sv.isEstateCar) {
                     sv.abandonedTimer = (sv.abandonedTimer || 0) + dt;
                 }
@@ -15372,7 +15401,16 @@ class LeonidaGame {
 
             const prevY = ped.y;
 
-            ped._boardingVeh = null;
+            const keepAssignedBoarding = Boolean(
+                (ped.isReliefDriver || ped.isTrafficWarden) &&
+                ped._boardingVeh &&
+                !ped._boardingVeh.destroyed &&
+                ped._boardingVeh.driver === null &&
+                !ped._boardingVeh.towedByTruck
+            );
+            if (!keepAssignedBoarding) {
+                ped._boardingVeh = null;
+            }
 
 
 
@@ -15698,7 +15736,7 @@ class LeonidaGame {
 
                     // Post-shootout scene cleanup OR Squad Re-Boarding for Distant Pursuit:
                     // VCPD officers walk/run back to their patrol cruiser (or nearest unoccupied police car), climb in, and drive off!
-                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && (ped.homeCruiser._gridEpoch === this._gridEpoch || ped.isTrafficWarden))
+                    let returnCar = (ped.homeCruiser && !ped.homeCruiser.destroyed && ped.homeCruiser !== (p && p.inVehicle) && !ped.homeCruiser.towedByTruck && (ped.homeCruiser.driver === null || ped.homeCruiser.driver === "AI_COP") && (ped.homeCruiser._gridEpoch === this._gridEpoch || ped.isTrafficWarden || ped.isReliefDriver || this.vehicles.includes(ped.homeCruiser)))
                         ? ped.homeCruiser
                         : ((ped._boardingVeh && !ped._boardingVeh.destroyed && ped._boardingVeh.driver === null && !ped._boardingVeh.towedByTruck)
                             ? ped._boardingVeh
@@ -15722,8 +15760,7 @@ class LeonidaGame {
                                             !v.destroyed &&
                                             v.driver === null &&
                                             !v.towedByTruck &&
-                                            !v.isStaticParked &&
-                                            !v.isCurbParked &&
+                                            !((v.isStaticParked || v.isCurbParked) && !v._worldModified && !v.lastPlayerDriven) &&
                                             !v.isEstateCar &&
                                             (v.isPolice || v.wasCriminalCar || ped.isTrafficWarden)
                                         ) {
@@ -15748,8 +15785,16 @@ class LeonidaGame {
                             returnCar.wasCriminalCar = false;
                             returnCar.sirenActive = Boolean(returnCar.isPolice && this.wantedLevel > 0);
                             returnCar.lastPlayerDriven = false;
+                            returnCar.isStaticParked = false;
+                            returnCar.isCurbParked = false;
                             returnCar.abandonedTimer = 0;
                             returnCar.doorOpenTimer = 0.44;
+                            if (returnCar._worldModified) {
+                                returnCar._worldModified = false;
+                                if (this.net && typeof this.net.broadcastVehicleRemoved === "function" && returnCar.id) {
+                                    this.net.broadcastVehicleRemoved(returnCar.id);
+                                }
+                            }
                             if (ped.isTrafficWarden && this.director && this.director.laneTracker) {
                                 const clearSide = (ped.wardenBottleneck && ped.wardenBottleneck.clearSide) ? ped.wardenBottleneck.clearSide : 1;
                                 returnCar.aiPullOverOffset = clearSide * 24;

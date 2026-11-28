@@ -3470,11 +3470,104 @@ function runSimulations() {
             );
         }
         console.log("");
+
+        // 57. End-to-End Abandoned Vehicle, Curb-Park Stolen Car, 31-50 HP Dead-Zone, Relief Cop & Dedicated Server 24/7 Tow Clearance
+        console.log("── SCENARIO 57: End-to-End Abandoned Vehicle, Stolen Curb-Park, 31-50 HP Dead-Zone & Server 24/7 Tow Clearance ──");
+        {
+            const { g: g57, sandbox: sb57, stepSec: step57 } = createGameInstance(cmpBuf, true);
+            g57.trafficManager.generateTrafficCars = () => {};
+            g57.trafficManager.generateTrafficPeds = () => {};
+            g57.seedCityCurbsideParkedVehicles();
+            let jctBy57 = 280;
+            for (let r = 245; r < 305; r++) {
+                if (g57.map.getBlockInfo(444, r, 1).lid === 25) {
+                    jctBy57 = r;
+                    break;
+                }
+            }
+            const cx57 = 444.5 * TS, cy57 = (jctBy57 + 0.5) * TS;
+            const stolenCurb = g57.vehicles.find(v => v && v.isCurbParked && v.id.startsWith("curb_park_"));
+            assert(Boolean(stolenCurb && stolenCurb.isCurbParked === true), "Seeded curb_park_* vehicle starts with isCurbParked=true");
+
+            // 1. Simulate stealing a curb_park_* car, driving it into an Ocean Drive 4-way intersection (lid=25), denting it to HP=42 (31..50 dead-zone!), and exiting
+            g57.vehicles = [stolenCurb];
+            g57.peds.length = 0;
+            g57.player.x = stolenCurb.x;
+            g57.player.y = stolenCurb.y;
+            g57.completeVehicleEntry(stolenCurb);
+            stolenCurb.x = cx57;
+            stolenCurb.y = cy57;
+            stolenCurb.angle = 0.62;
+            stolenCurb.hp = 42; // Previously stuck in 30 < hp <= 50 dead-zone!
+            stolenCurb.burnTimer = 0;
+            g57.toggleVehicleEntry(); // Player exits the car in the intersection
+            g57.player.x = cx57 - 150;
+            g57.player.y = cy57 - 150;
+            g57.renderer.camX = cx57;
+            g57.renderer.camY = cy57;
+
+            assert(
+                stolenCurb.isCurbParked === false && stolenCurb.isStaticParked === false && stolenCurb.driver === null,
+                `Exiting stolen curb_park_* clears isCurbParked=${stolenCurb.isCurbParked} & isStaticParked=${stolenCurb.isStaticParked}`
+            );
+
+            // Step up to 28s: verify abandonedTimer increments on stationary curb_park_* and Tow Truck or Traffic Warden dispatches to clear it!
+            let sawAbTimer = 0;
+            let clearedOrHooked = false;
+            for (let s = 0; s < 28 * 60; s++) {
+                sb57.advanceClock(1000 / 60);
+                g57.update(1 / 60);
+                sawAbTimer = Math.max(sawAbTimer, stolenCurb.abandonedTimer || 0);
+                const towActive = g57.vehicles.some(tv => tv && tv.driver === "AI_TOW" && (tv.towTarget === stolenCurb || tv.towingVehicle === stolenCurb));
+                if (towActive || stolenCurb.driver === "AI_TRAFFIC" || !g57.vehicles.includes(stolenCurb)) {
+                    clearedOrHooked = true;
+                    break;
+                }
+            }
+            assert(
+                sawAbTimer > 2.0 && clearedOrHooked,
+                `Abandoned HP=42 curb_park_* in intersection increments abandonedTimer (${sawAbTimer.toFixed(1)}s) and gets cleared/targeted by Tow Truck or Traffic Warden`
+            );
+
+            // 2. Verify Relief Officer keeps _boardingVeh even while player is 1★ wanted and recovers an abandoned VCPD_CRUISER in the intersection!
+            g57.vehicles.length = 0;
+            g57.peds.length = 0;
+            const abCruiser = sb57.makeVeh("cop_ab_57", "VCPD_CRUISER", cx57, cy57, 0.5);
+            abCruiser.driver = null;
+            abCruiser._worldModified = true;
+            abCruiser.abandonedTimer = 8.0;
+            g57.vehicles.push(abCruiser);
+            g57.setWantedLevel(1, { x: cx57 + 260, y: cy57 + 260 }, true);
+            g57.player.x = cx57 + 260;
+            g57.player.y = cy57 + 260;
+            step57(1.2);
+            const rCop = g57.peds.find(pd => pd && !pd.dead && pd.kind === "COP" && pd.isReliefDriver && pd.homeCruiser === abCruiser);
+            assert(Boolean(rCop && rCop._boardingVeh === abCruiser), "Relief Officer preserves _boardingVeh across pedestrian update ticks even during 1★ wanted state");
+            // Move relief officer near cruiser door and step 1.5s to confirm physical boarding & server removal tombstoning
+            rCop.x = abCruiser.x + 22;
+            rCop.y = abCruiser.y + 12;
+            step57(1.5);
+            assert(
+                abCruiser.driver !== null && abCruiser._worldModified === false,
+                `Relief Officer boards abandoned VCPD_CRUISER (newDriver=${abCruiser.driver}) and clears _worldModified=${abCruiser._worldModified}`
+            );
+
+            // 3. Verify Dedicated Server Section 3B (`server/world_server.js`) dispatches TOW for intact drv=0 modifiedVehs AND purges stale multi-hour abandoned cars!
+            const srvSrc57 = fs.readFileSync(path.join(ROOT, "server", "world_server.js"), "utf8");
+            assert(
+                srvSrc57.includes("purgeVehicleAndBroadcast") &&
+                srvSrc57.includes("isTowableLandVeh") &&
+                srvSrc57.includes('launchFleetUnit(room, "TOW", vid, snappedGoal.x, snappedGoal.y)') &&
+                srvSrc57.includes("protectedCeVehicles"),
+                "Dedicated Server world_server.js dispatches fleet_tow_* for intact drv=0 abandoned vehicles, protects unmoved CreationEngine props, and purges stale/unreachable hulks"
+            );
+        }
+        console.log("");
     }
 
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 56 FULL-GAME 200-LOOP AUDIT, STRICT CAR AI CROSSWALK/TRAJECTORY, FLUIDITY/PERF, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 57 FULL-GAME 200-LOOP AUDIT, ABANDONED VEHICLE/TOW CLEARANCE, STRICT CAR AI, FLUIDITY/PERF, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

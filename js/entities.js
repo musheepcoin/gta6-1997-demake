@@ -1473,6 +1473,10 @@ class Vehicle {
         const frBias = (this.w * 0.5) / 3.0; // fr_bias = maxx / 3.0f (Vehicle.cpp:723)
 
         const shouldDent = isExplosive || amount >= 4.2 || this.hp < this.maxHp * 0.90;
+        if ((isExplosive || this.hp <= 30) && !this.isEstateCar && !this.missionTag) {
+            this.isStaticParked = false;
+            this.isCurbParked = false;
+        }
         if (shouldDent) {
             if (hitX !== undefined && hitY !== undefined) {
                 if (localX > frBias) {
@@ -4486,7 +4490,7 @@ class Vehicle {
                 if (v === this || v.specKey === "BMX_BIKE" || v.specKey === "E_SCOOTER") continue;
                 if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) continue;
                 if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(Math.floor(v.x / TILE_SIZE), Math.floor(v.y / TILE_SIZE))) continue;
-                const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50);
+                const isLiveBurning = !v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 30);
                 const isBurningWreck = v.destroyed && !v.fireExtinguished && (v.abandonedTimer || 0) >= 1.5;
                 if (!isLiveBurning && !isBurningWreck) continue;
                 const d = Math.hypot(v.x - this.x, v.y - this.y);
@@ -4514,16 +4518,16 @@ class Vehicle {
                 const ang = Math.atan2(burningCar.y - this.y, burningCar.x - this.x);
                 const onRoadFire = Boolean(map && map.isRoadAtPixel && map.isRoadAtPixel(this.x, this.y));
                 const inJctBoxFire = onRoadFire && this.isOccupyingIntersectionBox(map);
-                const blockedNearFire = bestDist < 380 && (!inJctBoxFire || (this.approachNoProgress || 0) > 2.8) && (
-                    (this.approachNoProgress || 0) > 1.15 ||
-                    (this.aiStuckTimer || 0) > 0.28 ||
+                const blockedNearFire = bestDist < 480 && !inJctBoxFire && (
+                    (this.approachNoProgress || 0) > 1.25 ||
+                    (this.aiStuckTimer || 0) > 0.30 ||
                     (this.aiReverseTimer || 0) > 0
                 );
                 const shouldParkAndDeploy =
                     (bestDist < 285 && !inJctBoxFire) ||
                     blockedNearFire ||
-                    Boolean(this.deployedFireman) ||
-                    Boolean(this._parkedAtFireScene && bestDist < 420);
+                    Boolean(this.deployedFireman && !inJctBoxFire) ||
+                    Boolean(this._parkedAtFireScene && !inJctBoxFire && bestDist < 500);
 
                 if (shouldParkAndDeploy) {
                     this.alignCurbsideAndCheckSpacing(map, game, 82, burningCar, true);
@@ -4729,7 +4733,7 @@ class Vehicle {
         if (this.towingVehicle) {
             const tv = this.towingVehicle;
             this.towingTimer = (this.towingTimer || 0) + dt;
-            const tvBurning = (!tv.destroyed && ((tv.burnTimer || 0) > 0 || tv.hp <= 50)) ||
+            const tvBurning = (!tv.destroyed && ((tv.burnTimer || 0) > 0 || tv.hp <= 30)) ||
                 (tv.destroyed && !tv.fireExtinguished && tv.specKey !== "BMX_BIKE" && tv.specKey !== "E_SCOOTER");
             if (!this.impoundDepot && game && typeof game.getNearestEmergencyStation === "function") {
                 this.impoundDepot = game.getNearestEmergencyStation("TOW", this.x, this.y);
@@ -4780,20 +4784,31 @@ class Vehicle {
         // Validate or acquire target abandoned / wrecked vehicle on road
         // (Tow Truck prioritizes cooled wrecks first so it can peel a multi-car pileup while the Fire Truck extinguishes burning ones!)
         const isVehBurning = (v) =>
-            (!v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 50)) ||
+            (!v.destroyed && ((v.burnTimer || 0) > 0 || v.hp <= 30)) ||
             (v.destroyed && !v.fireExtinguished && v.specKey !== "BMX_BIKE" && v.specKey !== "E_SCOOTER");
 
+        const isUntouchedParked = (v) =>
+            Boolean((v.isStaticParked || v.isCurbParked) && !v._worldModified && !v.lastPlayerDriven && !v.destroyed);
+
         const isValidTowCandidate = (v) => {
-            if (!v || v === this || v.towedByTruck || v.isStaticParked || v.missionTag || v.isEstateCar) return false;
+            if (!v || v === this || v.towedByTruck || isUntouchedParked(v) || v.missionTag || v.isEstateCar) return false;
             // NEVER target a burning vehicle or un-extinguished wreck — wait for VCFD Fire Engine to extinguish it first!
             if (isVehBurning(v)) return false;
             if (map && map.isWaterAtPixel && map.isWaterAtPixel(v.x, v.y)) return false;
             if (map && map.isRestrictedNoTrafficZone && map.isRestrictedNoTrafficZone(Math.floor(v.x / TILE_SIZE), Math.floor(v.y / TILE_SIZE))) return false;
-            const towDelay = Math.max(12.0, Math.min(45.0, (game && game.wreckTowDelay) || 45.0));
+            const towDelay = Math.max(8.0, Math.min(24.0, (game && game.wreckTowDelay) || 14.0));
             const isWreck = v.destroyed && (v.abandonedTimer || 0) > towDelay;
+            const inJctOrCw = Boolean(
+                map &&
+                typeof map.doesVehicleOverlapCrosswalkOrBox === "function" &&
+                map.doesVehicleOverlapCrosswalkOrBox(v.x, v.y, v.angle || 0, (v.w || 62) * 0.48, (v.h || 26) * 0.44, true)
+            );
+            const reqAbandoned = inJctOrCw
+                ? (v.lastPlayerDriven ? 14.0 : 9.0)
+                : (v.lastPlayerDriven ? 24.0 : (v.isPolice ? 18.0 : 13.0));
             const isAbandoned = !v.destroyed &&
                 v.driver === null &&
-                (v.abandonedTimer || 0) > (v.lastPlayerDriven ? 55.0 : (v.isPolice ? 42.0 : 35.0));
+                (v.abandonedTimer || 0) > reqAbandoned;
             if (!isWreck && !isAbandoned) return false;
             if (game && Array.isArray(game.vehicles)) {
                 for (let ti = 0; ti < game.vehicles.length; ti++) {
@@ -4812,7 +4827,7 @@ class Vehicle {
             isVehBurning(target) ||
             (target.driver !== null && !target.destroyed) ||
             (target.towedByTruck && target.towedByTruck !== this) ||
-            target.isStaticParked ||
+            isUntouchedParked(target) ||
             target.missionTag
         ) {
             target = null;
@@ -5000,7 +5015,11 @@ class Vehicle {
             };
         }
 
-        if (!targetStillBurning && along <= -6 && (rearBoomDist <= 40 || dist < hookDist || (dist < 225 && noProgress >= 2.2))) {
+        const canWinchHookNow = !targetStillBurning && (
+            (along <= -6 && (rearBoomDist <= 40 || dist < hookDist || (dist < 235 && noProgress >= 2.2))) ||
+            (dist < 340 && noProgress >= 6.0)
+        );
+        if (canWinchHookNow) {
             // Stop for 1.8s to attach the rear tow winch cable before pulling away!
             this.towHookTimer = (this.towHookTimer || 0) + dt;
             if (this.towHookTimer < 1.8) {
@@ -5042,8 +5061,14 @@ class Vehicle {
                 (map.getTileAtPixel && map.getTileAtPixel(target.x, target.y) === TILE.SAND)
             )
         );
-        const closeApproach = dist < 175 || (towTargetInBeachOrPark && this.x >= 444.0 * TILE_SIZE && dist < 2400);
-        const towForceDirect = (!towTargetOnRoad && dist < 175) || (towTargetInBeachOrPark && this.x >= 444.0 * TILE_SIZE && dist < 2400);
+        const towClearOfBuildings = map.traceSegment2D
+            ? !map.traceSegment2D(this.x, this.y, target.x, target.y, this.z || 2.0).hit
+            : (dist < 260);
+        const closeApproach = dist < 195 || (towTargetInBeachOrPark && this.x >= 444.0 * TILE_SIZE && dist < 2400);
+        const towForceDirect =
+            (!towTargetOnRoad && dist < 210) ||
+            (dist < 265 && noProgress > 1.4 && towClearOfBuildings) ||
+            (towTargetInBeachOrPark && this.x >= 444.0 * TILE_SIZE && dist < 2400);
         const roadCtrl = this.computeTargetRoadOrFeelerControls(
             dt,
             map,
@@ -5083,6 +5108,13 @@ class Vehicle {
             Math.abs(this.vy || 0) < 0.05 &&
             Math.abs(this.angularVelocity || 0) < 0.01
         ) {
+            if ((this.isCurbParked || this.isStaticParked) && !this.isEstateCar && !this.missionTag && (this._worldModified || this.lastPlayerDriven)) {
+                this.isCurbParked = false;
+                this.isStaticParked = false;
+            }
+            if (!this.isStaticParked && !this.isCurbParked && !this.isEstateCar) {
+                this.abandonedTimer = (this.abandonedTimer || 0) + dt;
+            }
             return;
         }
 
@@ -5174,11 +5206,17 @@ class Vehicle {
         if (this.driver === "PLAYER") {
             this.lastPlayerDriven = true;
             this.isStaticParked = false;
+            this.isCurbParked = false;
             this.abandonedTimer = 0;
         } else if (this.driver !== null) {
             this.isStaticParked = false;
+            this.isCurbParked = false;
             this.abandonedTimer = 0;
         } else {
+            if (Math.abs(this.speed || 0) > 16 && !this.isEstateCar && !this.missionTag) {
+                this.isStaticParked = false;
+                this.isCurbParked = false;
+            }
             this.abandonedTimer = (this.abandonedTimer || 0) + dt;
         }
 
@@ -5416,7 +5454,7 @@ class Vehicle {
                 let srvBestDist = 365;
                 const evalBurnTarget = (ov) => {
                     if (!ov || ov === this || ov.specKey === "BMX_BIKE" || ov.specKey === "E_SCOOTER") return;
-                    const isBurn = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 50)) || (ov.destroyed && !ov.fireExtinguished);
+                    const isBurn = (!ov.destroyed && ((ov.burnTimer || 0) > 0 || ov.hp <= 30)) || (ov.destroyed && !ov.fireExtinguished);
                     if (!isBurn) return;
                     const d = Math.hypot(ov.x - this.x, ov.y - this.y);
                     if (d < srvBestDist && (!map.traceSegment2D || !map.traceSegment2D(this.x, this.y, ov.x, ov.y, this.z || 2.0).hit)) {
@@ -5560,8 +5598,9 @@ class Vehicle {
             this.angularVelocity = 0;
             return;
         }
-        if (this.isStaticParked && (this.driver || Math.abs(this.speed || 0) > 25)) {
+        if ((this.isStaticParked || this.isCurbParked) && (this.driver || Math.abs(this.speed || 0) > 18)) {
             this.isStaticParked = false;
+            this.isCurbParked = false;
         }
 
         // Control inputs

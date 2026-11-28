@@ -502,6 +502,7 @@ class ViceNetworkManager {
                 v.driver = "PLAYER";
                 v._worldModified = true;
                 v.isStaticParked = false;
+                v.isCurbParked = false;
             }
         }
         if (typeof g.updateHud === "function") g.updateHud();
@@ -1937,6 +1938,9 @@ class ViceNetworkManager {
                     }
                     v.driver = "REMOTE";
                     v._linkedRemoteId = pkt.id;
+                    v.isStaticParked = false;
+                    v.isCurbParked = false;
+                    v.abandonedTimer = 0;
                     if (this.game.director && typeof this.game.director.allowVehicleSnap === "function") {
                         this.game.director.allowVehicleSnap(v, 400);
                     }
@@ -1972,6 +1976,8 @@ class ViceNetworkManager {
                 v.doorOpenTimer = 0.48;
                 v._worldModified = true;
                 v.isStaticParked = false;
+                v.isCurbParked = false;
+                v.isCurbParked = false;
                 const localIsDriver = this.game.player.inVehicle === v && (this.game.player.seatIndex || 0) === 0;
                 if (rSeat === 0 && !localIsDriver) {
                     v.driver = null;
@@ -2005,6 +2011,7 @@ class ViceNetworkManager {
             if (v) {
                 v._worldModified = true;
                 v.isStaticParked = false;
+                v.isCurbParked = false;
                 if (!v.destroyed) {
                     this.game.explodeVehicle(v, false, true);
                 }
@@ -2727,6 +2734,7 @@ class ViceNetworkManager {
                     v._worldModified = true;
                     v._serverDriven = false;
                     v.isStaticParked = false;
+                    v.isCurbParked = false;
                 } else if (
                     (isInitialServerBootstrap || isAutonomousServerTick) &&
                     drvCode !== 0 &&
@@ -2806,8 +2814,8 @@ class ViceNetworkManager {
                     v.hp = (hp >= (v.maxHp || 100) && !(flags & 28)) ? hp : (Number.isFinite(v.hp) ? Math.min(v.hp, hp) : hp);
                     if (v.hp <= 0) v.hp = 1;
                 }
-                if (isInitialServerBootstrap && v.driver === null && v.isPolice && !nowDestroyed) {
-                    v.abandonedTimer = Math.max(v.abandonedTimer || 0, 10.0);
+                if (isInitialServerBootstrap && v.driver === null && (isMod || v.isPolice || nowDestroyed)) {
+                    v.abandonedTimer = Math.max(v.abandonedTimer || 0, nowDestroyed ? 16.0 : 18.0);
                 }
                 if (!wasDestroyed && nowDestroyed) {
                     g.explodeVehicle(v, false, true);
