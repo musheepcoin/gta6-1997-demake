@@ -18264,9 +18264,60 @@ class WorldObjectEngine {
 
         const accentRgb = hexToRgb(intr.accent || "#f472b6");
 
-        // 1. ARCHITECTURAL FOUNDATION CURB & THRESHOLD MAT ON REAL .CMP SIDEWALK (NO fake green void!)
-        rawAoR(-4, 36, rw + 8, rh - 20, 1.998, 14, 0.34);
-        rawBoxR(-4, 38, rw + 8, rh - 22, 1.996, 2.0005, [0.76, 0.72, 0.66], 9);
+        // 1. NEXT-GEN ARCADE 3D ARCHITECTURAL DIORAMA PLINTH + 1:1 ENTRANCE SIDEWALK PORCH (Zero .CMP scale clash!)
+        rawAoR(-18, 22, rw + 36, rh + 6, 1.988, 22, 0.55);
+        rawBoxR(-16, 24, rw + 32, rh + 2, 1.984, 1.999, [0.06, 0.08, 0.14], 9);
+        // Subtle glowing architectural accent trim around the diorama plinth
+        rawBoxR(-16, 24, rw + 32, 3, 1.999, 2.002, accentRgb, 10, 0.65);
+        rawBoxR(-16, rh + 23, rw + 32, 3, 1.999, 2.002, accentRgb, 10, 0.65);
+        rawBoxR(-16, 24, 3, rh + 2, 1.999, 2.002, accentRgb, 10, 0.65);
+        rawBoxR(rw + 13, 24, 3, rh + 2, 1.999, 2.002, accentRgb, 10, 0.65);
+
+        // Bespoke 1:1 Entrance Sidewalk Threshold ("Entry Porch") anchored exclusively outside the active doorway!
+        const porchFace = (intr && intr.facing) || "S";
+        const porchMidY = Math.round(40 + (rh - 40) * 0.5);
+        if (porchFace === "S") {
+            const px0 = Math.round(rw * 0.5 - 148), pw0 = 296, py0 = rh - 2, ph0 = 58;
+            rawAoR(px0 - 6, py0, pw0 + 12, ph0 + 6, 1.985, 16, 0.45);
+            rawBoxR(px0 - 4, py0, pw0 + 8, ph0 + 4, 1.984, 1.998, [0.08, 0.11, 0.18], 9);
+            rawDeckBoxR(px0, py0, pw0, ph0 - 8, 1.994, 2.0008, 41, [0.90, 0.86, 0.80]);
+            rawBoxR(px0, py0 + ph0 - 8, pw0, 8, 1.994, 2.006, [0.74, 0.70, 0.64], 9); // Street curbstone
+            for (const bx of [px0 + 22, px0 + pw0 - 22]) {
+                rawCyl(bx, py0 + 28, 10, 12, 2.00, 2.15, 10, [0.88, 0.72, 0.24], 9, true);
+                rawCone(bx, py0 + 28, 22, 2.15, 2.40, 10, [0.14, 0.78, 0.42], 9);
+            }
+            for (const bolX of [px0 + 58, px0 + pw0 - 58]) {
+                rawCyl(bolX, py0 + ph0 - 14, 3.5, 3.5, 2.00, 2.12, 8, [0.22, 0.26, 0.34], 9, true);
+                rawCyl(bolX, py0 + ph0 - 14, 3.8, 3.8, 2.12, 2.15, 8, accentRgb, 10, true);
+            }
+        } else if (porchFace === "N") {
+            const px0 = Math.round(rw * 0.5 - 148), pw0 = 296, py0 = -18, ph0 = 58;
+            rawBoxR(px0 - 4, py0 - 4, pw0 + 8, ph0 + 4, 1.984, 1.998, [0.08, 0.11, 0.18], 9);
+            rawDeckBoxR(px0, py0 + 8, pw0, ph0 - 8, 1.994, 2.0008, 41, [0.90, 0.86, 0.80]);
+            rawBoxR(px0, py0, pw0, 8, 1.994, 2.006, [0.74, 0.70, 0.64], 9);
+            for (const bx of [px0 + 22, px0 + pw0 - 22]) {
+                rawCyl(bx, py0 + 30, 10, 12, 2.00, 2.15, 10, [0.88, 0.72, 0.24], 9, true);
+                rawCone(bx, py0 + 30, 22, 2.15, 2.40, 10, [0.14, 0.78, 0.42], 9);
+            }
+        } else if (porchFace === "E") {
+            const px0 = rw - 2, pw0 = 58, py0 = porchMidY - 128, ph0 = 256;
+            rawBoxR(px0, py0 - 4, pw0 + 4, ph0 + 8, 1.984, 1.998, [0.08, 0.11, 0.18], 9);
+            rawDeckBoxR(px0, py0, pw0 - 8, ph0, 1.994, 2.0008, 41, [0.90, 0.86, 0.80]);
+            rawBoxR(px0 + pw0 - 8, py0, 8, ph0, 1.994, 2.006, [0.74, 0.70, 0.64], 9);
+            for (const by of [py0 + 22, py0 + ph0 - 22]) {
+                rawCyl(px0 + 26, by, 10, 12, 2.00, 2.15, 10, [0.88, 0.72, 0.24], 9, true);
+                rawCone(px0 + 26, by, 22, 2.15, 2.40, 10, [0.14, 0.78, 0.42], 9);
+            }
+        } else if (porchFace === "W") {
+            const px0 = -56, pw0 = 58, py0 = porchMidY - 128, ph0 = 256;
+            rawBoxR(px0 - 4, py0 - 4, pw0 + 4, ph0 + 8, 1.984, 1.998, [0.08, 0.11, 0.18], 9);
+            rawDeckBoxR(px0 + 8, py0, pw0 - 8, ph0, 1.994, 2.0008, 41, [0.90, 0.86, 0.80]);
+            rawBoxR(px0, py0, 8, ph0, 1.994, 2.006, [0.74, 0.70, 0.64], 9);
+            for (const by of [py0 + 22, py0 + ph0 - 22]) {
+                rawCyl(px0 + 32, by, 10, 12, 2.00, 2.15, 10, [0.88, 0.72, 0.24], 9, true);
+                rawCone(px0 + 32, by, 22, 2.15, 2.40, 10, [0.14, 0.78, 0.42], 9);
+            }
+        }
         const exteriorVertCount = 0;
 
         // Theme palette & indoor mood grading
@@ -18510,11 +18561,15 @@ class WorldObjectEngine {
             wallTV3D(24, 206, 12, 32, [0.22, 0.94, 0.46]); // Clerk CCTV monitor
             for (let ai = 0; ai < 3; ai++) {
                 const gx = 286 + ai * 112;
-                aoR(gx, 248, 42, 164, 2.004, 8, 0.32);
-                deckBoxR(gx, 248, 42, 164, 2.00, 2.20, 177, [0.88, 0.92, 0.96]);
-                for (let py = 256; py < 400; py += 24) {
-                    boxR(gx + 4, py, 14, 16, 2.20, 2.27, ai === 0 ? [0.94, 0.20, 0.24] : [0.18, 0.82, 0.42], 9);
-                    boxR(gx + 24, py, 14, 16, 2.20, 2.27, ai === 1 ? [0.98, 0.64, 0.16] : [0.22, 0.68, 0.98], 9);
+                aoR(gx, 248, 42, 164, 2.004, 8, 0.34);
+                // Dark powder-coated steel gondola rack + central divider spine + multi-pack micro-merchandise
+                boxR(gx, 248, 42, 164, 2.00, 2.16, [0.18, 0.22, 0.30], 9);
+                boxR(gx + 19, 246, 4, 168, 2.00, 2.29, [0.32, 0.38, 0.48], 9);
+                for (let py = 252; py < 404; py += 16) {
+                    const pColL = ((ai + py) % 3 === 0) ? [0.92, 0.18, 0.22] : (((ai + py) % 3 === 1) ? [0.16, 0.78, 0.38] : [0.96, 0.72, 0.14]);
+                    const pColR = ((ai + py) % 3 === 0) ? [0.18, 0.56, 0.94] : (((ai + py) % 3 === 1) ? [0.96, 0.48, 0.14] : [0.72, 0.28, 0.92]);
+                    boxR(gx + 3, py, 14, 11, 2.16, 2.25, pColL, 9);
+                    boxR(gx + 25, py, 14, 11, 2.16, 2.25, pColR, 9);
                 }
             }
             boxR(754, 204, 24, 280, 2.00, 2.32, [0.18, 0.28, 0.42], 9);
@@ -18884,14 +18939,27 @@ class WorldObjectEngine {
             drawWallSpanH("S", 0, rh - 18, rw, 18, 2.185);
         }
 
-        // 6. SUBTLE 3D BRASS/NEON FLOOR MEDALLIONS AT READY STATIONS (clean 8px disc — zero spinning square clutter!)
+        // 6. SLEEK NEXT-GEN ARCADE HOLOGRAPHIC CORNER-BRACKET PADS AT READY STATIONS (zero ugly board-game circles!)
         const stations = intr.stations || [];
+        const padPulse = 0.72 + 0.28 * Math.sin(t * 5.2);
         for (let i = 0; i < stations.length; i++) {
             const st = stations[i];
             if ((st.cooldown || 0) > 0) continue;
             const stCol = hexToRgb(st.color || intr.accent || "#38bdf8");
-            rawCyl(st.x, st.y, 9, 10, 2.002, 2.008, 12, [0.10, 0.14, 0.22], 9, true);
-            rawCyl(st.x, st.y, 6.5, 7.5, 2.008, 2.013, 12, stCol, 10, true, 0.88);
+            const pCol = [stCol[0] * padPulse, stCol[1] * padPulse, stCol[2] * padPulse];
+            const r = 13;
+            const arm = 6;
+            const thk = 2.2;
+            // 4 crisp neon L-corner brackets flush on the floor
+            rawBoxR(st.x - r, st.y - r, arm, thk, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x - r, st.y - r, thk, arm, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x + r - arm, st.y - r, arm, thk, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x + r - thk, st.y - r, thk, arm, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x - r, st.y + r - thk, arm, thk, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x - r, st.y + r - arm, thk, arm, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x + r - arm, st.y + r - thk, arm, thk, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x + r - thk, st.y + r - arm, thk, arm, 2.002, 2.009, pCol, 10, 0.92);
+            rawBoxR(st.x - 7, st.y - 7, 14, 14, 2.0015, 2.004, pCol, 10, 0.18);
         }
 
         if (iVerts.length === 0) return;
@@ -18974,25 +19042,25 @@ class WorldObjectEngine {
             return { x, y, angle: ang };
         };
 
-        // 1. Theme-Specific 3D Micro-Props (Displayed Firearms, Jacuzzi Flamingo Floats, Kitchen Sizzle Steam, Boutique Mannequins)
+        // 1. Theme-Specific 3D Micro-Props (Authentic GTA1 Firearms inside Glass Cases, Jacuzzi Flamingo Floats, Kitchen Sizzle Steam, Boutique Mannequins)
         if (theme === "SHOP_GUN_SHOP") {
             for (const [wspr, wx, wy, wz, wang, wsc] of [
-                ["pistol", 318, 142, 2.21, 0.15, 1.04],
-                ["uzi", 386, 142, 2.21, -0.12, 1.04],
-                ["shotgun", 452, 142, 2.21, 0.06, 1.08],
-                ["shotgun", 312, 62, 2.29, 0.0, 1.08],
-                ["rocket", 442, 62, 2.29, 0.0, 1.08]
+                ["548", 328, 141, 2.215, 0.12, 0.95],
+                ["554", 394, 141, 2.215, -0.10, 0.95],
+                ["555", 460, 141, 2.215, 0.06, 0.98],
+                ["555", 312, 62, 2.29, 0.0, 1.02],
+                ["556", 442, 62, 2.29, 0.0, 1.02]
             ]) {
                 const wp = trPt(wx, wy, wang);
                 renderer.batchObjectSprite3D(wspr, ox + wp.x, oy + wp.y, wz, wp.angle, wsc, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         } else if (theme === "DINER_PAWN") {
             for (const [wspr, wx, wy, wz, wang] of [
-                ["pistol", 582, 138, 2.21, 0.2],
-                ["shotgun", 686, 138, 2.21, -0.1]
+                ["548", 588, 137, 2.215, 0.18],
+                ["555", 692, 137, 2.215, -0.08]
             ]) {
                 const wp = trPt(wx, wy, wang);
-                renderer.batchObjectSprite3D(wspr, ox + wp.x, oy + wp.y, wz, wp.angle, 1.02, SPRITE_DRAW_ORDER.MAP_OBJECT);
+                renderer.batchObjectSprite3D(wspr, ox + wp.x, oy + wp.y, wz, wp.angle, 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         } else if (theme === "SHOP_HOTEL" || theme === "ART_DECO_HOTEL") {
             const fp = trPt(665 + Math.sin(t * 2.0) * 8, 400 + Math.cos(t * 1.6) * 6);
@@ -19016,7 +19084,7 @@ class WorldObjectEngine {
             }
         }
 
-        // 2. Crisp Floating 3D Item Icons at Ready Stations (NO spinning opaque floor squares!)
+        // 2. Authentic Animated 1997 GTA1 3D Pickup Sprites Floating Above Holographic Station Pads!
         const stations = intr.stations || [];
         const pInX = game.interiorX !== undefined ? game.interiorX : (rw * 0.5);
         const pInY = game.interiorY !== undefined ? game.interiorY : (rh - 78);
@@ -19025,20 +19093,24 @@ class WorldObjectEngine {
             const ready = (st.cooldown || 0) <= 0;
             if (!ready) continue;
             const isNearSt = Math.hypot(pInX - st.x, pInY - st.y) < 92;
-            const bobZ = 2.16 + Math.sin(t * 4.2 + i) * 0.022;
-            const spinA = t * 2.2 + i;
-            let iconSpr = null;
+            const bobZ = 2.09 + Math.sin(t * 4.4 + i) * 0.022;
+            const anim8 = Math.floor(t * 9.5 + i * 2) % 8;
             const rt = st.rewardType || "";
-            if (st.action === "BUY_PISTOL") iconSpr = "pistol";
-            else if (st.action === "BUY_UZI" || rt === "ARSENAL") iconSpr = "uzi";
-            else if (st.action === "BUY_SHOTGUN") iconSpr = "shotgun";
-            else if (st.action === "BUY_ROCKET" || st.action === "ORBITAL_STRIKE" || rt === "HEAVY_WEAPONS" || rt === "ROCKET_LAUNCH") iconSpr = "rocket";
-            else if (st.action === "BUY_ARMOR" || st.action === "BUY_OUTFIT" || st.action === "CHANGE_OUTFIT" || st.action === "BUY_OUTFIT_1" || st.action === "BUY_OUTFIT_2" || st.action === "BUY_OUTFIT_VIP" || st.action === "QUICK_FIT" || rt === "WARDROBE") iconSpr = "armor";
-            else if (st.action === "BUY_SNACK" || st.action === "BUY_MEAL" || st.action === "BUY_DRINK" || st.action === "BUY_COCKTAIL" || st.action === "BUY_ENERGY" || st.action === "RENT_SUITE" || st.action === "ZERO_G_HEAL" || st.action === "HEAL_FULL" || st.action === "SAVE_GAME" || st.action === "JUKEBOX_VIBE" || rt === "LOUNGE" || rt === "EXTRA_LIFE") iconSpr = "medkit";
-            else if (st.action === "ROB_REGISTER" || st.action === "HOTEL_PERK" || st.action === "PLAY_LOTTO" || st.action === "PLAY_POOL" || st.action === "PLAY_SLOTS" || st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH" || st.action === "EXPORT_CAR" || rt === "HEIST_SAFE" || rt === "MULTIPLIER_CASH" || rt === "JAIL_CARDS") iconSpr = "briefcase";
+            let sprId = null;
+            if (st.action === "BUY_PISTOL") sprId = String(548 + (anim8 % 6));
+            else if (st.action === "BUY_UZI" || rt === "ARSENAL") sprId = String(554 + (anim8 % 2));
+            else if (st.action === "BUY_SHOTGUN") sprId = "555";
+            else if (st.action === "BUY_ROCKET" || st.action === "ORBITAL_STRIKE" || rt === "HEAVY_WEAPONS" || rt === "ROCKET_LAUNCH") sprId = String(556 + anim8);
+            else if (st.action === "BUY_ARMOR" || st.action === "BUY_OUTFIT" || st.action === "CHANGE_OUTFIT" || st.action === "BUY_OUTFIT_1" || st.action === "BUY_OUTFIT_2" || st.action === "BUY_OUTFIT_VIP" || st.action === "QUICK_FIT" || rt === "WARDROBE") sprId = String(597 + anim8);
+            else if (rt === "MULTIPLIER_CASH") sprId = String(605 + anim8);
+            else if (rt === "EXTRA_LIFE") sprId = String(629 + anim8);
+            else if (rt === "JAIL_CARDS") sprId = String(613 + anim8);
+            else if (st.action === "BUY_SNACK" || st.action === "BUY_MEAL" || st.action === "BUY_DRINK" || st.action === "BUY_COCKTAIL" || st.action === "BUY_ENERGY" || st.action === "RENT_SUITE" || st.action === "ZERO_G_HEAL" || st.action === "HEAL_FULL" || st.action === "SAVE_GAME" || st.action === "JUKEBOX_VIBE" || rt === "LOUNGE") sprId = String(621 + anim8);
+            else if (st.action === "ROB_REGISTER" || st.action === "HOTEL_PERK" || st.action === "PLAY_LOTTO" || st.action === "PLAY_POOL" || st.action === "PLAY_SLOTS" || st.action === "COLLECT_VAULT" || st.action === "SCARFACE_STASH" || st.action === "PAWN_FENCE" || st.action === "LUCIA_STASH" || st.action === "EXPORT_CAR" || rt === "HEIST_SAFE") sprId = "277";
 
-            if (iconSpr) {
-                renderer.batchObjectSprite3D(iconSpr, ox + st.x, oy + st.y, bobZ, spinA, isNearSt ? 1.32 : 1.15, SPRITE_DRAW_ORDER.MAP_OBJECT);
+            if (sprId) {
+                const spinAng = sprId === "277" ? (Math.sin(t * 2.8 + i) * 0.25) : 0;
+                renderer.batchObjectSprite3D(sprId, ox + st.x, oy + st.y, bobZ, spinAng, isNearSt ? 1.16 : 0.96, SPRITE_DRAW_ORDER.MAP_OBJECT);
             }
         }
 

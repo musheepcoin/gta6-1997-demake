@@ -8265,7 +8265,7 @@ class RetroRenderer {
             this.vehicleBannerTimer = Math.max(0, this.vehicleBannerTimer - dt);
         }
 
-        // FollowCameraController.cpp: Smoothly track player X, Y and ground elevation Z (or World-Anchored 3D Cutaway Interior camera!)
+        // FollowCameraController.cpp: Smoothly track player X, Y and ground elevation Z (or Next-Gen Arcade 3D Diorama Interior camera!)
         let effectiveViewProj;
         if (game.activeInterior) {
             const intr = game.activeInterior;
@@ -8276,22 +8276,30 @@ class RetroRenderer {
                 : { x: 0, y: 0 };
             const px = game.interiorX !== undefined ? game.interiorX : rw * 0.5;
             const py = game.interiorY !== undefined ? game.interiorY : rh - 78;
-            // Softly clamp local focus inside the venue while anchored in real world .CMP coordinates so live street traffic & sidewalks stay framed outside!
-            const marginX = Math.min(175, rw * 0.22);
-            const marginY = Math.min(135, rh * 0.23);
-            const targetLocalX = Math.max(marginX, Math.min(rw - marginX, px));
-            const targetLocalY = Math.max(marginY + 16, Math.min(rh - marginY + 18, py));
-            const targetCamX = orig.x + targetLocalX;
-            const targetCamY = orig.y + targetLocalY;
+            const pAng = game.interiorAngle !== undefined ? game.interiorAngle : -Math.PI * 0.5;
+            const isMovingNow = Boolean(game.player && game.player.isMoving);
+            const lookDist = isMovingNow ? 28 : 14;
+            const rawLocalX = px + Math.cos(pAng) * lookDist;
+            const rawLocalY = py + Math.sin(pAng) * lookDist;
+            const marginX = Math.min(185, rw * 0.24);
+            const marginY = Math.min(140, rh * 0.25);
+            const targetLocalX = Math.max(marginX, Math.min(rw - marginX, rawLocalX));
+            const targetLocalY = Math.max(marginY + 12, Math.min(rh - marginY + 16, rawLocalY));
+            let shakeX = 0, shakeY = 0;
+            if ((intr._shakeTimer || 0) > 0) {
+                const mag = Math.min(1.0, intr._shakeTimer / 0.20) * 6.5;
+                shakeX = Math.sin(this.time * 68.0) * mag;
+                shakeY = Math.cos(this.time * 57.0) * mag;
+            }
+            const targetCamX = orig.x + targetLocalX + shakeX;
+            const targetCamY = orig.y + targetLocalY + shakeY;
             if (!this._wasInInterior) {
-                if (Math.hypot(targetCamX - this.camX, targetCamY - this.camY) > 1100) {
-                    this.camX = targetCamX;
-                    this.camY = targetCamY;
-                }
+                this.camX = orig.x + rw * 0.5;
+                this.camY = orig.y + rh * 0.58;
                 this.camZBlocks = 2.0;
                 this._wasInInterior = true;
             }
-            const camAlphaInt = 1.0 - Math.exp(-9.0 * dt);
+            const camAlphaInt = 1.0 - Math.exp(-10.5 * dt);
             this.camX += (targetCamX - this.camX) * camAlphaInt;
             this.camY += (targetCamY - this.camY) * camAlphaInt;
             this.camZBlocks = 2.0;
@@ -8299,10 +8307,8 @@ class RetroRenderer {
         } else {
             const target = game.player.inVehicle || game.player;
             if (this._wasInInterior) {
-                if (Math.hypot(target.x - this.camX, target.y - this.camY) > 1100) {
-                    this.camX = target.x;
-                    this.camY = target.y;
-                }
+                this.camX = target.x;
+                this.camY = target.y;
                 this._camLeadX = 0;
                 this._camLeadY = 0;
                 this._camSpeedZoom = 0;
@@ -8502,9 +8508,9 @@ class RetroRenderer {
         const fovyRad = (55.0 * Math.PI) / 180.0;
         const f = 1.0 / Math.tan(fovyRad * 0.5);
 
-        // Tailored GTA cutaway camera elevation (5.85 blocks): reveals micro-props, table settings & showcase weapons while framing the live Vice City street right outside!
-        const baseScale = W < 900 ? 6.35 : 5.85;
-        const distBlocks = Math.max(4.85, Math.min(8.6, baseScale + (this.zoomOffsetBlocks || 0) * 0.5));
+        // Punchy Next-Gen Arcade Diorama camera elevation (4.75 blocks): frames Lucia, 3D furniture, showcases & spinning pickups up close with zero wasted border space!
+        const baseScale = W < 900 ? 5.25 : 4.75;
+        const distBlocks = Math.max(3.95, Math.min(7.2, baseScale + (this.zoomOffsetBlocks || 0) * 0.45));
 
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
@@ -8586,6 +8592,23 @@ class RetroRenderer {
 
         gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
 
+        const activeIntr = (game && game.activeInterior) ? game.activeInterior : null;
+
+        if (activeIntr) {
+            // Next-Gen Arcade Architectural Diorama Stage: deep cinema obsidian void (100% immune to .CMP building block scale mismatches!)
+            gl.clearColor(0.018, 0.024, 0.048, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            this._activeCutawayPxRect = null;
+            if (this.map && this.map.objectEngine) {
+                this.map.objectEngine.renderInterior3DMesh(gl, this, game, viewProj);
+                this.beginSpriteBatch();
+                this.map.objectEngine.batchInteriorSprites3D(this, game, "INT");
+                this.flushSpriteBatch(viewProj, 0.0, 0.0, 0.36, 0.93);
+            }
+            this._lastViewProj = viewProj;
+            return;
+        }
+
         if (this.mapStyle === "VICE") {
             // Smoothly interpolate Tropical Atlantic turquoise sea-level clear color from Day -> Sunset -> Midnight Navy
             const r = 0.03 * (1.0 - nf) + 0.012 * nf + sf * 0.06;
@@ -8603,10 +8626,7 @@ class RetroRenderer {
             : (this.tilesTexNyc || this.tilesTex);
         if (!this.gta1Ready || !this.cmpReady || !activeTilesTex) return;
 
-        const activeIntr = (game && game.activeInterior) ? game.activeInterior : null;
-        const intrOrig = (activeIntr && window.ShopInteriors && typeof window.ShopInteriors.getWorldOrigin === "function")
-            ? window.ShopInteriors.getWorldOrigin(activeIntr)
-            : null;
+        const intrOrig = null;
 
         // Visible ground frustum in block units (tightened to aspect ratio on portrait mobile screens to avoid drawing off-screen chunks)
         const camXBlocks = this.camX / TILE_SIZE;
@@ -15809,9 +15829,12 @@ class RetroRenderer {
             labelR(46, 235, 56, 22, "LOTTO", "#78350f", "bold 8px Consolas, monospace");
             for (let ai = 0; ai < 3; ai++) {
                 const gx = 286 + ai * 112;
-                fillR(gx, 248, 42, 164, "#e2e8f0", "#0f172a", 2.0);
-                fillR(gx + 4, 254, 15, 152, ai === 0 ? "#ef4444" : (ai === 1 ? "#22c55e" : "#eab308"));
-                fillR(gx + 23, 254, 15, 152, ai === 0 ? "#3b82f6" : (ai === 1 ? "#f97316" : "#ec4899"));
+                fillR(gx, 248, 42, 164, "#1e293b", "#0f172a", 2.0);
+                fillR(gx + 19, 250, 4, 160, "#475569");
+                for (let sy = 254; sy < 404; sy += 18) {
+                    fillR(gx + 3, sy, 14, 13, ((ai + sy) % 3 === 0) ? "#dc2626" : (((ai + sy) % 3 === 1) ? "#16a34a" : "#d97706"));
+                    fillR(gx + 25, sy, 14, 13, ((ai + sy) % 3 === 0) ? "#2563eb" : (((ai + sy) % 3 === 1) ? "#ea580c" : "#9333ea"));
+                }
             }
             fillR(624, 186, CANON_W - 642, CANON_H - 204, tex.kitchen_tile, "#22d3ee", 1.5);
         } else if (t === "STARLET_MOTEL") {
@@ -16748,7 +16771,7 @@ class RetroRenderer {
 
         ctx.save();
 
-        // 1. Subtle Ambient Venue Mood & Corner Depth Vignette (Club Neon / Dive Amber / Bunker Steel / Sunlit Day)
+        // 1. Next-Gen Arcade Diorama Cinema Vignette & Ambient Mood Grading
         const isClub = (tTheme === "NEON_CLUB" || tTheme === "STRIP_CLUB" || tTheme === "MALIBU_CLUB" || tTheme === "ONLYRAW_STUDIO");
         const isBar = (tTheme === "SHOP_BAR");
         const isBunker = (tTheme === "SPACE_BUNKER" || tTheme === "PRISON_BLOCK");
@@ -16756,11 +16779,16 @@ class RetroRenderer {
         if (isClub) moodTint = "rgba(18, 8, 42, 0.24)";
         else if (isBar) moodTint = "rgba(28, 14, 6, 0.18)";
         else if (isBunker) moodTint = "rgba(8, 18, 34, 0.16)";
-        else if (nf > 0.25) moodTint = `rgba(10, 14, 30, ${(nf * 0.15).toFixed(3)})`;
+        else if (nf > 0.25) moodTint = `rgba(10, 14, 30, ${(nf * 0.14).toFixed(3)})`;
         if (moodTint) {
             ctx.fillStyle = moodTint;
             ctx.fillRect(0, 0, W, H);
         }
+        const vigGrad = ctx.createRadialGradient(W * 0.5, H * 0.52, Math.min(W, H) * 0.34, W * 0.5, H * 0.52, Math.max(W, H) * 0.76);
+        vigGrad.addColorStop(0.0, "rgba(0, 0, 0, 0.0)");
+        vigGrad.addColorStop(1.0, "rgba(2, 4, 12, 0.52)");
+        ctx.fillStyle = vigGrad;
+        ctx.fillRect(0, 0, W, H);
 
         // 2. Angled Volumetric Sunbeams (Day/Sunset) or Streetlamp Shafts (Night) Streaming Through Storefront Windows & Open Doorway!
         ctx.globalCompositeOperation = "lighter";
@@ -16871,6 +16899,31 @@ class RetroRenderer {
             emitPool(675, 290, 125, tTheme === "SHOP_GUN_SHOP" ? "rgba(251, 146, 60, 0.12)" : "rgba(56, 189, 248, 0.11)");
         }
 
+        // 3B. Soft Holographic Floor Glow Under Ready Interactive Pickup Pads
+        if (Array.isArray(intr.stations)) {
+            const stPulse = (0.14 + 0.05 * Math.sin(time * 5.0)).toFixed(3);
+            for (let si = 0; si < intr.stations.length; si++) {
+                const st = intr.stations[si];
+                if ((st.cooldown || 0) > 0) continue;
+                const sc = this.interiorToScreen(intr, st.x, st.y, 2.02);
+                if (sc.x < -50 || sc.x > W + 50 || sc.y < -50 || sc.y > H + 50) continue;
+                const hex = String(st.color || intr.accent || "#38bdf8").replace("#", "");
+                let rC = 56, gC = 189, bC = 248;
+                if (hex.length === 6) {
+                    rC = parseInt(hex.slice(0, 2), 16) || 56;
+                    gC = parseInt(hex.slice(2, 4), 16) || 189;
+                    bC = parseInt(hex.slice(4, 6), 16) || 248;
+                }
+                const sg = ctx.createRadialGradient(sc.x, sc.y, 2, sc.x, sc.y, 34);
+                sg.addColorStop(0.0, `rgba(${rC}, ${gC}, ${bC}, ${stPulse})`);
+                sg.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+                ctx.fillStyle = sg;
+                ctx.beginPath();
+                ctx.arc(sc.x, sc.y, 34, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
         // 4. Subtle Warm Player Presence Rim & Dynamic Indoor Gunfire Muzzle Flash
         const px = game.interiorX !== undefined ? game.interiorX : rw * 0.5;
         const py = game.interiorY !== undefined ? game.interiorY : rh - 78;
@@ -16929,28 +16982,31 @@ class RetroRenderer {
             return lo > 0 ? raw.slice(0, lo).trimEnd() + "…" : "";
         };
 
-        // 1. Sleek Top-Center Authentic GTA Venue Banner (uses SUB2 bitmap font for title + Art Deco neon trim)
+        // 1. Sleek Top-Center Next-Gen Arcade Venue Header (zero overlap between SUB2 title & subtitle!)
         const alarmOn = (intr._alarmTimer || 0) > 0;
-        const banW = Math.min(W - 24, Math.max(360, Math.min(620, W - 320)));
-        const banH = 42;
+        const banW = Math.min(W - 24, Math.max(380, Math.min(650, W - 310)));
+        const banH = 54;
         const banX = Math.round(W * 0.5 - banW * 0.5);
-        const banY = 10;
+        const banY = 8;
+        const accCol = alarmOn ? "#ef4444" : (intr.accent || "#facc15");
 
-        ctx.fillStyle = alarmOn ? "rgba(48, 8, 14, 0.90)" : "rgba(8, 13, 26, 0.88)";
+        ctx.fillStyle = alarmOn ? "rgba(48, 8, 14, 0.94)" : "rgba(6, 10, 22, 0.92)";
         ctx.fillRect(banX, banY, banW, banH);
-        ctx.strokeStyle = alarmOn ? "#ef4444" : (intr.accent || "#facc15");
+        ctx.strokeStyle = accCol;
         ctx.lineWidth = 2.0;
         ctx.strokeRect(banX + 0.5, banY + 0.5, banW - 1, banH - 1);
+        ctx.fillStyle = accCol;
+        ctx.fillRect(banX + 14, banY + 33, banW - 28, 1.5);
 
         const cleanTitle = String(intr.name || "ESTABLISHMENT").replace(/[^\x20-\x7E]/g, "").trim();
-        this.drawGta1FontString(ctx, "SUB2", cleanTitle.slice(0, 38), banX + banW * 0.5, banY + 14, 1.05, "center");
+        this.drawGta1FontString(ctx, "SUB2", cleanTitle.slice(0, 36), banX + banW * 0.5, banY + 17, 0.92, "center");
 
         ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
         ctx.fillStyle = alarmOn ? "#fecaca" : "#e2e8f0";
         const subBanner = alarmOn
             ? `🚨 SILENT ALARM ACTIVE (${Math.ceil(intr._alarmTimer)}S) — SECURITY / VCPD ALERTED! 🚨`
             : intr.subtitle;
-        ctx.fillText(fitIntText(subBanner, banW - 20), banX + banW * 0.5, banY + 32);
+        ctx.fillText(fitIntText(subBanner, banW - 24), banX + banW * 0.5, banY + 44);
 
         const placedRects = [];
         const resolveLabelOverlap = (x, y, w, h) => {
@@ -17055,7 +17111,24 @@ class RetroRenderer {
             }
         }
 
-        // 3. Indoor Bullet Tracers & Target/Loot Floating Popups
+        // 3. Indoor Bullet Tracers, Flying Glass/Cash Shards & Target/Loot Floating Popups
+        if (Array.isArray(intr._indoorShards)) {
+            for (let si = 0; si < intr._indoorShards.length; si++) {
+                const sh = intr._indoorShards[si];
+                const sp = this.interiorToScreen(intr, sh.x, sh.y, sh.z || 2.12);
+                ctx.save();
+                ctx.translate(sp.x, sp.y);
+                ctx.rotate(sh.rot || 0);
+                ctx.fillStyle = sh.isCash ? "#4ade80" : "#bae6fd";
+                ctx.strokeStyle = sh.isCash ? "#166534" : "#ffffff";
+                ctx.lineWidth = 1.0;
+                const sw = sh.isCash ? 9 : 6;
+                const shH = sh.isCash ? 5 : 4;
+                ctx.fillRect(-sw * 0.5, -shH * 0.5, sw, shH);
+                ctx.strokeRect(-sw * 0.5, -shH * 0.5, sw, shH);
+                ctx.restore();
+            }
+        }
         if (Array.isArray(game.interiorTracers)) {
             for (const tr of game.interiorTracers) {
                 const s1 = this.interiorToScreen(intr, tr.x1, tr.y1, 2.15);

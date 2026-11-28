@@ -3625,8 +3625,14 @@ function runSimulations() {
             step58(0.05);
             g58.input.shoot = false;
             assert(
-                targetBrk.broken === true && g58.cash > cashBefore58 && g58.wantedLevel >= 2 && (targetShop._alarmTimer || 0) > 0,
-                `Smash-and-grab shatters showcase (${targetBrk.kind}), awards +$${g58.cash - cashBefore58}, raises ${g58.wantedLevel}★ wanted & activates alarm strobe (${targetShop._alarmTimer.toFixed(1)}s)`
+                targetBrk.broken === true &&
+                g58.cash > cashBefore58 &&
+                g58.wantedLevel >= 2 &&
+                (targetShop._alarmTimer || 0) > 0 &&
+                (targetShop._shakeTimer || 0) > 0 &&
+                Array.isArray(targetShop._indoorShards) &&
+                targetShop._indoorShards.length >= 5,
+                `Smash-and-grab shatters showcase (${targetBrk.kind}), spawns ${targetShop._indoorShards ? targetShop._indoorShards.length : 0} shards, triggers shake (${(targetShop._shakeTimer || 0).toFixed(2)}s), awards +$${g58.cash - cashBefore58} & raises ${g58.wantedLevel}★ wanted`
             );
 
             // 4. Step 1.5s indoors: verify exterior world keeps ticking while armed NPCs engage / unarmed patrons flee toward exit!
@@ -3638,7 +3644,7 @@ function runSimulations() {
                 `Indoor NPCs dynamically react to robbery/gunfire (armed defender hostile=${armedNpc58 ? (armedNpc58._hostileTimer > 0) : "n/a"})`
             );
 
-            // 5. Verify Multiplayer Co-Op Indoor State Sync (`intr`, `ix`, `iy`, `ia`) & WebGL Cutaway Shader Uniforms
+            // 5. Verify Multiplayer Co-Op Indoor State Sync (`intr`, `ix`, `iy`, `ia`), Next-Gen Arcade Obsidian Diorama Stage & Real GTA1 3D Pickup Sprites
             let sentStatePkt58 = null;
             g58.net.enabled = true;
             g58.net.wsConnected = true;
@@ -3648,11 +3654,13 @@ function runSimulations() {
             const objSrc58 = fs.readFileSync(path.join(ROOT, "js", "object_engine.js"), "utf8");
             assert(
                 Boolean(sentStatePkt58 && sentStatePkt58.intr === targetShop.id && typeof sentStatePkt58.ix === "number" && typeof sentStatePkt58.iy === "number") &&
-                rendSrc58.includes("uCutawayRect") &&
+                rendSrc58.includes("gl.clearColor(0.018, 0.024, 0.048, 1.0)") &&
                 rendSrc58.includes("renderInteriorLighting") &&
-                objSrc58.includes("uIndoorMood") &&
+                objSrc58.includes('"548"') &&
+                objSrc58.includes('"277"') &&
+                !objSrc58.includes('iconSpr = "pistol"') &&
                 objSrc58.includes("GLASS_CASE"),
-                `Multiplayer STATE packet syncs intr=${sentStatePkt58 ? sentStatePkt58.intr : "null"} (ix=${sentStatePkt58 ? sentStatePkt58.ix : "null"}) & WebGL cutaway + 3D showcase shaders verified`
+                `Next-Gen Arcade Diorama stage, authentic GTA1 3D pickup sprites (548..629, 277) & Co-Op STATE sync (intr=${sentStatePkt58 ? sentStatePkt58.intr : "null"}) verified`
             );
             g58.exitInterior();
         }

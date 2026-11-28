@@ -12444,9 +12444,28 @@ class LeonidaGame {
 
         }
 
-        // Decay indoor alarm strobe, bullet tracers & floating target popups
+        // Decay indoor alarm strobe, micro screen-shake, flying glass/cash shards, bullet tracers & floating target popups
         if ((intr._alarmTimer || 0) > 0) {
             intr._alarmTimer = Math.max(0, intr._alarmTimer - dt);
+        }
+        if ((intr._shakeTimer || 0) > 0) {
+            intr._shakeTimer = Math.max(0, intr._shakeTimer - dt);
+        }
+        if ((intr._smashComboTimer || 0) > 0) {
+            intr._smashComboTimer = Math.max(0, intr._smashComboTimer - dt);
+            if (intr._smashComboTimer <= 0) intr._smashCombo = 0;
+        }
+        if (Array.isArray(intr._indoorShards)) {
+            for (let i = intr._indoorShards.length - 1; i >= 0; i--) {
+                const sh = intr._indoorShards[i];
+                sh.x += sh.vx * dt;
+                sh.y += sh.vy * dt;
+                sh.vx *= Math.pow(0.06, dt);
+                sh.vy *= Math.pow(0.06, dt);
+                sh.rot = (sh.rot || 0) + (sh.vRot || 0) * dt;
+                sh.life -= dt;
+                if (sh.life <= 0) intr._indoorShards.splice(i, 1);
+            }
         }
         if (Array.isArray(this.interiorTracers)) {
             for (let i = this.interiorTracers.length - 1; i >= 0; i--) {
@@ -12586,18 +12605,38 @@ class LeonidaGame {
                             smashedBreakable = true;
                             hitX = cxB;
                             hitY = cyB;
-                            const loot = Math.max(60, Number(brk.loot) || 180);
+                            intr._smashCombo = ((intr._smashComboTimer || 0) > 0 ? (intr._smashCombo || 0) : 0) + 1;
+                            intr._smashComboTimer = 6.5;
+                            intr._shakeTimer = 0.22;
+                            const comboBonus = Math.min(200, (intr._smashCombo - 1) * 50);
+                            const loot = Math.max(60, Number(brk.loot) || 180) + comboBonus;
                             if (this.audio && typeof this.audio.playGlassSmash === "function") {
                                 this.audio.playGlassSmash();
                             }
-                            this.addCash(loot, brk.kind === "GLASS_CASE" ? "💎 SMASH & GRAB!" : "💵 REGISTER SMASHED!", true);
+                            if (!intr._indoorShards) intr._indoorShards = [];
+                            for (let sp = 0; sp < 10; sp++) {
+                                const sAng = (sp / 10) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+                                const sSpd = 65 + Math.random() * 115;
+                                intr._indoorShards.push({
+                                    x: bcx,
+                                    y: bcy,
+                                    vx: Math.cos(sAng) * sSpd,
+                                    vy: Math.sin(sAng) * sSpd,
+                                    rot: Math.random() * Math.PI * 2,
+                                    vRot: (Math.random() - 0.5) * 14,
+                                    isCash: sp % 3 === 0,
+                                    life: 2.2 + Math.random() * 1.2
+                                });
+                            }
+                            const comboTag = intr._smashCombo > 1 ? ` x${intr._smashCombo} COMBO` : "";
+                            this.addCash(loot, brk.kind === "GLASS_CASE" ? `💎 SMASH & GRAB${comboTag}!` : `💵 REGISTER SMASHED${comboTag}!`, true);
                             if (!this.interiorPopups) this.interiorPopups = [];
                             this.interiorPopups.push({
                                 x: bcx,
                                 y: bcy - 8,
-                                text: brk.kind === "GLASS_CASE" ? `💎 SMASH & GRAB +$${loot}!` : `💵 REGISTER +$${loot}!`,
-                                color: "#38bdf8",
-                                life: 1.45
+                                text: brk.kind === "GLASS_CASE" ? `💎 SMASH${comboTag} +$${loot}!` : `💵 REGISTER${comboTag} +$${loot}!`,
+                                color: intr._smashCombo > 1 ? "#fde047" : "#38bdf8",
+                                life: 1.55
                             });
                             this.setWantedLevel(Math.max(this.wantedLevel || 0, 2));
                             this.triggerInteriorChaos(intr, true);
