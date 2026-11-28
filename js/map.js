@@ -5265,9 +5265,10 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 142, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE", dialog: "WELCOME BACK TO HOTEL DIXON! YOUR SUITE STASH IS UPSTAIRS." },
-                    { x: 165, y: 245, angle: 0, type: "civ1", label: "GUEST", dialog: "OCEAN DRIVE NEVER SLEEPS... PASS ME ANOTHER MOJITO!" },
-                    { x: 665, y: 84, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER", dialog: "COLDEST CUBAN MOJITOS ON SOUTH BEACH!" }
+                    { x: 410, y: 142, angle: Math.PI * 0.5, type: "civ2", label: "CONCIERGE", roleBehavior: "CLERK", dialog: "WELCOME BACK TO HOTEL DIXON! LUCIA & JASON'S SUITE IS UPSTAIRS." },
+                    { x: 165, y: 245, angle: 0, type: "civ1", label: "GUEST", roleBehavior: "SHOPPER", patrolRadius: 34, dialog: "OCEAN DRIVE NEONS SHINE RIGHT THROUGH THE LOBBY GLASS!" },
+                    { x: 665, y: 84, angle: Math.PI * 0.5, type: "civ3", label: "BARTENDER", roleBehavior: "BARTENDER", patrolSpan: 44, dialog: "COLDEST YERBA BUENA MOJITOS ON VICE BEACH!" },
+                    { x: 675, y: 420, angle: -Math.PI * 0.5, type: "bikini_cyan", label: "SPA GUEST", roleBehavior: "DANCER", dancing: true, dialog: "NOTHING BEATS THE HOTEL DIXON JACUZZI AFTER MIDNIGHT." }
                 ],
                 stations: [
                     {
@@ -5311,11 +5312,11 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 94, z: 2.34, angle: Math.PI * 0.5, type: "gang", label: "RESIDENT DJ", dialog: "CLUB NINE1NINE IN THE MIX! STEP UP TO THE DECKS!" },
-                    { x: 355, y: 275, angle: 0.8, type: "civ2", label: "DANCER", dancing: true, dialog: "THIS BASSLINE IS SHAKING THE WHOLE BAY!" },
-                    { x: 465, y: 275, angle: -0.8, type: "civ1", label: "DANCER", dancing: true },
-                    { x: 410, y: 335, angle: -1.5, type: "civ3", label: "DANCER", dancing: true },
-                    { x: 645, y: 345, angle: Math.PI, type: "civ0", label: "VIP HOST", dialog: "PRIVATE BOTTLE SERVICE WEST, MANAGER'S VAULT EAST." }
+                    { x: 410, y: 94, z: 2.34, angle: Math.PI * 0.5, type: "gang", label: "RESIDENT DJ", roleBehavior: "BARTENDER", patrolSpan: 24, dialog: "CLUB NINE1NINE LIVE! ONLYRAW ANTHEMS ALL NIGHT!" },
+                    { x: 355, y: 275, angle: 0.8, type: "bikini_pink", label: "DANCER", roleBehavior: "DANCER", dancing: true, dialog: "THIS BASSLINE IS SHAKING ALL OF CROSSTOWN!" },
+                    { x: 465, y: 275, angle: -0.8, type: "bikini_cyan", label: "DANCER", roleBehavior: "DANCER", dancing: true },
+                    { x: 410, y: 335, angle: -1.5, type: "civ3", label: "CLUBBER", roleBehavior: "DANCER", dancing: true },
+                    { x: 645, y: 345, angle: Math.PI, type: "gang", label: "VIP BOUNCER", roleBehavior: "BOUNCER", armed: true, weapon: "UZI", dialog: "PRIVATE BOTTLE SERVICE WEST, MANAGER'S VAULT STRICTLY LOCKED." }
                 ],
                 stations: [
                     {
@@ -5359,10 +5360,10 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 262, z: 2.22, angle: Math.PI * 0.5, type: "bikini_pink", label: "STAGE PERFORMER", dancing: true, dialog: "MAKE IT RAIN AT THE JACK OF HEARTS, BABY!" },
-                    { x: 300, y: 295, angle: 0, type: "gang", label: "BOOBIE IKE VIP", dialog: "BOOBIE IKE OWNS THIS WHOLE BLOCK, WATCH YOUR STEP." },
-                    { x: 520, y: 295, angle: Math.PI, type: "civ1", label: "PATRON", dialog: "BEST VIP LOUNGE IN LEONIDA!" },
-                    { x: 645, y: 345, angle: Math.PI, type: "gang", label: "VAULT GUARD", dialog: "BACKROOM COUNTING OFFICE IS STRICTLY OFF-LIMITS!" }
+                    { x: 410, y: 262, z: 2.22, angle: Math.PI * 0.5, type: "bikini_pink", label: "STAGE PERFORMER", roleBehavior: "DANCER", dancing: true, dialog: "MAKE IT RAIN AT THE JACK OF HEARTS, BABY!" },
+                    { x: 300, y: 295, angle: 0, type: "gang", label: "BOOBIE IKE", roleBehavior: "CLERK", armed: true, weapon: "UZI", dialog: "REAL ESTATE, STRIP CLUBS, ONLYRAW RECORDS — THIS EMPIRE IS MINE." },
+                    { x: 520, y: 295, angle: Math.PI, type: "civ1", label: "HIGH ROLLER", roleBehavior: "SHOPPER", patrolRadius: 30, dialog: "COLLECTED 12 JACK OF HEARTS CARDS ALREADY!" },
+                    { x: 645, y: 345, angle: Math.PI, type: "gang", label: "VAULT ENFORCER", roleBehavior: "GUARD", armed: true, weapon: "SHOTGUN", dialog: "STEP NEAR BOOBIE'S COUNTING ROOM AND YOU CATCH LEAD!" }
                 ],
                 stations: [
                     {
@@ -5452,9 +5453,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 410, y: 84, angle: Math.PI * 0.5, type: "gang", label: "CARTEL BOSS", dialog: "THE WORLD IS YOURS... IF YOU CAN HOLD ON TO IT." },
-                    { x: 315, y: 268, angle: 0, type: "gang", label: "BODYGUARD", dialog: "EYES OFF THE DESK, PAL. BOSS IS COUNTING." },
-                    { x: 505, y: 268, angle: Math.PI, type: "civ2", label: "VIP GUEST", dialog: "HAVE YOU SEEN THAT GOLDEN GLOBE FOUNTAIN?!" }
+                    { x: 410, y: 84, angle: Math.PI * 0.5, type: "gang", label: "CARTEL BOSS", roleBehavior: "CLERK", armed: true, weapon: "UZI", dialog: "THE WORLD IS YOURS... IF YOU CAN HOLD ON TO IT." },
+                    { x: 315, y: 268, angle: 0, type: "gang", label: "SICARIO GUARD", roleBehavior: "GUARD", armed: true, weapon: "SHOTGUN", patrolRadius: 36, dialog: "EYES OFF THE DESK, PAL. BOSS IS COUNTING." },
+                    { x: 505, y: 268, angle: Math.PI, type: "bikini_pink", label: "VIP GUEST", roleBehavior: "SHOPPER", patrolRadius: 32, dialog: "HAVE YOU SEEN THAT GOLDEN GLOBE FOUNTAIN?!" }
                 ],
                 stations: [
                     {
@@ -5544,9 +5545,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 400, y: 78, angle: Math.PI * 0.5, type: "police", label: "WARDEN", dialog: "BAD LUCK I GUESS? STAY OUT OF TROUBLE ON PAROLE!" },
-                    { x: 165, y: 112, angle: Math.PI * 0.5, type: "monk", label: "INMATE #09", dialog: "LUCIA LEFT HER OLD STASH HIDDEN UNDER BUNK #06..." },
-                    { x: 505, y: 275, angle: Math.PI, type: "police", label: "CORRECTIONS OFFICER", dialog: "CELLBLOCK B LOCKDOWN IN TEN MINUTES! KEEP MOVING!" }
+                    { x: 400, y: 78, angle: Math.PI * 0.5, type: "police", label: "WARDEN", roleBehavior: "GUARD", armed: true, weapon: "PISTOL", dialog: "BAD LUCK, I GUESS? STAY CLEAN ON PAROLE, CAMINOS!" },
+                    { x: 165, y: 112, angle: Math.PI * 0.5, type: "monk", label: "INMATE #09", roleBehavior: "SHOPPER", patrolRadius: 24, dialog: "LUCIA LEFT HER OLD CONTRABAND UNDER BUNK #06..." },
+                    { x: 505, y: 275, angle: Math.PI, type: "police", label: "DOC OFFICER", roleBehavior: "GUARD", armed: true, weapon: "SHOTGUN", patrolRadius: 46, dialog: "CELLBLOCK B LOCKDOWN IN TEN MINUTES! KEEP MOVING!" }
                 ],
                 stations: [
                     {
@@ -5590,9 +5591,9 @@ class LeonidaMap {
                 w: 820,
                 h: 560,
                 npcs: [
-                    { x: 345, y: 98, angle: Math.PI * 0.5, type: "civ0", label: "CASHIER", dialog: "WELCOME TO HANK'S WAFFLES! PLEASE DON'T ROB THE REGISTER!" },
-                    { x: 220, y: 275, angle: Math.PI, type: "civ3", label: "DINER CUSTOMER", dialog: "BEST PECAN WAFFLES & BLACK COFFEE IN PORT GELLHORN." },
-                    { x: 635, y: 92, angle: Math.PI * 0.5, type: "gang", label: "PAWN BROKER", dialog: "UNCLE JACK'S PAWN: WE BUY GOLD, WATCHES & HEAVY IRON!" }
+                    { x: 345, y: 98, angle: Math.PI * 0.5, type: "civ0", label: "HANK'S CASHIER", roleBehavior: "CLERK", dialog: "WELCOME TO HANK'S WAFFLES! PLEASE DON'T POINT THAT AT ME!" },
+                    { x: 220, y: 275, angle: Math.PI, type: "civ3", label: "CAL HAMPTON", roleBehavior: "SHOPPER", patrolRadius: 28, dialog: "COAST GUARD SCANNER IS GOING CRAZY TODAY, JASON!" },
+                    { x: 635, y: 92, angle: Math.PI * 0.5, type: "gang", label: "PAWN BROKER", roleBehavior: "CLERK", armed: true, weapon: "SHOTGUN", dialog: "PAWN & GUN: SMASH MY GLASS CASES AND YOU MEET THIS 12-GAUGE!" }
                 ],
                 stations: [
                     {

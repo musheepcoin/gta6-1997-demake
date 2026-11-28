@@ -21,6 +21,7 @@ const path = require("path");
 // Load the authentic 512x512x6 3D LeonidaMap engine directly on the Dedicated Server
 // so the server simulates real road lanes, traffic lights, bridges, municipal stations, and sidewalks 24/7!
 global.window = global;
+require("../js/interiors.js");
 require("../js/object_engine.js");
 require("../js/map.js");
 require("../js/world_director.js");

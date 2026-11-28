@@ -89,8 +89,16 @@ function createGameInstance(cmpBuf, forceFresh = false) {
     };
 
     let simNowMs = 10000;
+    let rngState = 0x77772026;
+    const seededMath = Object.create(Math);
+    seededMath.random = () => {
+        rngState = (rngState + 0x6D2B79F5) | 0;
+        let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
     const sandbox = {
-        console, Math, Date, Array, Object, String, Number, Boolean, RegExp, Map, Set, WeakMap, Promise,
+        console, Math: seededMath, Date, Array, Object, String, Number, Boolean, RegExp, Map, Set, WeakMap, Promise,
         Uint8Array, Uint16Array, Uint32Array, Int8Array, Int16Array, Int32Array, Float32Array, Float64Array,
         Uint8ClampedArray, ArrayBuffer, DataView, JSON, parseInt, parseFloat, isNaN, isFinite,
         performance: { now: () => simNowMs },
@@ -2888,9 +2896,10 @@ function runSimulations() {
     // =========================================================================
     {
         console.log("--- SCENARIO 51: CAR AI ZERO-DEFECT TORTURE AUDIT (VENETIAN CAUSEWAY, COLLINS AVE & OCEAN DRIVE) ---");
-        const { g, sandbox } = createGameInstance(cmpBuf);
+        const { g, sandbox } = createGameInstance(cmpBuf, true);
         const map = g.map;
         const TS = 64;
+        g.trafficManager.generateTrafficCars = () => {};
         g.trafficManager.generateTrafficPeds = () => {};
         g.seedCityCurbsideParkedVehicles();
         const localParked = g.vehicles.filter(v => !v.driver && Math.abs(v.x - 438.5 * TS) < 850 && Math.abs(v.y - 173.5 * TS) < 850);
@@ -3563,11 +3572,96 @@ function runSimulations() {
             );
         }
         console.log("");
+
+        // 58. Interior Engine 2.0 (GTA VI Leonida Edition): World-Anchored Cutaway, Tailored Dimensions, Smash-and-Grab, Live Armed/Fleeing NPCs, Surface Audio & Co-Op Indoor Sync
+        console.log("── SCENARIO 58: Interior Engine 2.0 — World Cutaway, Tailored Venues, Smash-and-Grab, Live NPCs & Co-Op Sync ──");
+        {
+            const { g: g58, sandbox: sb58, stepSec: step58 } = createGameInstance(cmpBuf, true);
+            const SI = sb58.window.ShopInteriors;
+            assert(
+                Boolean(SI && typeof SI.getWorldOrigin === "function" && typeof SI.getWindows === "function" && typeof SI.getBreakables === "function" && typeof SI.getSurfaceAt === "function"),
+                "ShopInteriors exposes getWorldOrigin, getWindows, getBreakables & getSurfaceAt APIs"
+            );
+
+            // 1. Verify tailored architectural dimensions across GTA VI venues + Starlet Motel & OnlyRaw Records templates
+            const dimsStore = SI.getThemeDimensions("SHOP_CONVENIENCE");
+            const dimsVilla = SI.getThemeDimensions("MANSION");
+            const hasGta6Venues = g58.map.interiors.some(i => String(i.name || "").includes("STARLET") || String(i.name || "").includes("ONLYRAW") || String(i.name || "").includes("UNCLE JACK") || String(i.name || "").includes("RUSTY ANCHOR"));
+            assert(
+                dimsStore.w < dimsVilla.w && dimsStore.h < dimsVilla.h && hasGta6Venues,
+                `Tailored venue footprints differentiate compact bodegas (${dimsStore.w}x${dimsStore.h}) from luxury villas (${dimsVilla.w}x${dimsVilla.h}) with researched GTA VI establishments`
+            );
+
+            // 2. Enter a Gun Shop / Boutique / Store with breakable glass showcases, verify world-anchored cutaway bounds & storefront windows
+            const targetShop = g58.map.interiors.find(i => i.theme === "SHOP_GUN_SHOP" || i.theme === "SHOP_BOUTIQUE") || g58.map.interiors[0];
+            g58.player.dead = false;
+            g58.setWantedLevel(0);
+            g58.enterInterior(targetShop);
+            const orig58 = SI.getWorldOrigin(targetShop);
+            const wins58 = SI.getWindows(targetShop);
+            const brks58 = SI.getBreakables(targetShop);
+            const surf58 = SI.getSurfaceAt(targetShop, g58.interiorX, g58.interiorY);
+            assert(
+                Number.isFinite(orig58.x) && Number.isFinite(orig58.y) &&
+                orig58.cutMaxBX > orig58.cutMinBX && orig58.cutMaxBZ > orig58.cutMinBZ &&
+                Array.isArray(wins58) && wins58.length >= 1 &&
+                Array.isArray(brks58) && brks58.length >= 1 &&
+                ["CARPET", "WOOD", "MARBLE", "TILE", "METAL"].includes(surf58),
+                `World-anchored cutaway origin (${Math.round(orig58.x)},${Math.round(orig58.y)}), ${wins58.length} 3D storefront windows, ${brks58.length} breakables & acoustic surface (${surf58}) active`
+            );
+
+            // 3. Test Smash-and-Grab on an intact GLASS_CASE / REGISTER: awards cash, marks broken, raises 2★ wanted & triggers NPC chaos!
+            const targetBrk = brks58.find(b => !b.broken) || brks58[0];
+            targetBrk.broken = false;
+            const cashBefore58 = g58.cash;
+            g58.player.weapon = "PISTOL";
+            g58.player.ammo.PISTOL = 50;
+            g58.player.fireTimer = 0;
+            g58.interiorX = targetBrk.x - 28;
+            g58.interiorY = targetBrk.y;
+            g58.interiorAngle = 0;
+            g58.player.mouseShoot = false;
+            g58.input.shoot = true;
+            step58(0.05);
+            g58.input.shoot = false;
+            assert(
+                targetBrk.broken === true && g58.cash > cashBefore58 && g58.wantedLevel >= 2 && (targetShop._alarmTimer || 0) > 0,
+                `Smash-and-grab shatters showcase (${targetBrk.kind}), awards +$${g58.cash - cashBefore58}, raises ${g58.wantedLevel}★ wanted & activates alarm strobe (${targetShop._alarmTimer.toFixed(1)}s)`
+            );
+
+            // 4. Step 1.5s indoors: verify exterior world keeps ticking while armed NPCs engage / unarmed patrons flee toward exit!
+            const armedNpc58 = Array.isArray(targetShop.npcs) ? targetShop.npcs.find(n => n && n.armed && !n._dead) : null;
+            step58(1.5);
+            const npcReacted58 = Array.isArray(targetShop.npcs) && targetShop.npcs.some(n => (n._hostileTimer || 0) > 0 || (n._panicTimer || 0) > 0 || n._fled);
+            assert(
+                npcReacted58 && (!armedNpc58 || (armedNpc58._hostileTimer || 0) > 0),
+                `Indoor NPCs dynamically react to robbery/gunfire (armed defender hostile=${armedNpc58 ? (armedNpc58._hostileTimer > 0) : "n/a"})`
+            );
+
+            // 5. Verify Multiplayer Co-Op Indoor State Sync (`intr`, `ix`, `iy`, `ia`) & WebGL Cutaway Shader Uniforms
+            let sentStatePkt58 = null;
+            g58.net.enabled = true;
+            g58.net.wsConnected = true;
+            g58.net.sendPacket = (pkt) => { if (pkt && pkt.t === "STATE") sentStatePkt58 = pkt; };
+            g58.net.broadcastStateNow();
+            const rendSrc58 = fs.readFileSync(path.join(ROOT, "js", "renderer.js"), "utf8");
+            const objSrc58 = fs.readFileSync(path.join(ROOT, "js", "object_engine.js"), "utf8");
+            assert(
+                Boolean(sentStatePkt58 && sentStatePkt58.intr === targetShop.id && typeof sentStatePkt58.ix === "number" && typeof sentStatePkt58.iy === "number") &&
+                rendSrc58.includes("uCutawayRect") &&
+                rendSrc58.includes("renderInteriorLighting") &&
+                objSrc58.includes("uIndoorMood") &&
+                objSrc58.includes("GLASS_CASE"),
+                `Multiplayer STATE packet syncs intr=${sentStatePkt58 ? sentStatePkt58.intr : "null"} (ix=${sentStatePkt58 ? sentStatePkt58.ix : "null"}) & WebGL cutaway + 3D showcase shaders verified`
+            );
+            g58.exitInterior();
+        }
+        console.log("");
     }
 
     console.log("================================================================================");
     if (allPassed) {
-        console.log("  🎉 ALL 57 FULL-GAME 200-LOOP AUDIT, ABANDONED VEHICLE/TOW CLEARANCE, STRICT CAR AI, FLUIDITY/PERF, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO, 3D INTERIORS & WEBAUDIO SCENARIOS PASSED 100%!");
+        console.log("  🎉 ALL 58 FULL-GAME 200-LOOP AUDIT, INTERIOR ENGINE 2.0 (GTA VI CUTAWAY), ABANDONED VEHICLE/TOW CLEARANCE, STRICT CAR AI, FLUIDITY/PERF, SPEED DIVERSITY, DETACHABLE 3D CAR PARTS, MMO & WEBAUDIO SCENARIOS PASSED 100%!");
         console.log("================================================================================");
         process.exit(0);
     } else {

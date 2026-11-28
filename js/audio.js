@@ -1876,6 +1876,55 @@ class RetroAudioEngine {
         }
     }
 
+    playGlassSmash() {
+        if (!this.initialized || this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this._lastGlassSmashTime && now - this._lastGlassSmashTime < 0.16) return;
+        this._lastGlassSmashTime = now;
+        this.playSample("gta_crate_break", 0.085, 1.28 + Math.random() * 0.14, 0.42);
+        this.playBandNoise(0.095, 4850, 2.6, 0.062);
+        this.playBandNoise(0.055, 2650, 1.8, 0.045);
+        setTimeout(() => {
+            if (this.ctx && !this.muted) {
+                this.playBandNoise(0.048, 6100, 4.2, 0.032);
+            }
+        }, 65);
+    }
+
+    updateInteriorAmbience(dt, theme = null) {
+        if (!this.initialized || this.muted || !this.ctx || !theme) {
+            this._intBeatTimer = 0;
+            return;
+        }
+        this._intBeatTimer = (this._intBeatTimer || 0) + dt;
+        const isClub = (theme === "NEON_CLUB" || theme === "STRIP_CLUB" || theme === "MALIBU_CLUB" || theme === "ONLYRAW_STUDIO");
+        if (isClub) {
+            if (this._intBeatTimer >= 0.49) {
+                this._intBeatTimer %= 0.49;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(62, now);
+                    osc.frequency.exponentialRampToValueAtTime(34, now + 0.13);
+                    g.gain.setValueAtTime(0.022, now);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+                    osc.connect(g);
+                    g.connect(this.sfxOut());
+                    osc.start(now);
+                    osc.stop(now + 0.16);
+                    this._registerVoice(osc, [g], now + 0.16);
+                } catch (_e) {}
+            }
+        } else if (theme === "SHOP_RESTAURANT" || theme === "DINER_PAWN") {
+            if (this._intBeatTimer >= 2.6) {
+                this._intBeatTimer = 0;
+                this.playBandNoise(0.075, 2900, 2.8, 0.007);
+            }
+        }
+    }
+
     playFootstep(surface = "PAVEMENT", isLeft = false) {
         if (!this.initialized || this.muted || !this.ctx) return;
         const now = this.ctx.currentTime;
@@ -1885,6 +1934,31 @@ class RetroAudioEngine {
 
         if (surface === "WATER") {
             this.playWaterSplash(0.68);
+            return;
+        }
+        if (surface === "CARPET") {
+            if (!this.playSample("step_soft", 0.048, 0.80 * pitchJit, 0.14)) {
+                this.playBandNoise(0.045, 520 * pitchJit, 1.8, 0.022);
+            }
+            return;
+        }
+        if (surface === "WOOD") {
+            const stepKeyW = isLeft ? "gta_step_1" : "gta_step_2";
+            this.playSample(stepKeyW, 0.054, 0.86 * pitchJit, 0.13);
+            this.playBeep(142 * pitchJit, 0.028, "triangle", 0.015);
+            return;
+        }
+        if (surface === "MARBLE" || surface === "TILE") {
+            const stepKeyM = isLeft ? "gta_step_1" : "gta_step_2";
+            if (!this.playSample(stepKeyM, 0.062, 1.22 * pitchJit, 0.12)) {
+                this.playBandNoise(0.032, 3200 * pitchJit, 3.8, 0.026);
+            }
+            return;
+        }
+        if (surface === "METAL") {
+            const stepKeyMt = isLeft ? "gta_step_1" : "gta_step_2";
+            this.playSample(stepKeyMt, 0.058, 1.30 * pitchJit, 0.12);
+            this.playBeep(640 * pitchJit, 0.022, "triangle", 0.013);
             return;
         }
         if (surface === "SAND") {

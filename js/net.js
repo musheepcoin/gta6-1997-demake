@@ -1625,6 +1625,29 @@ class ViceNetworkManager {
             rp.isFocused = pkt.foc !== undefined ? Boolean(pkt.foc) : !pkt.hid;
             rp.ver = pkt.ver || 0;
             rp.veh = pkt.veh || null;
+            rp.charId = pkt.charId || rp.charId || "LUCIA";
+            rp.intrId = pkt.intr || null;
+            if (rp.intrId && typeof pkt.ix === "number" && typeof pkt.iy === "number") {
+                if (rp._lastIntrId !== rp.intrId || rp.ix === undefined) {
+                    rp.ix = pkt.ix;
+                    rp.iy = pkt.iy;
+                    rp.ia = pkt.ia !== undefined ? pkt.ia : (pkt.a || 0);
+                }
+                rp.itx = pkt.ix;
+                rp.ity = pkt.iy;
+                rp.ita = pkt.ia !== undefined ? pkt.ia : (pkt.a || 0);
+                rp.ivx = pkt.mov ? Math.cos(rp.ita) * 125 : 0;
+                rp.ivy = pkt.mov ? Math.sin(rp.ita) * 125 : 0;
+                if ((pkt.mz || 0) > 0) rp.shootTimer = 0.14;
+            } else {
+                rp.ix = undefined;
+                rp.iy = undefined;
+                rp.itx = undefined;
+                rp.ity = undefined;
+                rp.ivx = 0;
+                rp.ivy = 0;
+            }
+            rp._lastIntrId = rp.intrId;
             rp.lastSeen = performance.now();
             if (typeof pkt.sc === "number" && pkt.sc > 0 && ((pkt.econVer || 1) >= 2 || pkt.sc <= 50000) && this.game && typeof this.game.recordHighScore === "function") {
                 this.game.recordHighScore(rp.name, pkt.charId || "LUCIA", pkt.sc, rp.color, false);
@@ -1662,6 +1685,24 @@ class ViceNetworkManager {
             const rp = this.remotePlayers.get(pkt.id);
             if (rp) {
                 rp.muzzleTimer = 0.10;
+                rp.shootTimer = 0.16;
+            }
+            if (pkt.intr) {
+                if (this.game.activeInterior && this.game.activeInterior.id === pkt.intr) {
+                    if (this.game.audio) this.game.audio.playShot(pkt.wep || "PISTOL", 0.72);
+                    if (rp && rp.ix !== undefined && rp.iy !== undefined && Array.isArray(this.game.interiorTracers)) {
+                        const rAng = rp.ia !== undefined ? rp.ia : 0;
+                        this.game.interiorTracers.push({
+                            x1: rp.ix + Math.cos(rAng) * 14,
+                            y1: rp.iy + Math.sin(rAng) * 14,
+                            x2: rp.ix + Math.cos(rAng) * 210,
+                            y2: rp.iy + Math.sin(rAng) * 210,
+                            color: rp.color || "#38bdf8",
+                            life: 0.12
+                        });
+                    }
+                }
+                return;
             }
             const dist = Math.hypot((pkt.x || 0) - this.game.player.x, (pkt.y || 0) - this.game.player.y);
             if (dist < 620 && this.game.audio) {
@@ -3018,6 +3059,17 @@ class ViceNetworkManager {
             if ((rp.muzzleTimer || 0) > 0) {
                 rp.muzzleTimer = Math.max(0, rp.muzzleTimer - dt);
             }
+            if ((rp.shootTimer || 0) > 0) {
+                rp.shootTimer = Math.max(0, rp.shootTimer - dt);
+            }
+            if (rp.intrId && rp.itx !== undefined && rp.ity !== undefined) {
+                const iLerp = Math.min(1.0, dt * 15.0);
+                rp.ix = (rp.ix !== undefined ? rp.ix : rp.itx) + (rp.itx - (rp.ix !== undefined ? rp.ix : rp.itx)) * iLerp;
+                rp.iy = (rp.iy !== undefined ? rp.iy : rp.ity) + (rp.ity - (rp.iy !== undefined ? rp.iy : rp.ity)) * iLerp;
+                const curIa = rp.ia !== undefined ? rp.ia : (rp.ita || 0);
+                const iAngDiff = Math.atan2(Math.sin((rp.ita || 0) - curIa), Math.cos((rp.ita || 0) - curIa));
+                rp.ia = curIa + iAngDiff * iLerp;
+            }
 
             // Predict with velocity + blend toward target position
             rp.targetX += (rp.vx || 0) * dt * 0.45;
@@ -3285,6 +3337,10 @@ class ViceNetworkManager {
             msn: storyMask,
             ank: Boolean(p.ankleScrambled),
             charId: p.charId || "LUCIA",
+            intr: (this.game && this.game.activeInterior) ? this.game.activeInterior.id : null,
+            ix: (this.game && this.game.activeInterior) ? Math.round(this.game.interiorX || 0) : undefined,
+            iy: (this.game && this.game.activeInterior) ? Math.round(this.game.interiorY || 0) : undefined,
+            ia: (this.game && this.game.activeInterior) ? Math.round((this.game.interiorAngle || 0) * 1000) / 1000 : undefined,
             veh: vehData
         });
     }
@@ -3308,6 +3364,7 @@ class ViceNetworkManager {
             t: "SHOOT",
             name: this.playerName,
             wep: weaponKey,
+            intr: (this.game && this.game.activeInterior) ? this.game.activeInterior.id : null,
             x: Math.round(p.x),
             y: Math.round(p.y),
             pellets: pellets.map((pr) => ({

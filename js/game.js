@@ -5294,6 +5294,35 @@ class LeonidaGame {
         if (window.ShopInteriors && typeof window.ShopInteriors.orientInterior === "function") {
             window.ShopInteriors.orientInterior(intr);
         }
+        if (window.ShopInteriors && typeof window.ShopInteriors.getBreakables === "function") {
+            window.ShopInteriors.getBreakables(intr);
+        }
+        const nowEnterMs = Date.now();
+        const resetRoomState = (nowEnterMs - (intr._lastVisitedMs || 0)) > 45000;
+        if (resetRoomState) {
+            intr._alarmTimer = 0;
+        }
+        if (Array.isArray(intr.npcs)) {
+            for (const npc of intr.npcs) {
+                if (resetRoomState || npc._liveX === undefined || npc._liveY === undefined) {
+                    npc._dead = false;
+                    npc._fled = false;
+                    npc._hostileTimer = 0;
+                    npc._panicTimer = 0;
+                    npc._robbedTimer = 0;
+                    npc._hp = npc.armed ? 65 : 35;
+                    npc._liveX = npc.x;
+                    npc._liveY = npc.y;
+                    npc._liveAngle = typeof npc.angle === "number" ? npc.angle : Math.PI * 0.5;
+                    npc._isMoving = false;
+                    npc._walkPhase = 0;
+                    npc._fireCd = 0.65;
+                    npc._patrolWait = 0.5 + Math.random() * 1.5;
+                    npc._patrolTx = npc.x;
+                    npc._patrolTy = npc.y;
+                }
+            }
+        }
         const pose = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
             ? window.ShopInteriors.getEntrancePose(intr)
             : { spawnX: intr.w * 0.5, spawnY: intr.h - 120, spawnAngle: -Math.PI * 0.5, partnerX: intr.w * 0.5 + 38, partnerY: intr.h - 112, partnerAngle: -Math.PI * 0.5 };
@@ -5307,6 +5336,7 @@ class LeonidaGame {
         this.interiorJasonX = pose.partnerX;
         this.interiorJasonY = pose.partnerY;
         this.interiorJasonAngle = pose.partnerAngle;
+        this._partnerIndoorFireCd = 0.4;
         if (this.player) {
             this.player.weaponDrawnTimer = 0;
             this.player.muzzleTimer = 0;
@@ -5318,8 +5348,6 @@ class LeonidaGame {
             this.audio.resetLoops();
         }
 
-
-
         if (!this.vaultLockouts) this.vaultLockouts = {};
         const nowMs = Date.now();
         if (Array.isArray(intr.stations)) {
@@ -5330,15 +5358,14 @@ class LeonidaGame {
             }
         }
 
-
-
         this.fadeAlpha = 1.0;
-
-
 
         this.showBigBanner(intr.name, intr.subtitle, intr.accent || "#00f0ff", 2.6);
 
         this.updateHud();
+        if (this.net && typeof this.net.broadcastStateNow === "function") {
+            this.net.broadcastStateNow();
+        }
 
         return true;
 
@@ -5351,6 +5378,7 @@ class LeonidaGame {
         if (!this.activeInterior) return;
 
         const intr = this.activeInterior;
+        intr._lastVisitedMs = Date.now();
 
         this.activeInterior = null;
         this.interiorTracers = [];
@@ -5360,10 +5388,13 @@ class LeonidaGame {
 
         this.interiorCooldown = 0.6;
 
-        if (this.audio && typeof this.audio.resetLoops === "function") {
-
-            this.audio.resetLoops();
-
+        if (this.audio) {
+            if (typeof this.audio.updateInteriorAmbience === "function") {
+                this.audio.updateInteriorAmbience(0, null);
+            }
+            if (typeof this.audio.resetLoops === "function") {
+                this.audio.resetLoops();
+            }
         }
 
         const { x: dtx, y: dty, fnv: dnx } = this.getDoorThresholdPos(intr);
@@ -5409,7 +5440,30 @@ class LeonidaGame {
         this.addFloatingText(this.player.x, this.player.y - 24, `🚪 EXITED ${cleanVenueName}`, "#38bdf8");
 
         this.updateHud();
+        if (this.net && typeof this.net.broadcastStateNow === "function") {
+            this.net.broadcastStateNow();
+        }
 
+    }
+
+    triggerInteriorChaos(intr, isHoldUp = false) {
+        if (!intr) return;
+        if (isHoldUp) {
+            intr._alarmTimer = Math.max(intr._alarmTimer || 0, 14.0);
+        }
+        if (!Array.isArray(intr.npcs)) return;
+        for (const npc of intr.npcs) {
+            if (!npc || npc._dead || npc._fled) continue;
+            if (npc.armed) {
+                npc._hostileTimer = Math.max(npc._hostileTimer || 0, 18.0);
+                npc._robbedTimer = 0;
+                npc._panicTimer = 0;
+                if (!(npc._fireCd > 0)) npc._fireCd = 0.55 + Math.random() * 0.35;
+            } else {
+                npc._robbedTimer = Math.max(npc._robbedTimer || 0, 14.0);
+                npc._panicTimer = Math.max(npc._panicTimer || 0, 12.0);
+            }
+        }
     }
 
 
@@ -5535,11 +5589,7 @@ class LeonidaGame {
 
             this.audio.playShot("PISTOL");
             this.recordStationCooldown(this.activeInterior, st, Math.max(90.0, st.cooldownSec || 90.0), true);
-            if (this.activeInterior && Array.isArray(this.activeInterior.npcs)) {
-                for (const npc of this.activeInterior.npcs) {
-                    npc._robbedTimer = 14.0;
-                }
-            }
+            this.triggerInteriorChaos(this.activeInterior, true);
 
         } else {
 
@@ -5807,6 +5857,35 @@ class LeonidaGame {
                     }
                     break;
                 }
+                case "PLAY_SLOTS": {
+                    this.recordStationCooldown(this.activeInterior, st, 8.0, false);
+                    const slotRoll = Math.random();
+                    if (slotRoll < 0.14) {
+                        this.addCash(500, "🎰 TRIPLE 777 NEON JACKPOT!", true);
+                        bannerTitle = "🎰 TRIPLE 777 JACKPOT!";
+                        bannerSub = "NEON REELS ALIGNED: WON +$500!";
+                        bannerCol = "#fde047";
+                    } else if (slotRoll < 0.52) {
+                        this.addCash(175, "🍒 CHERRY NEON PAYOUT!", true);
+                        bannerTitle = "🍒 CHERRY TRIPLE LINE!";
+                        bannerSub = "VICE SLOTS PAYOUT: WON +$175!";
+                        bannerCol = "#39ff14";
+                    } else {
+                        bannerTitle = "🎰 TWO BARS — SO CLOSE!";
+                        bannerSub = "SPIN AGAIN FOR THE $500 TRIPLE-777!";
+                        bannerCol = "#94a3b8";
+                    }
+                    break;
+                }
+                case "JUKEBOX_VIBE": {
+                    this.recordStationCooldown(this.activeInterior, st, 12.0, false);
+                    p.hp = Math.min(p.maxHp, p.hp + 35);
+                    p.speedBoostTimer = Math.max(p.speedBoostTimer || 0, 16.0);
+                    bannerTitle = "🎵 LEONIDA JUKEBOX GROOVE!";
+                    bannerSub = "+35 HP & 16S BASS-BOOSTED ADRENALINE!";
+                    bannerCol = "#f472b6";
+                    break;
+                }
                 case "ROB_REGISTER": {
                     this.recordStationCooldown(this.activeInterior, st, 120.0, true);
                     const take = Math.min(350, Number(st.reward) || 300);
@@ -5823,11 +5902,7 @@ class LeonidaGame {
                     bannerTitle = "🚨 ARMED HOLD-UP COMPLETE!";
                     bannerSub = `STOLE +$${take.toLocaleString()} CASH! VCPD DISPATCHED (+2★)!`;
                     bannerCol = "#ef4444";
-                    if (this.activeInterior && Array.isArray(this.activeInterior.npcs)) {
-                        for (const npc of this.activeInterior.npcs) {
-                            npc._robbedTimer = 14.0;
-                        }
-                    }
+                    this.triggerInteriorChaos(this.activeInterior, true);
                     break;
                 }
                 default:
@@ -5938,11 +6013,7 @@ class LeonidaGame {
 
                 rwdCooldown = 150.0;
                 syncVault = true;
-                if (this.activeInterior && Array.isArray(this.activeInterior.npcs)) {
-                    for (const npc of this.activeInterior.npcs) {
-                        npc._robbedTimer = 14.0;
-                    }
-                }
+                this.triggerInteriorChaos(this.activeInterior, true);
 
                 if (this.missions && typeof this.missions.onInteriorRobbery === "function") {
                     this.missions.onInteriorRobbery();
@@ -9038,9 +9109,13 @@ class LeonidaGame {
         const fd = this.ensureActiveFlashDistrict();
         if (!fd || !this.player) return false;
         if (this.activeInterior) {
+            this.activeInterior._lastVisitedMs = Date.now();
             this.activeInterior = null;
             this.interiorTracers = [];
             this.interiorPopups = [];
+            if (this.audio && typeof this.audio.updateInteriorAmbience === "function") {
+                this.audio.updateInteriorAmbience(0, null);
+            }
         }
         if (this.player.inVehicle && (this.player.seatIndex || 0) !== 0) {
             this.player.inVehicle = null;
@@ -10541,9 +10616,13 @@ class LeonidaGame {
         p.respawnGraceUntil = performance.now() + 4500;
 
         if (this.activeInterior) {
+            this.activeInterior._lastVisitedMs = Date.now();
             this.activeInterior = null;
             this.interiorTracers = [];
             this.interiorPopups = [];
+            if (this.audio && typeof this.audio.updateInteriorAmbience === "function") {
+                this.audio.updateInteriorAmbience(0, null);
+            }
         }
         if (p.isSitting) {
             p.isSitting = false;
@@ -12365,7 +12444,10 @@ class LeonidaGame {
 
         }
 
-        // Decay indoor bullet tracers & floating target popups
+        // Decay indoor alarm strobe, bullet tracers & floating target popups
+        if ((intr._alarmTimer || 0) > 0) {
+            intr._alarmTimer = Math.max(0, intr._alarmTimer - dt);
+        }
         if (Array.isArray(this.interiorTracers)) {
             for (let i = this.interiorTracers.length - 1; i >= 0; i--) {
                 this.interiorTracers[i].life -= dt;
@@ -12379,35 +12461,65 @@ class LeonidaGame {
                 if (this.interiorPopups[i].life <= 0) this.interiorPopups.splice(i, 1);
             }
         }
-        if (Array.isArray(intr.npcs)) {
-            for (const npc of intr.npcs) {
-                if ((npc._robbedTimer || 0) > 0) npc._robbedTimer = Math.max(0, npc._robbedTimer - dt);
-            }
-        }
         if (Array.isArray(intr._targetHitTimers)) {
             for (let i = 0; i < intr._targetHitTimers.length; i++) {
                 if ((intr._targetHitTimers[i] || 0) > 0) intr._targetHitTimers[i] = Math.max(0, intr._targetHitTimers[i] - dt);
             }
         }
 
-        // Live 360-degree Mouse Aiming inside Interiors when mouseShoot is enabled!
-        if (p.mouseShoot && this.input.shoot && this.renderer && typeof this.renderer.worldToScreen === "function") {
-            const pScr = this.renderer.worldToScreen(this.interiorX, this.interiorY, 2.05);
-            const mdx = (this.input.mouseX || 0) - pScr.x;
-            const mdy = (this.input.mouseY || 0) - pScr.y;
-            if (mdx * mdx + mdy * mdy > 16) {
-                this.interiorAngle = Math.atan2(mdy, mdx);
+        const obs = (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function")
+            ? window.ShopInteriors.getObstacles(intr)
+            : [];
+        const poseExit = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
+            ? window.ShopInteriors.getEntrancePose(intr)
+            : null;
+
+        const resolveIndoorCircle = (cx0, cy0, rad) => {
+            let rx = Math.max(poseBounds.minX, Math.min(poseBounds.maxX, cx0));
+            let ry = Math.max(poseBounds.minY, Math.min(poseBounds.maxY, cy0));
+            for (let pass = 0; pass < 2; pass++) {
+                for (let i = 0; i < obs.length; i++) {
+                    const b = obs[i];
+                    const bx = Math.max(b.x, Math.min(b.x + b.w, rx));
+                    const by = Math.max(b.y, Math.min(b.y + b.h, ry));
+                    const dx = rx - bx;
+                    const dy = ry - by;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < rad * rad && d2 > 0.0001) {
+                        const d = Math.sqrt(d2);
+                        rx += (dx / d) * (rad - d);
+                        ry += (dy / d) * (rad - d);
+                    }
+                }
+            }
+            return {
+                x: Math.max(poseBounds.minX, Math.min(poseBounds.maxX, rx)),
+                y: Math.max(poseBounds.minY, Math.min(poseBounds.maxY, ry))
+            };
+        };
+
+        // Live 360-degree Mouse Aiming inside Interiors using exact cutaway screen projection!
+        if (p.mouseShoot && this.input.shoot && this.renderer) {
+            const pScr = typeof this.renderer.interiorToScreen === "function"
+                ? this.renderer.interiorToScreen(intr, this.interiorX, this.interiorY, 2.05)
+                : (typeof this.renderer.worldToScreen === "function" ? this.renderer.worldToScreen(this.interiorX, this.interiorY, 2.05) : null);
+            if (pScr) {
+                const mdx = (this.input.mouseX || 0) - pScr.x;
+                const mdy = (this.input.mouseY || 0) - pScr.y;
+                if (mdx * mdx + mdy * mdy > 16) {
+                    this.interiorAngle = Math.atan2(mdy, mdx);
+                }
             }
         }
 
-        // Live Indoor Weapon Firing & Ammu-Nation 4-Lane Firing Range Target Practice!
+        // Live Indoor Weapon Firing, Smash-and-Grab Showcases, Indoor NPC Combat & Ammu-Nation Firing Range!
         p.fireTimer = Math.max(0, (p.fireTimer || 0) - dt);
         p.weaponDrawnTimer = Math.max(0, (p.weaponDrawnTimer || 0) - dt);
         p.muzzleTimer = Math.max(0, (p.muzzleTimer || 0) - dt);
         p.punchTimer = Math.max(0, (p.punchTimer || 0) - dt);
         if (this.input.shoot && p.fireTimer <= 0) {
             const wKey = p.weapon || "FIST";
-            const wDef = (typeof WEAPON_SPECS !== "undefined" && (WEAPON_SPECS[wKey] || WEAPON_SPECS.FIST)) || { fireRate: 0.25 };
+            const wDef = (typeof WEAPON_SPECS !== "undefined" && (WEAPON_SPECS[wKey] || WEAPON_SPECS.FIST)) || { fireRate: 0.25, damage: 25 };
             if (wKey !== "FIST" && (p.ammo[wKey] || 0) <= 0) {
                 p.weapon = "FIST";
                 this.updateHud();
@@ -12418,21 +12530,13 @@ class LeonidaGame {
                 } else {
                     p.weaponDrawnTimer = 0.65;
                     p.muzzleTimer = 0.09;
-                    if (intr.theme !== "SHOP_GUN_SHOP" && Array.isArray(intr.npcs)) {
-                        for (const npc of intr.npcs) {
-                            npc._robbedTimer = Math.max(npc._robbedTimer || 0, 10.0);
-                        }
-                    }
                 }
                 if (wKey !== "FIST" && !this.infiniteAmmo) {
                     p.ammo[wKey] = Math.max(0, (p.ammo[wKey] || 0) - 1);
                     this.updateHud();
                 }
                 const ang = this.interiorAngle !== undefined ? this.interiorAngle : (p.angle || -Math.PI * 0.5);
-                const maxRange = wKey === "FIST" ? 42 : 460;
-                const obs = (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function")
-                    ? window.ShopInteriors.getObstacles(intr)
-                    : [];
+                const maxRange = wKey === "FIST" ? 48 : 480;
                 let hitX = this.interiorX + Math.cos(ang) * maxRange;
                 let hitY = this.interiorY + Math.sin(ang) * maxRange;
                 const steps = Math.ceil(maxRange / 6);
@@ -12459,6 +12563,100 @@ class LeonidaGame {
                     }
                 }
 
+                // 1. Check Smash-and-Grab Display Cases & Physical Cash Registers (`ShopInteriors.getBreakables(intr)`)
+                let smashedBreakable = false;
+                if (window.ShopInteriors && typeof window.ShopInteriors.getBreakables === "function") {
+                    const brks = window.ShopInteriors.getBreakables(intr);
+                    const rdxB = hitX - this.interiorX;
+                    const rdyB = hitY - this.interiorY;
+                    const rLenB2 = rdxB * rdxB + rdyB * rdyB;
+                    for (let bi = 0; bi < brks.length; bi++) {
+                        const brk = brks[bi];
+                        if (!brk || brk.broken) continue;
+                        const hitRad = Math.max(18, Math.max(brk.w || 28, brk.h || 20) * 0.55);
+                        const uB = rLenB2 > 1 ? Math.max(0, Math.min(1, ((brk.x - this.interiorX) * rdxB + (brk.y - this.interiorY) * rdyB) / rLenB2)) : 0;
+                        const cxB = this.interiorX + uB * rdxB;
+                        const cyB = this.interiorY + uB * rdyB;
+                        if (Math.hypot(brk.x - cxB, brk.y - cyB) <= hitRad) {
+                            brk.broken = true;
+                            brk.brokenUntilMs = Date.now() + 90000;
+                            smashedBreakable = true;
+                            hitX = cxB;
+                            hitY = cyB;
+                            const loot = Math.max(60, Number(brk.loot) || 180);
+                            if (this.audio && typeof this.audio.playGlassSmash === "function") {
+                                this.audio.playGlassSmash();
+                            }
+                            this.addCash(loot, brk.kind === "GLASS_CASE" ? "💎 SMASH & GRAB!" : "💵 REGISTER SMASHED!", true);
+                            if (!this.interiorPopups) this.interiorPopups = [];
+                            this.interiorPopups.push({
+                                x: brk.x,
+                                y: brk.y - 8,
+                                text: brk.kind === "GLASS_CASE" ? `💎 SMASH & GRAB +$${loot}!` : `💵 REGISTER +$${loot}!`,
+                                color: "#38bdf8",
+                                life: 1.45
+                            });
+                            this.setWantedLevel(Math.max(this.wantedLevel || 0, 2));
+                            this.triggerInteriorChaos(intr, true);
+                            this.updateHud();
+                            break;
+                        }
+                    }
+                }
+
+                // 2. Check Living Indoor NPC Combat Hits!
+                let hitIndoorNpc = false;
+                if (!smashedBreakable && Array.isArray(intr.npcs)) {
+                    const rdxN = hitX - this.interiorX;
+                    const rdyN = hitY - this.interiorY;
+                    const rLenN2 = rdxN * rdxN + rdyN * rdyN;
+                    let bestNpc = null;
+                    let bestNpcU = 2.0;
+                    for (let ni = 0; ni < intr.npcs.length; ni++) {
+                        const npc = intr.npcs[ni];
+                        if (!npc || npc._dead || npc._fled) continue;
+                        const nx = typeof npc._liveX === "number" ? npc._liveX : npc.x;
+                        const ny = typeof npc._liveY === "number" ? npc._liveY : npc.y;
+                        const uN = rLenN2 > 1 ? Math.max(0, Math.min(1, ((nx - this.interiorX) * rdxN + (ny - this.interiorY) * rdyN) / rLenN2)) : 0;
+                        const cxN = this.interiorX + uN * rdxN;
+                        const cyN = this.interiorY + uN * rdyN;
+                        if (Math.hypot(nx - cxN, ny - cyN) <= 18 && uN < bestNpcU) {
+                            bestNpc = npc;
+                            bestNpcU = uN;
+                        }
+                    }
+                    if (bestNpc) {
+                        hitIndoorNpc = true;
+                        const nx = typeof bestNpc._liveX === "number" ? bestNpc._liveX : bestNpc.x;
+                        const ny = typeof bestNpc._liveY === "number" ? bestNpc._liveY : bestNpc.y;
+                        hitX = nx;
+                        hitY = ny;
+                        const dmg = wKey === "FIST" ? 20 : Math.max(22, Number(wDef.damage) || 34);
+                        bestNpc._hp = (typeof bestNpc._hp === "number" ? bestNpc._hp : (bestNpc.armed ? 65 : 35)) - dmg;
+                        if (bestNpc._hp <= 0) {
+                            bestNpc._dead = true;
+                            bestNpc._hostileTimer = 0;
+                            bestNpc._panicTimer = 0;
+                            bestNpc._isMoving = false;
+                            if (this.audio && typeof this.audio.playPedDeath === "function") this.audio.playPedDeath();
+                            this.addCash(35, "INDOOR TAKEDOWN", true);
+                            if (!this.interiorPopups) this.interiorPopups = [];
+                            this.interiorPopups.push({
+                                x: nx,
+                                y: ny - 10,
+                                text: "+$35",
+                                color: "#fde047",
+                                life: 1.15
+                            });
+                            this.setWantedLevel(Math.max(this.wantedLevel || 0, 2));
+                        } else {
+                            if (this.audio && typeof this.audio.playPedScream === "function") this.audio.playPedScream();
+                        }
+                        this.triggerInteriorChaos(intr, true);
+                        this.updateHud();
+                    }
+                }
+
                 if (wKey !== "FIST") {
                     if (!this.interiorTracers) this.interiorTracers = [];
                     this.interiorTracers.push({
@@ -12470,14 +12668,17 @@ class LeonidaGame {
                         life: 0.11
                     });
                     if (this.audio && this.audio.playShot) this.audio.playShot(wKey);
+                    if (this.net && typeof this.net.broadcastShoot === "function") {
+                        this.net.broadcastShoot(this.interiorX, this.interiorY, ang, wKey);
+                    }
                 } else if (this.audio && this.audio.playPunch) {
                     this.audio.playPunch();
                 }
 
-                // Check Ammu-Nation 4-Lane Downrange Bullseye Targets!
+                // 3. Check Ammu-Nation 4-Lane Downrange Bullseye Targets!
                 let hitRangeTarget = false;
                 let firedIntoSafeRange = false;
-                if (intr.theme === "SHOP_GUN_SHOP" && wKey !== "FIST" && window.ShopInteriors && typeof window.ShopInteriors.transformPoint === "function") {
+                if (!smashedBreakable && !hitIndoorNpc && intr.theme === "SHOP_GUN_SHOP" && wKey !== "FIST" && window.ShopInteriors && typeof window.ShopInteriors.transformPoint === "function") {
                     const tNow = (this.renderer && typeof this.renderer.time === "number") ? this.renderer.time : performance.now() * 0.001;
                     if (typeof window.ShopInteriors.transformRect === "function") {
                         const rZone = window.ShopInteriors.transformRect(532, 56, (intr.w || 820) - 550, 260, intr);
@@ -12489,7 +12690,6 @@ class LeonidaGame {
                         const lx = 550 + lane * 58;
                         const targY = Math.round(86 + Math.sin(tNow * 2.0 + lane * 1.4) * 3);
                         const tp = window.ShopInteriors.transformPoint(lx + 27, targY + 2, 0, intr);
-                        // Distance from ray segment to target center
                         const rdx = hitX - this.interiorX;
                         const rdy = hitY - this.interiorY;
                         const rLen2 = rdx * rdx + rdy * rdy;
@@ -12524,89 +12724,356 @@ class LeonidaGame {
                     }
                 }
 
-                // If firing inside a shop outside the range (or hitting near an NPC), trigger panic / hold-up!
-                if (!hitRangeTarget && !firedIntoSafeRange && wKey !== "FIST" && Array.isArray(intr.npcs)) {
-                    for (const npc of intr.npcs) {
-                        npc._robbedTimer = Math.max(npc._robbedTimer || 0, 8.0);
+                // Firing a gun outside the safe firing range triggers panic & armed defender reaction!
+                if (!hitRangeTarget && !firedIntoSafeRange && wKey !== "FIST") {
+                    this.triggerInteriorChaos(intr, false);
+                }
+            }
+        }
+
+        // Live Indoor NPC Routines, Panic Evacuation to Sidewalk & Armed Defender Return Fire!
+        if (Array.isArray(intr.npcs)) {
+            const exitTargetX = poseExit ? poseExit.exitX : (intr.w || 820) * 0.5;
+            const exitTargetY = poseExit ? poseExit.exitY : (intr.h || 560) - 24;
+            for (let ni = 0; ni < intr.npcs.length; ni++) {
+                const npc = intr.npcs[ni];
+                if (!npc || npc._dead || npc._fled) continue;
+                if (typeof npc._liveX !== "number") npc._liveX = npc.x;
+                if (typeof npc._liveY !== "number") npc._liveY = npc.y;
+                if (typeof npc._liveAngle !== "number") npc._liveAngle = typeof npc.angle === "number" ? npc.angle : Math.PI * 0.5;
+                if ((npc._robbedTimer || 0) > 0) npc._robbedTimer = Math.max(0, npc._robbedTimer - dt);
+                if ((npc._muzzleTimer || 0) > 0) npc._muzzleTimer = Math.max(0, npc._muzzleTimer - dt);
+
+                const roleB = npc.roleBehavior || "IDLE";
+
+                if (npc.armed && (npc._hostileTimer || 0) > 0 && !p.dead) {
+                    npc._hostileTimer = Math.max(0, npc._hostileTimer - dt);
+                    const dxP = this.interiorX - npc._liveX;
+                    const dyP = this.interiorY - npc._liveY;
+                    const distP = Math.hypot(dxP, dyP);
+                    const aimP = Math.atan2(dyP, dxP);
+                    npc._liveAngle = aimP;
+
+                    // Tactical strafe / standoff movement unless behind a fixed counter
+                    if (roleB !== "CLERK" && roleB !== "BARTENDER" && distP > 1) {
+                        let moveVx = 0, moveVy = 0;
+                        const strafeSign = (ni % 2 === 0) ? 1 : -1;
+                        if (distP > 210) {
+                            moveVx += (dxP / distP) * 72;
+                            moveVy += (dyP / distP) * 72;
+                        } else if (distP < 95) {
+                            moveVx -= (dxP / distP) * 58;
+                            moveVy -= (dyP / distP) * 58;
+                        }
+                        moveVx += (-dyP / distP) * strafeSign * 34;
+                        moveVy += (dxP / distP) * strafeSign * 34;
+                        const nextPos = resolveIndoorCircle(npc._liveX + moveVx * dt, npc._liveY + moveVy * dt, 12);
+                        const moved = Math.hypot(nextPos.x - npc._liveX, nextPos.y - npc._liveY);
+                        npc._liveX = nextPos.x;
+                        npc._liveY = nextPos.y;
+                        npc._isMoving = moved > 12 * dt;
+                        if (npc._isMoving) npc._walkPhase = (npc._walkPhase || 0) + dt * 1.25;
+                    } else {
+                        npc._isMoving = false;
+                    }
+
+                    npc._fireCd = (npc._fireCd !== undefined ? npc._fireCd : 0.75) - dt;
+                    if (npc._fireCd <= 0 && distP < 430) {
+                        const nWep = npc.weapon || "PISTOL";
+                        npc._fireCd = nWep === "SHOTGUN" ? 1.35 : (nWep === "UZI" ? 0.58 : 0.95);
+                        // Verify wall line-of-sight before firing
+                        let losBlocked = false;
+                        const losSteps = Math.max(2, Math.ceil(distP / 14));
+                        for (let ls = 1; ls < losSteps; ls++) {
+                            const u = ls / losSteps;
+                            const lx = npc._liveX + dxP * u;
+                            const ly = npc._liveY + dyP * u;
+                            for (let k = 0; k < obs.length; k++) {
+                                const b = obs[k];
+                                if (b.isWall && lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.h) {
+                                    losBlocked = true;
+                                    break;
+                                }
+                            }
+                            if (losBlocked) break;
+                        }
+                        if (!losBlocked) {
+                            npc._muzzleTimer = 0.09;
+                            const spread = (Math.random() - 0.5) * (p.isMoving ? 0.24 : 0.12);
+                            const shotAng = aimP + spread;
+                            const endX = npc._liveX + Math.cos(shotAng) * Math.min(420, distP + 28);
+                            const endY = npc._liveY + Math.sin(shotAng) * Math.min(420, distP + 28);
+                            if (!this.interiorTracers) this.interiorTracers = [];
+                            this.interiorTracers.push({
+                                x1: npc._liveX + Math.cos(shotAng) * 12,
+                                y1: npc._liveY + Math.sin(shotAng) * 12,
+                                x2: endX,
+                                y2: endY,
+                                color: "#f97316",
+                                life: 0.10
+                            });
+                            if (this.audio && typeof this.audio.playShot === "function") {
+                                this.audio.playShot(nWep);
+                            }
+                            if (Math.abs(spread) < 0.11) {
+                                const dmg = nWep === "SHOTGUN" ? 12 : (nWep === "UZI" ? 6 : 9);
+                                this.damagePlayer(dmg);
+                                if (!this.activeInterior) return; // Player died -> exited interior
+                            }
+                        }
+                    }
+                } else if ((npc._panicTimer || 0) > 0) {
+                    npc._panicTimer = Math.max(0, npc._panicTimer - dt);
+                    if (roleB === "CLERK" || roleB === "BARTENDER") {
+                        // Clerks behind counters cower in place facing the gunman
+                        npc._isMoving = false;
+                        npc._liveAngle = Math.atan2(this.interiorY - npc._liveY, this.interiorX - npc._liveX);
+                    } else {
+                        // Patrons sprint for the exit door and burst out onto the real Vice City sidewalk!
+                        const dxE = exitTargetX - npc._liveX;
+                        const dyE = exitTargetY - npc._liveY;
+                        const distE = Math.hypot(dxE, dyE);
+                        if (distE < 38) {
+                            npc._fled = true;
+                            npc._isMoving = false;
+                            if (this.peds && this.peds.length < 185 && typeof Pedestrian === "function") {
+                                const { x: dtx, y: dty, fnv: dnx } = this.getDoorThresholdPos(intr);
+                                const outX = dtx + dnx[0] * 22 + (Math.random() - 0.5) * 12;
+                                const outY = dty + dnx[1] * 22 + (Math.random() - 0.5) * 12;
+                                const outZ = this.map ? this.map.getHeightAtPixel(outX, outY, 4.0) : 2.0;
+                                const fleePed = new Pedestrian({
+                                    id: `flee_intr_${Date.now()}_${ni}`,
+                                    x: outX,
+                                    y: outY,
+                                    z: outZ,
+                                    angle: Math.atan2(dnx[1], dnx[0]) + (Math.random() - 0.5) * 0.5,
+                                    kind: "CIVILIAN",
+                                    g24Type: npc.pedType || "tourist_f",
+                                    hp: 45,
+                                    speed: 112
+                                });
+                                fleePed.panicTimer = 8.5;
+                                this.peds.push(fleePed);
+                            }
+                        } else {
+                            const fleeAng = Math.atan2(dyE, dxE);
+                            npc._liveAngle = fleeAng;
+                            const nextPos = resolveIndoorCircle(npc._liveX + Math.cos(fleeAng) * 142 * dt, npc._liveY + Math.sin(fleeAng) * 142 * dt, 11);
+                            npc._liveX = nextPos.x;
+                            npc._liveY = nextPos.y;
+                            npc._isMoving = true;
+                            npc._walkPhase = (npc._walkPhase || 0) + dt * 1.65;
+                        }
+                    }
+                } else {
+                    // Calm Living GTA VI Venue Routine
+                    if (roleB === "DANCER") {
+                        const tD = performance.now() * 0.0022 + ni * 1.7;
+                        npc._liveX = npc.x + Math.sin(tD) * 10;
+                        npc._liveY = npc.y + Math.sin(tD * 2.0) * 5;
+                        npc._liveAngle = (typeof npc.angle === "number" ? npc.angle : Math.PI * 0.5) + Math.sin(tD * 1.5) * 0.55;
+                        npc._isMoving = true;
+                        npc._walkPhase = (npc._walkPhase || 0) + dt * 1.85;
+                    } else if (roleB === "BARTENDER") {
+                        const span = npc.patrolSpan || 34;
+                        if ((npc._patrolWait || 0) > 0) {
+                            npc._patrolWait -= dt;
+                            npc._isMoving = false;
+                            npc._liveAngle = typeof npc.angle === "number" ? npc.angle : Math.PI * 0.5;
+                            if (npc._patrolWait <= 0) {
+                                const offset = (Math.random() * 2 - 1) * span;
+                                const f = (intr && intr.facing) || "S";
+                                npc._patrolTx = (f === "E" || f === "W") ? npc.x : (npc.x + offset);
+                                npc._patrolTy = (f === "E" || f === "W") ? (npc.y + offset) : npc.y;
+                            }
+                        } else {
+                            const dxT = (npc._patrolTx ?? npc.x) - npc._liveX;
+                            const dyT = (npc._patrolTy ?? npc.y) - npc._liveY;
+                            const dT = Math.hypot(dxT, dyT);
+                            if (dT < 5) {
+                                npc._patrolWait = 1.6 + Math.random() * 2.4;
+                                npc._isMoving = false;
+                            } else {
+                                const bAng = Math.atan2(dyT, dxT);
+                                npc._liveAngle = bAng;
+                                npc._liveX += (dxT / dT) * 34 * dt;
+                                npc._liveY += (dyT / dT) * 34 * dt;
+                                npc._isMoving = true;
+                                npc._walkPhase = (npc._walkPhase || 0) + dt * 0.85;
+                            }
+                        }
+                    } else if (roleB === "SHOPPER" || roleB === "PATROL") {
+                        const rad = npc.patrolRadius || 46;
+                        if ((npc._patrolWait || 0) > 0) {
+                            npc._patrolWait -= dt;
+                            npc._isMoving = false;
+                            if (npc._patrolWait <= 0) {
+                                const rAng = Math.random() * Math.PI * 2;
+                                const rDist = 14 + Math.random() * rad;
+                                const cand = resolveIndoorCircle(npc.x + Math.cos(rAng) * rDist, npc.y + Math.sin(rAng) * rDist, 12);
+                                npc._patrolTx = cand.x;
+                                npc._patrolTy = cand.y;
+                            }
+                        } else {
+                            const dxT = (npc._patrolTx ?? npc.x) - npc._liveX;
+                            const dyT = (npc._patrolTy ?? npc.y) - npc._liveY;
+                            const dT = Math.hypot(dxT, dyT);
+                            if (dT < 6) {
+                                npc._patrolWait = 1.8 + Math.random() * 2.8;
+                                npc._isMoving = false;
+                            } else {
+                                const sAng = Math.atan2(dyT, dxT);
+                                npc._liveAngle = sAng;
+                                const nextPos = resolveIndoorCircle(npc._liveX + (dxT / dT) * 38 * dt, npc._liveY + (dyT / dT) * 38 * dt, 12);
+                                const stepMoved = Math.hypot(nextPos.x - npc._liveX, nextPos.y - npc._liveY);
+                                npc._liveX = nextPos.x;
+                                npc._liveY = nextPos.y;
+                                if (stepMoved < 6 * dt) {
+                                    npc._patrolWait = 1.2;
+                                    npc._isMoving = false;
+                                } else {
+                                    npc._isMoving = true;
+                                    npc._walkPhase = (npc._walkPhase || 0) + dt * 0.92;
+                                }
+                            }
+                        }
+                    } else {
+                        npc._isMoving = false;
+                        const dPl = Math.hypot(this.interiorX - npc._liveX, this.interiorY - npc._liveY);
+                        if (dPl < 135) {
+                            npc._liveAngle = Math.atan2(this.interiorY - npc._liveY, this.interiorX - npc._liveX);
+                        } else {
+                            npc._liveAngle = typeof npc.angle === "number" ? npc.angle : Math.PI * 0.5;
+                        }
                     }
                 }
             }
         }
 
-
-
-        // The companion stays outside while the player is in a venue
-        if (this.jason) this.jason.isMoving = false;
-
-
-
-        // Keep audio loops silenced and footsteps active while walking inside an interior!
-
-        if (this.audio) {
-
-            if (p.isMoving) {
-
-                this._footstepTimer = (this._footstepTimer || 0) - dt;
-
-                const stepInterval = this.input.sprint ? 0.25 : 0.34;
-
-                if (this._footstepTimer <= 0) {
-
-                    this._footstepTimer = stepInterval;
-
-                    this._footLeft = !this._footLeft;
-
-                    this.audio.playFootstep("PAVEMENT", this._footLeft);
-
-                }
-
+        // Active Partner Indoor AI: follows player smoothly inside the venue & provides cover fire against hostile defenders!
+        if (this.jason && this.jason.recruited) {
+            const jx = typeof this.interiorJasonX === "number" ? this.interiorJasonX : this.interiorX + 32;
+            const jy = typeof this.interiorJasonY === "number" ? this.interiorJasonY : this.interiorY + 12;
+            const dxJ = this.interiorX - jx;
+            const dyJ = this.interiorY - jy;
+            const distJ = Math.hypot(dxJ, dyJ);
+            if (distJ > 54) {
+                const jAng = Math.atan2(dyJ, dxJ);
+                this.interiorJasonAngle = jAng;
+                const jSpd = walkSpeed * 0.96;
+                const nextJ = resolveIndoorCircle(jx + (dxJ / distJ) * jSpd * dt, jy + (dyJ / distJ) * jSpd * dt, 12);
+                this.interiorJasonX = nextJ.x;
+                this.interiorJasonY = nextJ.y;
+                this.jason.isMoving = true;
+                this.jason.walkPhase = (this.jason.walkPhase || 0) + dt * 1.2;
             } else {
+                this.jason.isMoving = false;
+            }
+            this._partnerIndoorFireCd = Math.max(0, (this._partnerIndoorFireCd || 0) - dt);
+            if (this._partnerIndoorFireCd <= 0 && Array.isArray(intr.npcs)) {
+                const hostileNpc = intr.npcs.find((n) => n && !n._dead && !n._fled && n.armed && (n._hostileTimer || 0) > 0);
+                if (hostileNpc) {
+                    const hx = typeof hostileNpc._liveX === "number" ? hostileNpc._liveX : hostileNpc.x;
+                    const hy = typeof hostileNpc._liveY === "number" ? hostileNpc._liveY : hostileNpc.y;
+                    const dH = Math.hypot(hx - this.interiorJasonX, hy - this.interiorJasonY);
+                    if (dH < 380) {
+                        this._partnerIndoorFireCd = 0.78;
+                        const hAng = Math.atan2(hy - this.interiorJasonY, hx - this.interiorJasonX);
+                        this.interiorJasonAngle = hAng;
+                        hostileNpc._hp = (typeof hostileNpc._hp === "number" ? hostileNpc._hp : 65) - 22;
+                        if (hostileNpc._hp <= 0) {
+                            hostileNpc._dead = true;
+                            hostileNpc._hostileTimer = 0;
+                            hostileNpc._isMoving = false;
+                        }
+                        if (!this.interiorTracers) this.interiorTracers = [];
+                        this.interiorTracers.push({
+                            x1: this.interiorJasonX + Math.cos(hAng) * 12,
+                            y1: this.interiorJasonY + Math.sin(hAng) * 12,
+                            x2: hx,
+                            y2: hy,
+                            color: "#38bdf8",
+                            life: 0.10
+                        });
+                        if (this.audio && typeof this.audio.playShot === "function") {
+                            this.audio.playShot("PISTOL");
+                        }
+                    }
+                }
+            }
+        } else if (this.jason) {
+            this.jason.isMoving = false;
+        }
 
+        // Material-Aware Indoor Footsteps, Venue Acoustic Ambience & Muffled Exterior Street Traffic/Sirens!
+        if (this.audio) {
+            if (typeof this.audio.updateInteriorAmbience === "function") {
+                this.audio.updateInteriorAmbience(dt, intr.theme);
+            }
+            if (p.isMoving) {
+                this._footstepTimer = (this._footstepTimer || 0) - dt;
+                const stepInterval = this.input.sprint ? 0.25 : 0.34;
+                if (this._footstepTimer <= 0) {
+                    this._footstepTimer = stepInterval;
+                    this._footLeft = !this._footLeft;
+                    const surf = (window.ShopInteriors && typeof window.ShopInteriors.getSurfaceAt === "function")
+                        ? window.ShopInteriors.getSurfaceAt(intr, this.interiorX, this.interiorY)
+                        : "TILE";
+                    this.audio.playFootstep(surf, this._footLeft);
+                }
+            } else {
                 this._footstepTimer = 0.06;
-
             }
 
             if (typeof this.audio.update === "function") {
-
+                const origW = (window.ShopInteriors && typeof window.ShopInteriors.getWorldOrigin === "function")
+                    ? window.ShopInteriors.getWorldOrigin(intr)
+                    : { x: p.x - this.interiorX, y: p.y - this.interiorY };
+                const wx = origW.x + this.interiorX;
+                const wy = origW.y + this.interiorY;
+                const doorDist = poseExit ? Math.hypot(this.interiorX - poseExit.exitX, this.interiorY - poseExit.exitY) : 180;
+                const muffleMult = 1.35 + Math.min(1.0, doorDist / 260) * 1.55;
+                let nearTrafDist = 9999;
+                let nearTrafSpd = 0;
+                let nearSirDist = 9999;
+                let nearSirType = "POLICE";
+                const vehs = this.vehicles || [];
+                for (let vi = 0; vi < vehs.length; vi++) {
+                    const v = vehs[vi];
+                    if (!v || v.destroyed || !v.driver) continue;
+                    const dx = v.x - wx;
+                    const dy = v.y - wy;
+                    if (dx > 680 || dx < -680 || dy > 680 || dy < -680) continue;
+                    const d = Math.hypot(dx, dy);
+                    if (v.specKey !== "TOW_TRUCK" && v.driver !== "AI_TOW" && (v.sirenActive || (this.wantedLevel > 0 && v.isPolice && v.driver === "AI_COP")) && d < nearSirDist) {
+                        nearSirDist = d;
+                        nearSirType = v.specKey === "MEDIC_AMBULANCE" ? "MEDIC" : (v.specKey === "FIRE_TRUCK" ? "FIRE" : "POLICE");
+                    }
+                    const vSpd = Math.abs(v.speed || 0);
+                    if (vSpd >= 12 && d < nearTrafDist) {
+                        nearTrafDist = d;
+                        nearTrafSpd = vSpd;
+                    }
+                }
                 this.audio.update(dt, {
-
                     inVehicle: false,
-
                     vehicleSpeed: 0,
-
                     vehicleDrifting: false,
-
                     playerSirenActive: false,
-
-                    wantedLevel: 0,
-
+                    wantedLevel: this.wantedLevel || 0,
                     nearestCopDist: 9999,
-
-                    nearestSirenDist: 9999,
-
-                    nearestTrafficDist: 9999,
-
-                    nearestTrafficSpeed: 0,
-
+                    nearestSirenDist: nearSirDist < 9000 ? nearSirDist * muffleMult : 9999,
+                    nearestSirenType: nearSirType,
+                    nearestTrafficDist: nearTrafDist < 9000 ? nearTrafDist * muffleMult : 9999,
+                    nearestTrafficSpeed: nearTrafSpd * 0.72,
                     waterProximity: 0,
-
                     nightFactor: 0
-
                 });
-
             }
-
         }
 
-
-
         // Stations inside venues NEVER auto-buy/auto-trigger on walk-over — player must press [E] while on the zone!
-
-        // Step directly onto the bottom EXIT DOOR mat (near center bottom) to return to the street!
-
-        const poseExit = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
-            ? window.ShopInteriors.getEntrancePose(intr)
-            : null;
+        // Step directly onto the EXIT DOOR mat to return seamlessly to the live Vice City street!
         if (this.interiorCooldown <= 0 &&
             (poseExit ? poseExit.isAtExit(this.interiorX, this.interiorY) : (this.interiorY >= intr.h - 38 && Math.abs(this.interiorX - intr.w * 0.5) < 52))) {
             this.exitInterior();

@@ -216,6 +216,8 @@ class RetroRenderer {
             uniform float uTime;
             uniform vec2 uSunDir;
             uniform float uMobileFast;
+            uniform vec4 uCutawayRect;
+            uniform vec4 uCutawayOuter;
 
             // Seamless world-space hash & noise (inputs wrapped to stay precise in mediump/highp)
             float aHash(vec2 p) {
@@ -660,6 +662,17 @@ class RetroRenderer {
             }
 
             void main() {
+                if (uCutawayRect.z > uCutawayRect.x) {
+                    if (vWorldPos.x >= uCutawayRect.x && vWorldPos.x <= uCutawayRect.z &&
+                        vWorldPos.z >= uCutawayRect.y && vWorldPos.z <= uCutawayRect.w) {
+                        discard;
+                    }
+                    if (vWorldPos.y > 2.18 &&
+                        vWorldPos.x >= uCutawayOuter.x && vWorldPos.x <= uCutawayOuter.z &&
+                        vWorldPos.z >= uCutawayOuter.y && vWorldPos.z <= uCutawayOuter.w) {
+                        discard;
+                    }
+                }
                 if (uNightTint < -0.5 && vAnim >= -0.5) discard;
                 vec4 c = texture2D(uTex, vUV);
                 vec3 rawTexRgb = c.rgb;
@@ -1274,6 +1287,9 @@ class RetroRenderer {
                     }
                     c.rgb = mix(c.rgb, nightRgb, nfAmt);
                 }
+                if (uCutawayRect.z > uCutawayRect.x) {
+                    c.rgb *= 0.86;
+                }
                 gl_FragColor = c;
             }
         `;
@@ -1524,7 +1540,9 @@ class RetroRenderer {
             uViceStyle: gl.getUniformLocation(this.cityProg, "uViceStyle"),
             uTime: gl.getUniformLocation(this.cityProg, "uTime"),
             uSunDir: gl.getUniformLocation(this.cityProg, "uSunDir"),
-            uMobileFast: gl.getUniformLocation(this.cityProg, "uMobileFast")
+            uMobileFast: gl.getUniformLocation(this.cityProg, "uMobileFast"),
+            uCutawayRect: gl.getUniformLocation(this.cityProg, "uCutawayRect"),
+            uCutawayOuter: gl.getUniformLocation(this.cityProg, "uCutawayOuter")
         };
 
         // Default 1x1 neutral daylight AO/shadow texture (replaced by 512x512 ray-marched lightmap in buildCityMesh)
@@ -7871,6 +7889,10 @@ class RetroRenderer {
         drawOrder = 4,
         pitchZ = 0
     ) {
+        if (this._activeCutawayPxRect) {
+            const cr = this._activeCutawayPxRect;
+            if (xPx >= cr[0] && xPx <= cr[2] && yPx >= cr[1] && yPx <= cr[3]) return;
+        }
         if (!this.spriteQueue) this.spriteQueue = [];
         if (!this.spritePool) this.spritePool = [];
         const seq = this.spriteQueue.length;
@@ -8243,36 +8265,44 @@ class RetroRenderer {
             this.vehicleBannerTimer = Math.max(0, this.vehicleBannerTimer - dt);
         }
 
-        // FollowCameraController.cpp: Smoothly track player X, Y and ground elevation Z (or 3D Interior Room camera!)
+        // FollowCameraController.cpp: Smoothly track player X, Y and ground elevation Z (or World-Anchored 3D Cutaway Interior camera!)
         let effectiveViewProj;
         if (game.activeInterior) {
             const intr = game.activeInterior;
-            const rw = intr.w || 780;
-            const rh = intr.h || 530;
-            const px = game.interiorX || rw * 0.5;
-            const py = game.interiorY || rh - 78;
-            // Track player smoothly at exterior GTA camera scale, softly clamped to the building footprint so adjacent rooms & exterior street remain framed
-            const marginX = Math.min(185, rw * 0.24);
-            const marginY = Math.min(145, rh * 0.25);
-            const targetCamX = Math.max(marginX, Math.min(rw - marginX, px));
-            const targetCamY = Math.max(marginY + 18, Math.min(rh - marginY + 12, py));
+            const rw = intr.w || 820;
+            const rh = intr.h || 560;
+            const orig = (window.ShopInteriors && typeof window.ShopInteriors.getWorldOrigin === "function")
+                ? window.ShopInteriors.getWorldOrigin(intr)
+                : { x: 0, y: 0 };
+            const px = game.interiorX !== undefined ? game.interiorX : rw * 0.5;
+            const py = game.interiorY !== undefined ? game.interiorY : rh - 78;
+            // Softly clamp local focus inside the venue while anchored in real world .CMP coordinates so live street traffic & sidewalks stay framed outside!
+            const marginX = Math.min(175, rw * 0.22);
+            const marginY = Math.min(135, rh * 0.23);
+            const targetLocalX = Math.max(marginX, Math.min(rw - marginX, px));
+            const targetLocalY = Math.max(marginY + 16, Math.min(rh - marginY + 18, py));
+            const targetCamX = orig.x + targetLocalX;
+            const targetCamY = orig.y + targetLocalY;
             if (!this._wasInInterior) {
-                this.camX = targetCamX;
-                this.camY = targetCamY;
+                if (Math.hypot(targetCamX - this.camX, targetCamY - this.camY) > 1100) {
+                    this.camX = targetCamX;
+                    this.camY = targetCamY;
+                }
                 this.camZBlocks = 2.0;
                 this._wasInInterior = true;
-            } else {
-                const camAlphaInt = 1.0 - Math.exp(-8.5 * dt);
-                this.camX += (targetCamX - this.camX) * camAlphaInt;
-                this.camY += (targetCamY - this.camY) * camAlphaInt;
-                this.camZBlocks = 2.0;
             }
+            const camAlphaInt = 1.0 - Math.exp(-9.0 * dt);
+            this.camX += (targetCamX - this.camX) * camAlphaInt;
+            this.camY += (targetCamY - this.camY) * camAlphaInt;
+            this.camZBlocks = 2.0;
             effectiveViewProj = this.computeInteriorViewProjMatrix(intr);
         } else {
             const target = game.player.inVehicle || game.player;
             if (this._wasInInterior) {
-                this.camX = target.x;
-                this.camY = target.y;
+                if (Math.hypot(target.x - this.camX, target.y - this.camY) > 1100) {
+                    this.camX = target.x;
+                    this.camY = target.y;
+                }
                 this._camLeadX = 0;
                 this._camLeadY = 0;
                 this._camSpeedZoom = 0;
@@ -8356,7 +8386,7 @@ class RetroRenderer {
             return;
         }
 
-        // 1. Render 3D WebGL CityMesh (or 3D WebGL Interior Room!) + 3D SpriteBatch into this.glCanvas
+        // 1. Render 3D WebGL CityMesh (with Live Cutaway if inside an Interior!) + 3D SpriteBatch into this.glCanvas
         const needDaylightAtmo = !this.isMobileInit && (this.nightFactor || 0) < 0.72 && !this.nightMode && !game.activeInterior;
         const needNightLight = ((this.nightFactor || 0) > 0.02 || (this.sunsetFactor || 0) > 0.04 || this.nightMode) && !game.activeInterior;
         const glMountedBehind = Boolean(this.glCanvas && this.glCanvas.parentNode);
@@ -8381,6 +8411,11 @@ class RetroRenderer {
             this.renderNightLighting(ctx, game);
         }
 
+        // 2C. Dynamic Volumetric Interior Lighting, Window Sunbeams, Club Lasers & Heist Alarm Strobes
+        if (game.activeInterior) {
+            this.renderInteriorLighting(ctx, game, game.activeInterior);
+        }
+
         // Optional 1997 GTA 1 DebugRenderer Wireframe Overlay (Vehicle::DebugDraw / Pedestrian::DebugDraw)
         if (this.debugDrawPhysics && !game.activeInterior) {
             this.renderDebugWireframe(ctx, game);
@@ -8402,9 +8437,16 @@ class RetroRenderer {
         for (const ft of game.floatingTexts) {
             if (!ft || typeof ft.x !== "number" || typeof ft.y !== "number" || !Number.isFinite(ft.x) || !Number.isFinite(ft.y)) continue;
             if (game.activeInterior) {
-                const fy = 112 + (indoorFtIdx++) * 22;
-                if (fy < this.canvas.height - 80) {
-                    this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), this.canvas.width * 0.5, fy, 1.35, "center");
+                if (ft._indoorLocal) {
+                    const sp = this.interiorToScreen(game.activeInterior, ft.x, ft.y, ft.z !== undefined ? ft.z : 2.34);
+                    if (Number.isFinite(sp.x) && Number.isFinite(sp.y)) {
+                        this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), sp.x, sp.y, 1.30, "center");
+                    }
+                } else {
+                    const fy = 78 + (indoorFtIdx++) * 22;
+                    if (fy < this.canvas.height - 80) {
+                        this.drawGta1FontString(ctx, "SUB2", String(ft.text || "").toUpperCase(), this.canvas.width * 0.5, fy, 1.35, "center");
+                    }
                 }
             } else {
                 if (Math.abs(ft.x - this.camX) > 960 || Math.abs(ft.y - this.camY) > 720) continue;
@@ -8438,6 +8480,13 @@ class RetroRenderer {
         ctx.restore();
     }
 
+    interiorToScreen(intr, lx, ly, zBlocks = 2.05) {
+        const orig = (intr && window.ShopInteriors && typeof window.ShopInteriors.getWorldOrigin === "function")
+            ? window.ShopInteriors.getWorldOrigin(intr)
+            : { x: 0, y: 0 };
+        return this.worldToScreen(orig.x + lx, orig.y + ly, zBlocks);
+    }
+
     computeViewProjMatrixWithSpeed(extraHeightBlocks = 0) {
         const saved = this.zoomOffsetBlocks;
         this.zoomOffsetBlocks = saved + extraHeightBlocks;
@@ -8453,9 +8502,9 @@ class RetroRenderer {
         const fovyRad = (55.0 * Math.PI) / 180.0;
         const f = 1.0 / Math.tan(fovyRad * 0.5);
 
-        // Match exterior GTA street camera scale (distBlocks ~ 6.85) so interior characters, weapons, furniture & tiles match the outdoor world 1:1!
-        const baseScale = W < 900 ? 7.35 : 6.85;
-        const distBlocks = Math.max(5.8, Math.min(9.2, baseScale + (this.zoomOffsetBlocks || 0) * 0.5));
+        // Tailored GTA cutaway camera elevation (5.85 blocks): reveals micro-props, table settings & showcase weapons while framing the live Vice City street right outside!
+        const baseScale = W < 900 ? 6.35 : 5.85;
+        const distBlocks = Math.max(4.85, Math.min(8.6, baseScale + (this.zoomOffsetBlocks || 0) * 0.5));
 
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
@@ -8537,34 +8586,6 @@ class RetroRenderer {
 
         gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
 
-        // Dedicated True 3D Hardware Z-Buffered Interior Pass when inside any of the 14 building themes!
-        if (game && game.activeInterior) {
-            // Beyond the street the backdrop follows the time of day too (day -> sunset -> night)
-            const nfI = Math.max(0, Math.min(1, this.nightFactor || 0));
-            const sfI = Math.max(0, Math.min(1, this.sunsetFactor || 0));
-            gl.clearColor(
-                (0.32 * (1 - nfI) + 0.03 * nfI) + sfI * 0.10,
-                (0.38 * (1 - nfI) + 0.04 * nfI) - sfI * 0.06,
-                (0.34 * (1 - nfI) + 0.08 * nfI) - sfI * 0.04,
-                1.0
-            );
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            if (!this.gta1Ready || !this.cmpReady) return;
-            if (this.map && this.map.objectEngine) {
-                this.map.objectEngine.renderInterior3DMesh(gl, this, game, viewProj);
-                // Outside props (palms, parked cars) use the real day / sunset / night grading; the room itself stays indoor-lit
-                const hrI = (typeof game.worldMinutes === "number") ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0 : 12.0;
-                const azI = ((hrI - 6.0) / 12.0) * Math.PI;
-                this.beginSpriteBatch();
-                this.map.objectEngine.batchInteriorSprites3D(this, game, "EXT");
-                this.flushSpriteBatch(viewProj, Math.max(0, Math.min(1, this.nightFactor || 0)), Math.max(0, Math.min(1, this.sunsetFactor || 0)), Math.cos(azI), Math.max(0.25, Math.sin(azI)));
-                this.beginSpriteBatch();
-                this.map.objectEngine.batchInteriorSprites3D(this, game, "INT");
-                this.flushSpriteBatch(viewProj);
-            }
-            return;
-        }
-
         if (this.mapStyle === "VICE") {
             // Smoothly interpolate Tropical Atlantic turquoise sea-level clear color from Day -> Sunset -> Midnight Navy
             const r = 0.03 * (1.0 - nf) + 0.012 * nf + sf * 0.06;
@@ -8582,6 +8603,11 @@ class RetroRenderer {
             : (this.tilesTexNyc || this.tilesTex);
         if (!this.gta1Ready || !this.cmpReady || !activeTilesTex) return;
 
+        const activeIntr = (game && game.activeInterior) ? game.activeInterior : null;
+        const intrOrig = (activeIntr && window.ShopInteriors && typeof window.ShopInteriors.getWorldOrigin === "function")
+            ? window.ShopInteriors.getWorldOrigin(activeIntr)
+            : null;
+
         // Visible ground frustum in block units (tightened to aspect ratio on portrait mobile screens to avoid drawing off-screen chunks)
         const camXBlocks = this.camX / TILE_SIZE;
         const camYBlocks = this.camY / TILE_SIZE;
@@ -8593,7 +8619,7 @@ class RetroRenderer {
         const minBY = camYBlocks - marginY;
         const maxBY = camYBlocks + marginY;
 
-        // A. Draw 3D NYC.CMP Voxel CityMesh Chunks
+        // A. Draw 3D NYC.CMP Voxel CityMesh Chunks (with GPU Cutaway Window when inside a Building!)
         gl.useProgram(this.cityProg);
         gl.uniformMatrix4fv(this.cityLocs.uViewProj, false, viewProj);
         gl.uniform1f(this.cityLocs.uWaterStep, Math.floor(this.time * 7.0) % 11);
@@ -8610,6 +8636,20 @@ class RetroRenderer {
         }
         if (this.cityLocs.uTime) {
             gl.uniform1f(this.cityLocs.uTime, this.time);
+        }
+        if (this.cityLocs.uCutawayRect) {
+            if (intrOrig) {
+                gl.uniform4f(this.cityLocs.uCutawayRect, intrOrig.cutMinBX, intrOrig.cutMinBZ, intrOrig.cutMaxBX, intrOrig.cutMaxBZ);
+            } else {
+                gl.uniform4f(this.cityLocs.uCutawayRect, 0.0, 0.0, -1.0, -1.0);
+            }
+        }
+        if (this.cityLocs.uCutawayOuter) {
+            if (intrOrig) {
+                gl.uniform4f(this.cityLocs.uCutawayOuter, intrOrig.outerMinBX, intrOrig.outerMinBZ, intrOrig.outerMaxBX, intrOrig.outerMaxBZ);
+            } else {
+                gl.uniform4f(this.cityLocs.uCutawayOuter, 0.0, 0.0, -1.0, -1.0);
+            }
         }
         const clockHr = (game && typeof game.worldMinutes === "number")
             ? (((game.worldMinutes % 1440) + 1440) % 1440) / 60.0
@@ -8671,20 +8711,40 @@ class RetroRenderer {
             gl.drawArrays(gl.TRIANGLES, ch.flatOffset, ch.flatCount);
         }
 
-        // A3. Render Hardware Z-Buffered 3D Volumetric Architectural Prefabs (WorldObjectEngine)
+        // A3. Render Hardware Z-Buffered 3D Volumetric Architectural Prefabs (WorldObjectEngine — also honors uCutawayRect!)
         if (this.map && this.map.objectEngine) {
             this.map.objectEngine.renderStatic3DMesh(gl, this, viewProj, nf, sf);
         }
 
-        // B. Populate & Flush 3D Depth-Tested SpriteBatch
+        // B. Populate & Flush Outdoor 3D Depth-Tested SpriteBatch (live traffic, pedestrians, palms, street props right outside the windows!)
         const minPxX = minBX * TILE_SIZE;
         const maxPxX = maxBX * TILE_SIZE;
         const minPxY = minBY * TILE_SIZE;
         const maxPxY = maxBY * TILE_SIZE;
 
+        if (intrOrig && activeIntr) {
+            this._activeCutawayPxRect = [
+                intrOrig.x - 10,
+                intrOrig.y + 34,
+                intrOrig.x + (activeIntr.w || 820) + 10,
+                intrOrig.y + (activeIntr.h || 560) + 2
+            ];
+        } else {
+            this._activeCutawayPxRect = null;
+        }
         this.beginSpriteBatch();
         this.batchWorldSprites3D(game, minPxX, minPxY, maxPxX, maxPxY);
         this.flushSpriteBatch(viewProj, nf, sf, sunDirX, sunDirY);
+        this._activeCutawayPxRect = null;
+
+        // C. Render World-Anchored 3D Cutaway Building Interior Mesh + Indoor 3D Characters/Props!
+        if (activeIntr && this.map && this.map.objectEngine) {
+            this.map.objectEngine.renderInterior3DMesh(gl, this, game, viewProj);
+            this.beginSpriteBatch();
+            this.map.objectEngine.batchInteriorSprites3D(this, game, "INT");
+            this.flushSpriteBatch(viewProj, 0.0, 0.0, 0.36, 0.93);
+        }
+
         this._lastViewProj = viewProj;
     }
 
@@ -11844,7 +11904,7 @@ class RetroRenderer {
         }
 
         const jason = game.jason;
-        if (jason && !jason.inVehicle) {
+        if (jason && !jason.inVehicle && !game.activeInterior) {
             const jInPool = Boolean(this.map && this.map.isSwimmingPoolAt && this.map.isSwimmingPoolAt(jason.x, jason.y));
             const jInWater = jInPool || Boolean(this.map && this.map.isWaterAtPixel && this.map.isWaterAtPixel(jason.x, jason.y));
             if (jInWater) {
@@ -11889,6 +11949,7 @@ class RetroRenderer {
         // 4B. Online Multiplayer Remote Players & Rival Bots (On-Foot & In-Vehicle 3D Sync)
         if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
             for (const rp of game.net.remotePlayers.values()) {
+                if (rp.intrId) continue;
                 if (rp.x < minX || rp.x > maxX || rp.y < minY || rp.y > maxY) continue;
                 const rz = this.getEntityZ(rp, 0.05);
                 if (rp.dead) {
@@ -11945,7 +12006,7 @@ class RetroRenderer {
         }
 
         const p = game.player;
-        if (!p.inVehicle) {
+        if (!p.inVehicle && !game.activeInterior) {
             const baseZ = this.getEntityZ(p, 0.05);
             const jumpZ = p.jumpZOffset || 0;
             const isJumpingOrSliding = jumpZ > 0.02 || (p.slideCarTimer || 0) > 0;
@@ -15534,11 +15595,13 @@ class RetroRenderer {
         if (!this._interiorFloorTexCache) {
             this._interiorFloorTexCache = {};
         }
-        const rw = intr.w || 820;
-        const rh = intr.h || 560;
+        const CANON_W = 820;
+        const CANON_H = 560;
+        const rw = intr.w || CANON_W;
+        const rh = intr.h || CANON_H;
         const t = intr.theme || "SHOP_CONVENIENCE";
         const facing = intr.facing || "S";
-        const key = `v6_${t}_${facing}_${rw}_${rh}`;
+        const key = `v10_${t}_${facing}_${rw}_${rh}`;
         if (this._interiorFloorTexCache[key]) {
             return this._interiorFloorTexCache[key];
         }
@@ -15547,6 +15610,7 @@ class RetroRenderer {
         c.width = rw * 2;
         c.height = rh * 2;
         const g = c.getContext("2d");
+        g.imageSmoothingEnabled = false;
         const tex = this.getInteriorTextures(g);
 
         g.save();
@@ -15558,6 +15622,12 @@ class RetroRenderer {
             }
             return { x, y, w, h };
         };
+        const trP = (x, y) => {
+            if (window.ShopInteriors && typeof window.ShopInteriors.transformPoint === "function") {
+                return window.ShopInteriors.transformPoint(x, y, 0, intr);
+            }
+            return { x, y };
+        };
         const fillR = (x, y, w, h, fill, stroke = null, lw = 1.5) => {
             const r = trR(x, y, w, h);
             g.fillStyle = fill;
@@ -15566,6 +15636,18 @@ class RetroRenderer {
                 g.strokeStyle = stroke;
                 g.lineWidth = lw;
                 g.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+            }
+        };
+        const fillC = (cx, cy, rad, fill, stroke = null, lw = 1.0) => {
+            const p = trP(cx, cy);
+            g.fillStyle = fill;
+            g.beginPath();
+            g.arc(p.x, p.y, rad, 0, Math.PI * 2);
+            g.fill();
+            if (stroke) {
+                g.strokeStyle = stroke;
+                g.lineWidth = lw;
+                g.stroke();
             }
         };
         const labelR = (x, y, w, h, text, col = "#fde047", font = "bold 9px Consolas, monospace") => {
@@ -15579,247 +15661,290 @@ class RetroRenderer {
             g.restore();
         };
 
-        // 1. Primary multi-zone procedural pixel-art floor pattern across the entire room
+        // 1. Primary 1:1 64px pixel-art surface across the entire venue
         let mainPat = tex.marble_dark;
         if (t === "SHOP_GUN_SHOP" || t === "SPACE_BUNKER") mainPat = tex.gunmetal_plate;
         else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") mainPat = tex.diner_checker;
         else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL" || t === "MALIBU_CLUB") mainPat = tex.terrazzo_deco;
         else if (t === "SHOP_CLOTHES" || t === "MANSION") mainPat = tex.marble_carrara;
-        else if (t === "SHOP_CONVENIENCE") mainPat = tex.linoleum_mart;
-        else if (t === "SHOP_BAR") mainPat = tex.wood_mahogany;
+        else if (t === "SHOP_CONVENIENCE" || t === "STARLET_MOTEL") mainPat = tex.linoleum_mart;
+        else if (t === "SHOP_BAR" || t === "ONLYRAW_STUDIO") mainPat = tex.wood_mahogany;
         else if (t === "PRISON_BLOCK") mainPat = tex.concrete_prison;
 
         g.fillStyle = mainPat;
         g.fillRect(0, 0, rw, rh);
 
-        // 2. Oriented Multi-Room Architectural Sub-Zones, Carpets, Rugs & High-Detail Top-Down Furniture Surfaces (mapped onto 3D furniture tops via MAT 14!)
+        // 2. Multi-room pixel-art carpets, rugs, pool felt, studio faders & furniture top-decks across all 16 GTA VI themes
         if (t === "SHOP_GUN_SHOP") {
-            // West Gunsmith & Kevlar Vault warm honey-oak plank floor
             fillR(18, 56, 206, 358, tex.wood_oak, "#78350f", 1.5);
-            // Center Showroom royal crimson tactical rug runner
             fillR(266, 174, 224, 96, tex.carpet_royal, "#f59e0b", 2.0);
-            labelR(266, 206, 224, 32, "★ AMMU-NATION ORDNANCE ★", "rgba(253, 224, 71, 0.55)", "bold 11px Consolas, monospace");
-
-            // Gunsmith Vault Safe (36, 68, 52, 32) & Hardwood Workbench (92, 68, 108, 28)
+            labelR(266, 206, 224, 32, "★ PHIL'S AMMU-NATION ★", "rgba(253, 224, 71, 0.70)", "bold 11px Consolas, monospace");
             fillR(36, 68, 52, 32, "#334155", "#0f172a", 2.0);
             fillR(42, 73, 40, 22, "#475569", "#fbbf24", 1.2);
-            labelR(36, 68, 52, 32, "SAFE", "#fde047", "bold 8px Consolas, monospace");
+            labelR(36, 68, 52, 32, "VAULT", "#fde047", "bold 8px Consolas, monospace");
             fillR(92, 68, 108, 28, tex.wood_mahogany, "#451a03", 2.0);
-            fillR(98, 72, 42, 18, "#1e40af", "#60a5fa", 1.0); // Blueprint mat on workbench
-            fillR(146, 74, 38, 6, "#94a3b8", "#0f172a", 1.0); // Disassembled rifle barrel
-            fillR(152, 82, 22, 6, "#f59e0b", "#78350f", 1.0); // Brass calipers
-
-            // South-West Tactical Kevlar Body Armor Rack (36, 352, 164, 28) — Detailed Police/SWAT Vests with Straps & Trauma Plates!
+            fillR(98, 72, 42, 18, "#1e40af", "#60a5fa", 1.0);
+            fillR(146, 74, 38, 6, "#94a3b8", "#0f172a", 1.0);
             fillR(36, 352, 164, 28, "#334155", "#0f172a", 2.0);
             for (let v = 0; v < 3; v++) {
                 const vx = 44 + v * 52;
-                fillR(vx, 354, 40, 24, "#0284c7", "#0f172a", 1.5); // Kevlar carrier body
-                fillR(vx + 10, 354, 20, 6, "#0f172a"); // Neck cutout collar
-                fillR(vx + 6, 361, 28, 13, "#1e293b", "#38bdf8", 1.0); // Ceramic trauma plate pouch
-                fillR(vx + 4, 355, 5, 22, "#facc15"); // High-vis shoulder strap L
-                fillR(vx + 31, 355, 5, 22, "#facc15"); // High-vis shoulder strap R
+                fillR(vx, 354, 40, 24, "#0284c7", "#0f172a", 1.5);
+                fillR(vx + 6, 361, 28, 13, "#1e293b", "#38bdf8", 1.0);
+                fillR(vx + 4, 355, 5, 22, "#facc15");
+                fillR(vx + 31, 355, 5, 22, "#facc15");
             }
-
-            // Center Showroom Illuminated Glass Weapon Showcase Counter (262, 128, 232, 28)
             fillR(262, 128, 232, 28, "#1e293b", "#0f172a", 2.0);
             for (let b = 0; b < 3; b++) {
-                const bx = 294 + b * 64;
-                fillR(bx, 131, 58, 22, "#7f1d1d", "#38bdf8", 1.5); // Velvet display bay under glass
-                fillR(bx + 8, 136, 26, 5, "#e2e8f0", "#0f172a", 1.0); // Displayed firearm barrel/receiver
-                fillR(bx + 6, 141, 10, 6, "#92400e"); // Wood grip/stock
-                fillR(bx + 38, 135, 14, 12, "#eab308", "#713f12", 1.0); // Brass ammo box
+                const bx = 296 + b * 64;
+                fillR(bx, 131, 58, 22, "#7f1d1d", "#38bdf8", 1.5);
+                fillR(bx + 8, 136, 26, 5, "#e2e8f0", "#0f172a", 1.0);
+                fillR(bx + 38, 135, 14, 12, "#eab308", "#713f12", 1.0);
             }
-            fillR(266, 131, 24, 22, "#ca8a04", "#0f172a", 1.5); // Brass POS cash register
-
-            // Center Military Surplus Stenciled Wood Slat Crates (258, 288, 86, 28 & 412, 288, 86, 28)
+            fillR(266, 131, 24, 22, "#ca8a04", "#0f172a", 1.5);
             for (const rx of [258, 412]) {
                 fillR(rx, 288, 86, 28, "#4d7c0f", "#1a2e05", 2.0);
-                fillR(rx + 4, 292, 78, 6, "#3f6212", "#1a2e05", 1.0);
-                fillR(rx + 4, 300, 78, 6, "#3f6212", "#1a2e05", 1.0);
-                fillR(rx + 4, 308, 78, 6, "#3f6212", "#1a2e05", 1.0);
-                labelR(rx, 288, 86, 28, rx < 350 ? "SHOTGUN 12GA" : "MICRO-UZI 9MM", "#fef08a", "bold 8px Consolas, monospace");
+                fillR(rx + 4, 293, 78, 6, "#3f6212", "#1a2e05", 1.0);
+                fillR(rx + 4, 303, 78, 6, "#3f6212", "#1a2e05", 1.0);
+                labelR(rx, 288, 86, 28, rx < 350 ? "HONKY-TONK 12G" : "STAR UZI 9MM", "#fef08a", "bold 7.5px Consolas, monospace");
             }
-
-            // East 4-Lane Live Firing Range: Warm Concrete Floor + Hazard Firing Line + Distance Markers + Numbered Stalls
-            fillR(532, 56, rw - 550, 358, tex.concrete_prison, "#78350f", 2.0);
+            fillR(532, 56, CANON_W - 550, 358, tex.concrete_prison, "#78350f", 2.0);
             fillR(540, 304, 250, 8, "#facc15", "#0f172a", 1.0);
-            for (let hx = 544; hx < 784; hx += 18) {
-                fillR(hx, 304, 9, 8, "#0f172a");
-            }
-            fillR(548, 312, 236, 22, tex.wood_oak, "#451a03", 2.0); // Shooting booth wooden counter
-            fillR(544, 218, 242, 3, "rgba(234, 88, 12, 0.55)");
-            fillR(544, 138, 242, 3, "rgba(220, 38, 38, 0.55)");
-            fillR(544, 62, 242, 22, "#92400e", "#451a03", 2.0); // Sandbag bullet-trap berm
+            for (let hx = 544; hx < 784; hx += 18) fillR(hx, 304, 9, 8, "#0f172a");
+            fillR(548, 312, 236, 22, tex.wood_oak, "#451a03", 2.0);
+            fillR(544, 218, 242, 3, "rgba(234, 88, 12, 0.58)");
+            fillR(544, 138, 242, 3, "rgba(220, 38, 38, 0.58)");
+            fillR(544, 62, 242, 22, "#92400e", "#451a03", 2.0);
             for (let lane = 0; lane < 4; lane++) {
                 const lx = 550 + lane * 58;
-                if (lane > 0) {
-                    fillR(lx - 2, 64, 3, 240, "rgba(15, 23, 42, 0.35)");
-                }
-                fillR(lx + 6, 266, 42, 30, "rgba(254, 240, 138, 0.35)", "#b45309", 1.2);
+                if (lane > 0) fillR(lx - 2, 64, 3, 240, "rgba(15, 23, 42, 0.35)");
+                fillR(lx + 6, 266, 42, 30, "rgba(254, 240, 138, 0.38)", "#b45309", 1.2);
                 labelR(lx + 6, 266, 42, 30, `L${lane + 1}`, "#78350f", "bold 10px Consolas, monospace");
-                fillR(lx + 8, 315, 16, 14, "#eab308", "#713f12", 1.0); // Ammo box on stall bench
-                fillR(lx + 30, 315, 14, 14, "#dc2626", "#0f172a", 1.0); // Ear defenders on stall bench
+                fillR(lx + 8, 315, 16, 14, "#eab308", "#713f12", 1.0);
+                fillR(lx + 30, 315, 14, 14, "#dc2626", "#0f172a", 1.0);
             }
-            for (let s = 0; s < 24; s++) {
-                const bx = 556 + ((s * 37) % 216);
-                const by = 338 + ((s * 19) % 34);
-                fillR(bx, by, 4, 2.5, "#f59e0b");
+            for (let s = 0; s < 28; s++) {
+                fillR(556 + ((s * 37) % 216), 338 + ((s * 19) % 34), 4, 2.5, "#f59e0b");
             }
-
-            // South Security Vestibule travertine floor + Guard Desk (54, 468, 96, 30) & Ordnance Pallet (664, 468, 96, 30)
-            fillR(18, 430, rw - 36, rh - 448, tex.gunmetal_plate, "#78716c", 1.5);
+            fillR(18, 430, CANON_W - 36, CANON_H - 448, tex.gunmetal_plate, "#78716c", 1.5);
             fillR(348, 410, 124, 22, tex.wood_oak, "#0f172a", 2.0);
             fillR(54, 468, 96, 30, tex.wood_mahogany, "#0f172a", 2.0);
-            fillR(62, 472, 32, 18, "#0284c7", "#e0f2fe", 1.2); // CCTV monitor screen
-            fillR(102, 474, 36, 14, "#e2e8f0", "#0f172a", 1.0); // Guard logbook
+            fillR(62, 472, 32, 18, "#0284c7", "#e0f2fe", 1.2);
             fillR(664, 468, 96, 30, "#4d7c0f", "#1a2e05", 2.0);
             labelR(664, 468, 96, 30, "US ORDNANCE", "#fef08a", "bold 8px Consolas, monospace");
         } else if (t === "SHOP_RESTAURANT" || t === "DINER_PAWN") {
-            fillR(18, 56, rw - 36, 136, tex.kitchen_tile, "#64748b", 1.5);
+            fillR(18, 56, CANON_W - 36, 136, tex.kitchen_tile, "#64748b", 1.5);
             const cookW = t === "DINER_PAWN" ? 384 : 480;
-            fillR(48, 62, cookW, 28, "#cbd5e1", "#0f172a", 2.0); // Stainless kitchen line
-            fillR(56, 66, 140, 20, "#334155", "#0f172a", 1.5); // Flattop griddle
-            fillR(212, 66, 110, 20, "#f59e0b", "#78350f", 1.5); // Golden deep-fryer vats
+            fillR(48, 62, cookW, 28, "#cbd5e1", "#0f172a", 2.0);
+            fillR(56, 66, 140, 20, "#334155", "#0f172a", 1.5);
+            fillR(212, 66, 110, 20, "#f59e0b", "#78350f", 1.5);
             if (t === "DINER_PAWN") {
-                fillR(56, 132, 376, 26, "#dc2626", "#0f172a", 2.0); // Diner counter
+                fillR(56, 132, 376, 26, "#dc2626", "#0f172a", 2.0);
                 fillR(62, 136, 364, 18, "#f8fafc", "#94a3b8", 1.0);
                 for (const by of [256, 344]) {
                     fillR(38, by, 118, 36, "#dc2626", "#7f1d1d", 2.0);
-                    fillR(54, by + 6, 86, 24, "#fef3c7", "#d97706", 1.2);
+                    fillR(52, by + 6, 90, 24, "#fef3c7", "#d97706", 1.2);
+                    fillC(74, by + 18, 6, "#ffffff", "#94a3b8", 1.0);
+                    fillC(74, by + 18, 3.5, "#d97706");
+                    fillC(118, by + 18, 6, "#ffffff", "#94a3b8", 1.0);
+                    fillC(118, by + 18, 3.5, "#b45309");
                 }
-                fillR(500, 56, rw - 518, rh - 74, tex.wood_mahogany, "#f97316", 1.5);
+                labelR(180, 206, 260, 24, "★ HANK'S WAFFLES & DINER ★", "rgba(185, 28, 28, 0.65)", "bold 10px Consolas, monospace");
+                fillR(500, 56, CANON_W - 518, CANON_H - 74, tex.wood_mahogany, "#f97316", 1.5);
                 fillR(536, 254, 196, 72, tex.carpet_royal, "#fde047", 1.5);
-                fillR(536, 124, 210, 28, tex.wood_oak, "#0f172a", 2.0);
+                labelR(536, 276, 196, 28, "PORT GELLHORN PAWN", "rgba(253, 224, 71, 0.65)", "bold 9px Consolas, monospace");
+                fillR(536, 124, 210, 28, "#1e293b", "#0f172a", 2.0);
+                fillR(546, 128, 86, 20, "#7f1d1d", "#38bdf8", 1.2);
+                fillR(646, 128, 90, 20, "#7f1d1d", "#fbbf24", 1.2);
                 fillR(546, 346, 196, 32, "#334155", "#fbbf24", 2.0);
             } else {
                 fillR(220, 124, 180, 24, "#e2e8f0", "#475569", 2.0);
                 fillR(18, 208, 138, 216, tex.wood_oak, "#78350f", 1.5);
                 for (const by of [238, 338]) {
                     fillR(36, by, 96, 42, "#dc2626", "#7f1d1d", 2.0);
-                    fillR(50, by + 8, 68, 26, "#fef3c7", "#d97706", 1.2);
+                    fillR(48, by + 8, 72, 26, "#fef3c7", "#d97706", 1.2);
                 }
+                fillR(354, 214, 112, 298, tex.carpet_royal, "#fbbf24", 1.5);
                 for (const tx of [254, 402]) {
                     for (const ty of [252, 354]) {
                         fillR(tx, ty, 62, 46, "#fffbeb", "#b45309", 2.0);
                         fillR(tx + 8, ty + 8, 46, 30, "#dc2626", "#fde047", 1.0);
+                        fillC(tx + 18, ty + 23, 5.5, "#ffffff", "#cbd5e1", 1.0);
+                        fillC(tx + 44, ty + 23, 5.5, "#ffffff", "#cbd5e1", 1.0);
+                        fillC(tx + 31, ty + 23, 3.0, "#fde047");
                     }
                 }
-                fillR(568, 208, rw - 586, 216, tex.wood_mahogany, "#fde047", 1.5);
-                fillR(354, 214, 112, 298, tex.carpet_royal, "#fbbf24", 1.5);
+                fillR(568, 208, CANON_W - 586, 216, tex.wood_mahogany, "#fde047", 1.5);
+                fillR(628, 66, 144, 30, tex.wood_mahogany, "#0f172a", 2.0);
             }
         } else if (t === "SHOP_HOTEL" || t === "ART_DECO_HOTEL") {
-            fillR(18, 56, 230, rh - 74, tex.wood_oak, "#92400e", 1.5);
-            fillR(38, 86, 174, 176, tex.carpet_royal, "#fde047", 2.0);
-            // King Bed (28, 96, 118, 86) with quilted coverlet, gold runner & twin white pillows
+            fillR(18, 56, 230, CANON_H - 74, tex.wood_oak, "#92400e", 1.5);
+            fillR(36, 84, 178, 180, tex.carpet_royal, "#fde047", 2.0);
             fillR(28, 96, 118, 86, "#f8fafc", "#451a03", 2.0);
             fillR(44, 104, 22, 30, "#ffffff", "#cbd5e1", 1.2);
             fillR(44, 144, 22, 30, "#ffffff", "#cbd5e1", 1.2);
             fillR(70, 100, 72, 78, "#db2777", "#831843", 1.5);
             fillR(116, 100, 24, 78, "#fbbf24", "#92400e", 1.2);
             fillR(38, 306, 174, 188, tex.carpet_royal, "#f472b6", 1.5);
-            fillR(316, 178, 188, 30, tex.wood_mahogany, "#fbbf24", 2.0); // Concierge Desk
-            labelR(316, 178, 188, 30, "CONCIERGE DESK", "#fde047", "bold 9px Consolas, monospace");
-            fillR(356, 208, 108, rh - 228, tex.carpet_royal, "#fbbf24", 2.0);
-            fillR(564, 56, rw - 582, rh - 74, tex.marble_carrara, "#38bdf8", 1.5);
+            fillR(316, 178, 188, 30, tex.wood_mahogany, "#fbbf24", 2.0);
+            labelR(316, 178, 188, 30, "OCEAN VIEW CONCIERGE", "#fde047", "bold 8.5px Consolas, monospace");
+            fillR(356, 208, 108, CANON_H - 228, tex.carpet_royal, "#fbbf24", 2.0);
+            fillR(564, 56, CANON_W - 582, CANON_H - 74, tex.marble_carrara, "#38bdf8", 1.5);
             fillR(584, 112, 176, 28, tex.wood_mahogany, "#22d3ee", 2.0);
             fillR(588, 344, 176, 112, "#e0f2fe", "#0284c7", 2.5);
             fillR(600, 356, 152, 88, "#06b6d4", "#67e8f9", 1.5);
         } else if (t === "SHOP_CLOTHES") {
-            fillR(18, 56, 224, rh - 74, tex.wood_oak, "#92400e", 1.5);
+            fillR(18, 56, 224, CANON_H - 74, tex.wood_oak, "#92400e", 1.5);
             fillR(42, 122, 124, 28, tex.wood_mahogany, "#0f172a", 2.0);
             fillR(42, 316, 124, 26, "#fbbf24", "#78350f", 2.0);
             fillR(338, 168, 144, 252, tex.carpet_royal, "#fde047", 2.0);
-            fillR(578, 56, rw - 596, rh - 74, tex.wood_mahogany, "#f472b6", 1.5);
-            fillR(602, 118, 164, 28, "#38bdf8", "#0f172a", 2.0);
+            fillR(578, 56, CANON_W - 596, CANON_H - 74, tex.wood_mahogany, "#f472b6", 1.5);
+            fillR(602, 118, 164, 28, "#1e293b", "#38bdf8", 2.0);
+            fillR(642, 121, 56, 22, "#581c87", "#fde047", 1.2);
+            fillR(704, 121, 56, 22, "#581c87", "#38bdf8", 1.2);
         } else if (t === "SHOP_CONVENIENCE") {
-            fillR(18, 56, rw - 36, 130, tex.concrete_prison, "#475569", 1.5);
+            fillR(18, 56, CANON_W - 36, 130, tex.concrete_prison, "#475569", 1.5);
             fillR(18, 202, 210, 110, tex.gunmetal_plate, "#38bdf8", 1.5);
-            fillR(38, 232, 168, 28, "#0d9488", "#0f172a", 2.0); // Cashier counter
+            fillR(38, 232, 168, 28, "#0d9488", "#0f172a", 2.0);
+            fillR(46, 235, 56, 22, "#fef08a", "#b45309", 1.2);
+            labelR(46, 235, 56, 22, "LOTTO", "#78350f", "bold 8px Consolas, monospace");
             for (let ai = 0; ai < 3; ai++) {
                 const gx = 286 + ai * 112;
                 fillR(gx, 248, 42, 164, "#e2e8f0", "#0f172a", 2.0);
                 fillR(gx + 4, 254, 15, 152, ai === 0 ? "#ef4444" : (ai === 1 ? "#22c55e" : "#eab308"));
                 fillR(gx + 23, 254, 15, 152, ai === 0 ? "#3b82f6" : (ai === 1 ? "#f97316" : "#ec4899"));
             }
-            fillR(624, 186, rw - 642, rh - 204, tex.kitchen_tile, "#22d3ee", 1.5);
-        } else if (t === "SHOP_BAR" || t === "NEON_CLUB" || t === "STRIP_CLUB" || t === "MALIBU_CLUB") {
-            fillR(18, 56, 230, rh - 74, tex.carpet_royal, "#f472b6", 1.5);
-            fillR(578, 56, rw - 596, rh - 74, tex.gunmetal_plate, "#fde047", 1.5);
-            if (t === "SHOP_BAR") {
-                fillR(18, 262, 230, rh - 280, "#064e3b", "#fbbf24", 2.0);
-                fillR(58, 342, 132, 74, "#15803d", "#78350f", 4.0); // 8-Ball Pool Table felt
-            } else {
-                fillR(288, 198, 244, 196, tex.wood_oak, "#e879f9", 2.0);
+            fillR(624, 186, CANON_W - 642, CANON_H - 204, tex.kitchen_tile, "#22d3ee", 1.5);
+        } else if (t === "STARLET_MOTEL") {
+            fillR(18, 56, 258, CANON_H - 74, tex.wood_oak, "#78350f", 1.5);
+            fillR(34, 82, 214, 326, tex.carpet_royal, "#fb7185", 1.5);
+            fillR(38, 98, 118, 82, "#f8fafc", "#451a03", 2.0);
+            fillR(46, 106, 20, 28, "#ffffff", "#cbd5e1", 1.0);
+            fillR(46, 142, 20, 28, "#ffffff", "#cbd5e1", 1.0);
+            fillR(72, 102, 80, 74, "#be123c", "#4c0519", 1.5);
+            labelR(82, 344, 140, 28, "ROOM #104", "rgba(253, 224, 71, 0.55)", "bold 10px Consolas, monospace");
+            fillR(336, 124, 176, 28, tex.wood_mahogany, "#fb7185", 2.0);
+            labelR(336, 124, 176, 28, "STARLET NIGHT OFFICE", "#fde047", "bold 8px Consolas, monospace");
+            fillR(582, 56, CANON_W - 600, CANON_H - 74, tex.kitchen_tile, "#38bdf8", 1.5);
+            fillR(612, 96, 146, 32, "#e2e8f0", "#0284c7", 2.0);
+            fillR(724, 286, 48, 148, "#cbd5e1", "#334155", 2.0);
+            fillC(662, 356, 10, "#334155", "#94a3b8", 1.5);
+        } else if (t === "ONLYRAW_STUDIO") {
+            fillR(18, 56, 230, CANON_H - 74, tex.carpet_royal, "#ec4899", 2.0);
+            fillR(34, 266, 196, 196, "#1e1b4b", "#00f0ff", 2.0);
+            labelR(42, 280, 180, 24, "🎙️ VOCAL BOOTH A", "#38bdf8", "bold 9px Consolas, monospace");
+            fillR(264, 56, 298, CANON_H - 74, tex.wood_oak, "#38bdf8", 1.5);
+            fillR(300, 196, 226, 180, tex.carpet_royal, "#00f0ff", 2.0);
+            labelR(300, 272, 226, 28, "ONLYRAW RECORDS", "rgba(56, 189, 248, 0.65)", "bold 11px Consolas, monospace");
+            fillR(312, 122, 196, 32, "#0f172a", "#38bdf8", 2.0);
+            for (let ch = 0; ch < 12; ch++) {
+                fillR(322 + ch * 14, 127, 9, 22, "#1e293b");
+                fillR(324 + ch * 14, 130 + ((ch * 5) % 11), 5, 4, ch % 3 === 0 ? "#ef4444" : "#38bdf8");
             }
+            fillR(578, 56, CANON_W - 596, CANON_H - 74, tex.gunmetal_plate, "#fde047", 1.5);
+            fillR(608, 108, 148, 28, "#1e293b", "#fde047", 2.0);
+        } else if (t === "SHOP_BAR" || t === "NEON_CLUB" || t === "STRIP_CLUB" || t === "MALIBU_CLUB") {
+            fillR(18, 56, 230, CANON_H - 74, tex.carpet_royal, "#f472b6", 1.5);
+            fillR(578, 56, CANON_W - 596, CANON_H - 74, tex.gunmetal_plate, "#fde047", 1.5);
+            fillR(312, 122, 196, 32, tex.wood_mahogany, "#00f0ff", 2.0);
+            if (t === "SHOP_BAR") {
+                fillR(18, 262, 230, CANON_H - 280, "#064e3b", "#fbbf24", 2.0);
+                fillR(56, 338, 124, 64, "#78350f", "#451a03", 2.0);
+                fillR(64, 346, 108, 48, "#15803d", "#166534", 1.5);
+                for (const px of [64, 118, 172]) {
+                    fillC(px, 346, 4.2, "#090d16");
+                    fillC(px, 394, 4.2, "#090d16");
+                }
+                fillC(92, 370, 3.0, "#f8fafc");
+                fillC(142, 370, 3.2, "#0f172a");
+                fillC(148, 365, 3.0, "#eab308");
+                fillC(148, 375, 3.0, "#ef4444");
+            } else if (t === "STRIP_CLUB") {
+                fillR(300, 198, 220, 196, tex.carpet_royal, "#e879f9", 2.0);
+                fillR(368, 224, 84, 132, "#db2777", "#fde047", 2.5);
+            } else {
+                fillR(288, 198, 244, 196, "#1e1b4b", "#e879f9", 2.0);
+            }
+            fillR(608, 108, 148, 28, "#334155", "#fde047", 2.0);
         } else if (t === "MANSION") {
-            fillR(18, 56, 240, rh - 74, tex.wood_mahogany, "#f97316", 1.5);
-            fillR(62, 122, 148, 34, tex.wood_oak, "#fbbf24", 2.0); // Scarface executive desk
-            fillR(348, 148, 124, rh - 168, tex.carpet_royal, "#fde047", 2.5);
-            fillR(572, 56, rw - 590, rh - 74, tex.terrazzo_deco, "#22d3ee", 1.5);
-            fillR(604, 338, 156, 108, "#06b6d4", "#e0f2fe", 2.5);
+            fillR(18, 56, 240, CANON_H - 74, tex.wood_mahogany, "#f97316", 1.5);
+            fillR(42, 92, 176, 30, "#334155", "#fbbf24", 2.0);
+            fillR(56, 356, 136, 56, "#15803d", "#78350f", 3.0);
+            fillR(336, 104, 148, 32, tex.wood_oak, "#fbbf24", 2.0);
+            labelR(336, 104, 148, 32, "THE WORLD IS YOURS", "#fde047", "bold 8px Consolas, monospace");
+            fillR(348, 148, 124, CANON_H - 168, tex.carpet_royal, "#fde047", 2.5);
+            fillR(572, 56, CANON_W - 590, CANON_H - 74, tex.terrazzo_deco, "#22d3ee", 1.5);
+            fillR(594, 326, 172, 134, "#e0f2fe", "#0284c7", 2.5);
+            fillR(608, 340, 144, 106, "#06b6d4", "#67e8f9", 1.5);
         } else if (t === "SPACE_BUNKER") {
-            fillR(18, 56, 234, rh - 74, tex.concrete_prison, "#38bdf8", 1.5);
-            fillR(580, 56, rw - 598, rh - 74, tex.kitchen_tile, "#39ff14", 1.5);
-            fillR(296, 168, 228, 236, "#1e293b", "#38bdf8", 2.0);
+            fillR(18, 56, 234, CANON_H - 74, tex.concrete_prison, "#38bdf8", 1.5);
+            fillR(580, 56, CANON_W - 598, CANON_H - 74, tex.kitchen_tile, "#39ff14", 1.5);
+            fillR(296, 168, 228, 236, "#0f172a", "#38bdf8", 2.0);
+            labelR(296, 178, 228, 24, "SERA ORBITAL TELEMETRY", "#38bdf8", "bold 9px Consolas, monospace");
+            fillR(320, 118, 180, 28, "#1e293b", "#00f0ff", 2.0);
         } else if (t === "PRISON_BLOCK") {
             fillR(18, 56, 260, 152, tex.concrete_prison, "#f87171", 1.5);
+            labelR(128, 146, 120, 22, "CELL #06", "rgba(248, 113, 113, 0.65)", "bold 10px Consolas, monospace");
+            fillR(36, 82, 86, 44, "#cbd5e1", "#334155", 2.0);
             fillR(294, 56, 222, 152, tex.wood_mahogany, "#fde047", 1.5);
-            fillR(532, 56, rw - 550, 152, tex.gunmetal_plate, "#38bdf8", 1.5);
+            fillR(332, 102, 136, 28, tex.wood_oak, "#0f172a", 2.0);
+            fillR(532, 56, CANON_W - 550, 152, tex.gunmetal_plate, "#38bdf8", 1.5);
+            fillR(566, 92, 196, 28, "#1e293b", "#38bdf8", 2.0);
             fillR(312, 336, 196, 36, "#94a3b8", "#0f172a", 2.0);
         }
 
         // 3. Soft Perimeter Wall Ambient Occlusion Vignette on Floor (with clean doorway gap on active entrance wall)
-        const nGrad = g.createLinearGradient(0, 56, 0, 92);
-        nGrad.addColorStop(0, "rgba(0, 0, 0, 0.55)");
+        const doorMidY = Math.round(40 + (rh - 40) * 0.5);
+        const nGrad = g.createLinearGradient(0, 56, 0, 88);
+        nGrad.addColorStop(0, "rgba(0, 0, 0, 0.46)");
         nGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = nGrad;
         if (facing === "N") {
-            g.fillRect(18, 56, 326, 36);
-            g.fillRect(476, 56, rw - 494, 36);
+            g.fillRect(18, 56, Math.max(20, rw * 0.5 - 104), 32);
+            g.fillRect(rw * 0.5 + 86, 56, Math.max(20, rw - 18 - (rw * 0.5 + 86)), 32);
         } else {
-            g.fillRect(18, 56, rw - 36, 36);
+            g.fillRect(18, 56, rw - 36, 32);
         }
 
-        const sGrad = g.createLinearGradient(0, rh - 18, 0, rh - 52);
-        sGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
+        const sGrad = g.createLinearGradient(0, rh - 18, 0, rh - 48);
+        sGrad.addColorStop(0, "rgba(0, 0, 0, 0.42)");
         sGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = sGrad;
         if (facing === "S") {
-            g.fillRect(18, rh - 52, 326, 34);
-            g.fillRect(476, rh - 52, rw - 494, 34);
+            g.fillRect(18, rh - 48, Math.max(20, rw * 0.5 - 104), 30);
+            g.fillRect(rw * 0.5 + 86, rh - 48, Math.max(20, rw - 18 - (rw * 0.5 + 86)), 30);
         } else {
-            g.fillRect(18, rh - 52, rw - 36, 34);
+            g.fillRect(18, rh - 48, rw - 36, 30);
         }
 
-        const wGrad = g.createLinearGradient(18, 0, 52, 0);
-        wGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
+        const wGrad = g.createLinearGradient(18, 0, 48, 0);
+        wGrad.addColorStop(0, "rgba(0, 0, 0, 0.42)");
         wGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = wGrad;
         if (facing === "W") {
-            g.fillRect(18, 56, 34, 176);
-            g.fillRect(18, 364, 34, rh - 382);
+            g.fillRect(18, 56, 30, Math.max(20, doorMidY - 74 - 56));
+            g.fillRect(18, doorMidY + 74, 30, Math.max(20, rh - 18 - (doorMidY + 74)));
         } else {
-            g.fillRect(18, 56, 34, rh - 74);
+            g.fillRect(18, 56, 30, rh - 74);
         }
 
-        const eGrad = g.createLinearGradient(rw - 18, 0, rw - 52, 0);
-        eGrad.addColorStop(0, "rgba(0, 0, 0, 0.50)");
+        const eGrad = g.createLinearGradient(rw - 18, 0, rw - 48, 0);
+        eGrad.addColorStop(0, "rgba(0, 0, 0, 0.42)");
         eGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
         g.fillStyle = eGrad;
         if (facing === "E") {
-            g.fillRect(rw - 52, 56, 34, 176);
-            g.fillRect(rw - 52, 364, 34, rh - 382);
+            g.fillRect(rw - 48, 56, 30, Math.max(20, doorMidY - 74 - 56));
+            g.fillRect(rw - 48, doorMidY + 74, 30, Math.max(20, rh - 18 - (doorMidY + 74)));
         } else {
-            g.fillRect(rw - 52, 56, 34, rh - 74);
+            g.fillRect(rw - 48, 56, 30, rh - 74);
         }
 
-        // 4. Subtle Contact Ambient Occlusion around Interior Partition Walls & Counters (no dark black smudges!)
+        // 4. Crisp Contact Ambient Occlusion around Partition Walls & 3D Furniture
         if (window.ShopInteriors && typeof window.ShopInteriors.getObstacles === "function") {
             const obs = window.ShopInteriors.getObstacles(intr);
             for (let i = 0; i < obs.length; i++) {
                 const ob = obs[i];
-                const pad = ob.isWall ? 6 : 4;
-                g.fillStyle = ob.isWall ? "rgba(0, 0, 0, 0.14)" : "rgba(0, 0, 0, 0.10)";
+                const pad = ob.isWall ? 5 : 4;
+                g.fillStyle = ob.isWall ? "rgba(0, 0, 0, 0.16)" : "rgba(0, 0, 0, 0.12)";
                 g.fillRect(ob.x - pad, ob.y - pad, ob.w + pad * 2, ob.h + pad * 2);
             }
         }
@@ -15831,14 +15956,15 @@ class RetroRenderer {
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        // Razor-sharp 1997 GTA pixel-art filtering — eliminates muddy bilinear blur!
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
         c.width = 1;
         c.height = 1;
 
         const existingKeys = Object.keys(this._interiorFloorTexCache);
-        if (existingKeys.length >= 24) {
+        if (existingKeys.length >= 28) {
             const oldestKey = existingKeys[0];
             const oldTex = this._interiorFloorTexCache[oldestKey];
             if (oldTex) gl.deleteTexture(oldTex);
@@ -16600,70 +16726,196 @@ class RetroRenderer {
         Box3D(doorRight - 4, rh - 24, 14, 22, "#334155", "#0f172a", "#fde047", 4);
     }
 
-    renderActiveInterior(ctx, game) {
-        const intr = game.activeInterior;
-        if (!intr) return;
-
+    renderInteriorLighting(ctx, game, intr) {
+        if (!ctx || !intr) return;
         const W = this.canvas.width;
         const H = this.canvas.height;
-        const rw = intr.w || 780;
-        const rh = intr.h || 530;
+        if (W < 4 || H < 4) return;
 
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        const rw = intr.w || 820;
+        const rh = intr.h || 560;
+        const tTheme = intr.theme || "SHOP_CONVENIENCE";
+        const nf = Math.max(0, Math.min(1, this.nightFactor || 0));
+        const sf = Math.max(0, Math.min(1, this.sunsetFactor || 0));
+        const time = this.time || 0;
 
-        // 1. Multi-Room Volumetric Ceiling Chandelier / Neon / Caustic Light Pools & Player Spotlight
         const trPtL = (lx, ly) => {
             if (window.ShopInteriors && typeof window.ShopInteriors.transformPoint === "function") {
                 return window.ShopInteriors.transformPoint(lx, ly, 0, intr);
             }
             return { x: lx, y: ly };
         };
-        const tTheme = intr.theme || "SHOP_CONVENIENCE";
-        const isClubTheme = tTheme === "NEON_CLUB" || tTheme === "STRIP_CLUB" || tTheme === "MALIBU_CLUB" || tTheme === "SHOP_BAR";
-        const isPoolTheme = tTheme === "SHOP_HOTEL" || tTheme === "ART_DECO_HOTEL" || tTheme === "MANSION";
-        const roomLights = [
-            { x: 410, y: 270, r: 135, col: isClubTheme ? "rgba(236, 72, 153, 0.12)" : "rgba(255, 240, 195, 0.11)" },
-            { x: 125, y: 240, r: 105, col: isClubTheme ? "rgba(56, 189, 248, 0.10)" : "rgba(255, 236, 190, 0.09)" },
-            { x: 675, y: 360, r: 115, col: isPoolTheme ? "rgba(34, 211, 238, 0.15)" : (tTheme === "SHOP_GUN_SHOP" ? "rgba(250, 204, 21, 0.10)" : "rgba(255, 236, 190, 0.09)") }
-        ];
-        for (let li = 0; li < roomLights.length; li++) {
-            const rl = roomLights[li];
-            const lp = trPtL(rl.x, rl.y);
-            const lScr = this.worldToScreen(lp.x, lp.y, 2.02);
-            const lg = ctx.createRadialGradient(lScr.x, lScr.y, 8, lScr.x, lScr.y, rl.r);
-            lg.addColorStop(0, rl.col);
-            lg.addColorStop(1, "rgba(0, 0, 0, 0.0)");
-            ctx.fillStyle = lg;
-            ctx.beginPath();
-            ctx.arc(lScr.x, lScr.y, rl.r, 0, Math.PI * 2);
-            ctx.fill();
+
+        ctx.save();
+
+        // 1. Subtle Ambient Venue Mood & Corner Depth Vignette (Club Neon / Dive Amber / Bunker Steel / Sunlit Day)
+        const isClub = (tTheme === "NEON_CLUB" || tTheme === "STRIP_CLUB" || tTheme === "MALIBU_CLUB" || tTheme === "ONLYRAW_STUDIO");
+        const isBar = (tTheme === "SHOP_BAR");
+        const isBunker = (tTheme === "SPACE_BUNKER" || tTheme === "PRISON_BLOCK");
+        let moodTint = null;
+        if (isClub) moodTint = "rgba(18, 8, 42, 0.24)";
+        else if (isBar) moodTint = "rgba(28, 14, 6, 0.18)";
+        else if (isBunker) moodTint = "rgba(8, 18, 34, 0.16)";
+        else if (nf > 0.25) moodTint = `rgba(10, 14, 30, ${(nf * 0.15).toFixed(3)})`;
+        if (moodTint) {
+            ctx.fillStyle = moodTint;
+            ctx.fillRect(0, 0, W, H);
         }
 
-        const p = game.player;
-        const px = game.interiorX || rw * 0.5;
-        const py = game.interiorY || rh - 78;
-        const pScr = this.worldToScreen(px, py, 2.05);
-        const spotGrad = ctx.createRadialGradient(pScr.x, pScr.y, 12, pScr.x, pScr.y, 92);
-        spotGrad.addColorStop(0, "rgba(255, 240, 200, 0.14)");
-        spotGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
-        ctx.fillStyle = spotGrad;
+        // 2. Angled Volumetric Sunbeams (Day/Sunset) or Streetlamp Shafts (Night) Streaming Through Storefront Windows & Open Doorway!
+        ctx.globalCompositeOperation = "lighter";
+        const wins = (window.ShopInteriors && typeof window.ShopInteriors.getWindows === "function")
+            ? window.ShopInteriors.getWindows(intr)
+            : [];
+        const beamIsDay = nf < 0.68;
+        const beamR = beamIsDay ? 255 : 120;
+        const beamG = beamIsDay ? Math.round(234 - sf * 38) : 195;
+        const beamB = beamIsDay ? Math.round(176 - sf * 44) : 255;
+        const beamBaseAlpha = beamIsDay ? (0.11 + sf * 0.05) * (1.0 - nf * 0.65) : (0.065 * nf);
+
+        const drawWindowShaft = (wx, wy, ww, wh, wall) => {
+            let inDx = 0, inDy = 0, spanX = ww, spanY = wh;
+            if (wall === "S") { inDx = -22; inDy = -115; }
+            else if (wall === "N") { inDx = 18; inDy = 115; }
+            else if (wall === "E") { inDx = -125; inDy = -16; }
+            else if (wall === "W") { inDx = 125; inDy = 16; }
+            const p0 = this.interiorToScreen(intr, wx, wy, 2.02);
+            const p1 = this.interiorToScreen(intr, wx + spanX, wy + spanY, 2.02);
+            const p2 = this.interiorToScreen(intr, wx + spanX + inDx, wy + spanY + inDy, 2.01);
+            const p3 = this.interiorToScreen(intr, wx + inDx, wy + inDy, 2.01);
+            const grad = ctx.createLinearGradient((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, (p2.x + p3.x) * 0.5, (p2.y + p3.y) * 0.5);
+            grad.addColorStop(0.0, `rgba(${beamR}, ${beamG}, ${beamB}, ${beamBaseAlpha.toFixed(3)})`);
+            grad.addColorStop(1.0, `rgba(${beamR}, ${beamG}, ${beamB}, 0.0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y);
+            ctx.closePath();
+            ctx.fill();
+        };
+        for (let wi = 0; wi < wins.length; wi++) {
+            const w = wins[wi];
+            drawWindowShaft(w.x, w.y, w.w, w.h, w.wall);
+        }
+        const pose = (window.ShopInteriors && typeof window.ShopInteriors.getEntrancePose === "function")
+            ? window.ShopInteriors.getEntrancePose(intr)
+            : { facing: intr.facing || "S", exitX: rw * 0.5, exitY: rh - 16 };
+        if (pose.facing === "S") drawWindowShaft(rw * 0.5 - 72, rh - 16, 144, 12, "S");
+        else if (pose.facing === "N") drawWindowShaft(rw * 0.5 - 72, 42, 144, 12, "N");
+        else if (pose.facing === "E") drawWindowShaft(rw - 16, rh * 0.5 - 48, 12, 124, "E");
+        else if (pose.facing === "W") drawWindowShaft(4, rh * 0.5 - 48, 12, 124, "W");
+
+        // 3. Multi-Room Fixture Light Pools, Club Sweeping Lasers, Pool-Table Lamp, Candles & Jacuzzi Caustics
+        const emitPool = (lx, ly, radPx, colInner) => {
+            const lp = trPtL(lx, ly);
+            const sc = this.interiorToScreen(intr, lp.x, lp.y, 2.03);
+            if (sc.x < -radPx || sc.x > W + radPx || sc.y < -radPx || sc.y > H + radPx) return;
+            const rg = ctx.createRadialGradient(sc.x, sc.y, 4, sc.x, sc.y, radPx);
+            rg.addColorStop(0.0, colInner);
+            rg.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+            ctx.fillStyle = rg;
+            ctx.beginPath();
+            ctx.arc(sc.x, sc.y, radPx, 0, Math.PI * 2);
+            ctx.fill();
+        };
+
+        if (isClub) {
+            const pulseA = (0.14 + 0.06 * Math.sin(time * 6.2)).toFixed(3);
+            const pulseB = (0.13 + 0.06 * Math.cos(time * 5.4)).toFixed(3);
+            emitPool(410 + Math.sin(time * 2.1) * 65, 290 + Math.cos(time * 1.7) * 42, 155, `rgba(244, 63, 165, ${pulseA})`);
+            emitPool(410 - Math.sin(time * 1.8) * 60, 275 - Math.cos(time * 2.3) * 38, 145, `rgba(0, 240, 255, ${pulseB})`);
+            emitPool(135, 210, 120, "rgba(192, 38, 211, 0.14)");
+            emitPool(675, 240, 110, "rgba(250, 204, 21, 0.10)");
+
+            const djPt = trPtL(410, 124);
+            const djScr = this.interiorToScreen(intr, djPt.x, djPt.y, 2.25);
+            for (let b = 0; b < 3; b++) {
+                const sweep = Math.sin(time * (1.8 + b * 0.45) + b * 2.1) * 145;
+                const tgtPt = trPtL(310 + b * 100 + sweep * 0.65, 385);
+                const tgtScr = this.interiorToScreen(intr, tgtPt.x, tgtPt.y, 2.02);
+                const lg = ctx.createLinearGradient(djScr.x, djScr.y, tgtScr.x, tgtScr.y);
+                const lCol = b === 0 ? "255, 42, 149" : (b === 1 ? "0, 240, 255" : "168, 85, 247");
+                lg.addColorStop(0.0, `rgba(${lCol}, 0.22)`);
+                lg.addColorStop(1.0, `rgba(${lCol}, 0.0)`);
+                ctx.fillStyle = lg;
+                ctx.beginPath();
+                ctx.moveTo(djScr.x - 4, djScr.y);
+                ctx.lineTo(djScr.x + 4, djScr.y);
+                ctx.lineTo(tgtScr.x + 44, tgtScr.y);
+                ctx.lineTo(tgtScr.x - 44, tgtScr.y);
+                ctx.closePath();
+                ctx.fill();
+            }
+        } else if (isBar) {
+            emitPool(410, 175, 145, "rgba(6, 182, 212, 0.14)");
+            emitPool(118, 370, 125, "rgba(34, 197, 94, 0.16)");
+            emitPool(675, 365, 115, "rgba(232, 121, 249, 0.13)");
+        } else if (tTheme === "SHOP_HOTEL" || tTheme === "ART_DECO_HOTEL" || tTheme === "MANSION") {
+            emitPool(410, 245, 155, "rgba(255, 236, 185, 0.13)");
+            emitPool(96, 142, 115, "rgba(251, 113, 133, 0.12)");
+            emitPool(676, 396, 140, `rgba(34, 211, 238, ${(0.16 + 0.04 * Math.sin(time * 3.5)).toFixed(3)})`);
+        } else if (tTheme === "SHOP_RESTAURANT" || tTheme === "DINER_PAWN") {
+            emitPool(260, 155, 140, "rgba(255, 234, 185, 0.12)");
+            if (tTheme === "SHOP_RESTAURANT") {
+                const flick = (0.12 + 0.03 * Math.sin(time * 9.0)).toFixed(3);
+                emitPool(285, 275, 78, `rgba(255, 196, 92, ${flick})`);
+                emitPool(433, 377, 78, `rgba(255, 196, 92, ${flick})`);
+            } else {
+                emitPool(635, 165, 130, "rgba(251, 191, 36, 0.12)");
+            }
+        } else {
+            emitPool(410, 250, 155, isBunker ? "rgba(56, 189, 248, 0.13)" : "rgba(255, 244, 214, 0.11)");
+            emitPool(135, 235, 120, isBunker ? "rgba(57, 255, 20, 0.10)" : "rgba(255, 240, 200, 0.09)");
+            emitPool(675, 290, 125, tTheme === "SHOP_GUN_SHOP" ? "rgba(251, 146, 60, 0.12)" : "rgba(56, 189, 248, 0.11)");
+        }
+
+        // 4. Subtle Warm Player Presence Rim & Dynamic Indoor Gunfire Muzzle Flash
+        const px = game.interiorX !== undefined ? game.interiorX : rw * 0.5;
+        const py = game.interiorY !== undefined ? game.interiorY : rh - 78;
+        const pScr = this.interiorToScreen(intr, px, py, 2.06);
+        const pGlowR = (game.player && (game.player.muzzleTimer || 0) > 0) ? 165 : 84;
+        const pGrad = ctx.createRadialGradient(pScr.x, pScr.y, 8, pScr.x, pScr.y, pGlowR);
+        if (game.player && (game.player.muzzleTimer || 0) > 0) {
+            pGrad.addColorStop(0.0, "rgba(255, 230, 110, 0.34)");
+            pGrad.addColorStop(0.45, "rgba(251, 146, 60, 0.14)");
+        } else {
+            pGrad.addColorStop(0.0, "rgba(255, 242, 208, 0.10)");
+        }
+        pGrad.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+        ctx.fillStyle = pGrad;
         ctx.beginPath();
-        ctx.arc(pScr.x, pScr.y, 92, 0, Math.PI * 2);
+        ctx.arc(pScr.x, pScr.y, pGlowR, 0, Math.PI * 2);
         ctx.fill();
 
-        // 2. Top-Center GTA Arcade Venue Header Banner (pinned cleanly at top center of viewport)
-        const banW = Math.min(W - 24, Math.max(360, Math.min(640, W - 300)));
-        const banH = 44;
-        const banX = Math.round(W * 0.5 - banW * 0.5);
-        const banY = 12;
+        // 5. Rotating Crimson Heist / Smash-and-Grab Security Alarm Strobe!
+        if ((intr._alarmTimer || 0) > 0) {
+            const strobe = Math.max(0, Math.sin(time * 14.0));
+            if (strobe > 0.05) {
+                ctx.fillStyle = `rgba(239, 68, 68, ${(strobe * 0.18).toFixed(3)})`;
+                ctx.fillRect(0, 0, W, H);
+            }
+        }
 
-        ctx.fillStyle = "rgba(10, 15, 28, 0.92)";
-        ctx.fillRect(banX, banY, banW, banH);
-        ctx.strokeStyle = intr.accent || "#facc15";
-        ctx.lineWidth = 2.0;
-        ctx.strokeRect(banX + 0.5, banY + 0.5, banW - 1, banH - 1);
+        ctx.restore();
+    }
+
+    renderActiveInterior(ctx, game) {
+        const intr = game.activeInterior;
+        if (!intr) return;
+
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        const rw = intr.w || 820;
+        const rh = intr.h || 560;
+        const px = game.interiorX !== undefined ? game.interiorX : rw * 0.5;
+        const py = game.interiorY !== undefined ? game.interiorY : rh - 78;
+        const p = game.player;
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
 
         const fitIntText = (txtStr, maxPx) => {
             const raw = String(txtStr || "");
@@ -16677,14 +16929,29 @@ class RetroRenderer {
             return lo > 0 ? raw.slice(0, lo).trimEnd() + "…" : "";
         };
 
-        ctx.font = "bold 16px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = "#fde047";
-        ctx.fillText(fitIntText(intr.name, banW - 20), banX + banW * 0.5, banY + 16);
-        ctx.font = "bold 11px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = "#f8fafc";
-        ctx.fillText(fitIntText(intr.subtitle, banW - 20), banX + banW * 0.5, banY + 33);
+        // 1. Sleek Top-Center Authentic GTA Venue Banner (uses SUB2 bitmap font for title + Art Deco neon trim)
+        const alarmOn = (intr._alarmTimer || 0) > 0;
+        const banW = Math.min(W - 24, Math.max(360, Math.min(620, W - 320)));
+        const banH = 42;
+        const banX = Math.round(W * 0.5 - banW * 0.5);
+        const banY = 10;
 
-        // 3. 3D-Projected Interactive Station Badges (Clean, legible GTA pills when visible, expanded [E] card when near!)
+        ctx.fillStyle = alarmOn ? "rgba(48, 8, 14, 0.90)" : "rgba(8, 13, 26, 0.88)";
+        ctx.fillRect(banX, banY, banW, banH);
+        ctx.strokeStyle = alarmOn ? "#ef4444" : (intr.accent || "#facc15");
+        ctx.lineWidth = 2.0;
+        ctx.strokeRect(banX + 0.5, banY + 0.5, banW - 1, banH - 1);
+
+        const cleanTitle = String(intr.name || "ESTABLISHMENT").replace(/[^\x20-\x7E]/g, "").trim();
+        this.drawGta1FontString(ctx, "SUB2", cleanTitle.slice(0, 38), banX + banW * 0.5, banY + 14, 1.05, "center");
+
+        ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
+        ctx.fillStyle = alarmOn ? "#fecaca" : "#e2e8f0";
+        const subBanner = alarmOn
+            ? `🚨 SILENT ALARM ACTIVE (${Math.ceil(intr._alarmTimer)}S) — SECURITY / VCPD ALERTED! 🚨`
+            : intr.subtitle;
+        ctx.fillText(fitIntText(subBanner, banW - 20), banX + banW * 0.5, banY + 32);
+
         const placedRects = [];
         const resolveLabelOverlap = (x, y, w, h) => {
             let cy = y;
@@ -16703,54 +16970,96 @@ class RetroRenderer {
             return cy;
         };
 
+        // 2. Context-Sensitive Interactive Station Cards (ONLY shown when near a station or recharging — zero distant screen clutter!)
         if (Array.isArray(intr.stations)) {
+            let nearestSt = null;
+            let nearestDist = 94;
             for (const st of intr.stations) {
-                const stTop = this.worldToScreen(st.x, st.y, 2.26);
-                if (stTop.x < -80 || stTop.x > W + 80 || stTop.y < 50 || stTop.y > H + 40) continue;
+                const d = Math.hypot(px - st.x, py - st.y);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearestSt = st;
+                }
+            }
+            for (const st of intr.stations) {
                 const ready = (st.cooldown || 0) <= 0;
-                const distToPlayer = Math.hypot(px - st.x, py - st.y);
-                const isNear = distToPlayer < 88;
-                const stCol = ready ? (st.color || "#39ff14") : "#94a3b8";
+                const isFocus = (st === nearestSt);
+                if (!isFocus && ready) continue;
 
+                const stTop = this.interiorToScreen(intr, st.x, st.y, 2.28);
+                if (stTop.x < -80 || stTop.x > W + 80 || stTop.y < 52 || stTop.y > H + 40) continue;
+                const stCol = ready ? (st.color || "#39ff14") : "#94a3b8";
                 const cleanSub = String(st.sub || "").replace(/^\[E\]\s*/i, "");
-                ctx.font = isNear ? "bold 13px Consolas, 'Courier New', monospace" : "bold 11px Consolas, 'Courier New', monospace";
+                const subTxt = ready ? `[E] USE • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`;
+
+                ctx.font = "bold 12.5px Consolas, 'Courier New', monospace";
                 const lblW = ctx.measureText(st.label).width;
-                const subTxt = ready ? `[E] BUY / USE • ${cleanSub}` : `RECHARGING (${Math.ceil(st.cooldown)}S)`;
                 ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
-                const subW = (isNear || !ready) ? ctx.measureText(subTxt).width : 0;
-                const bw = Math.min(W - 16, isNear ? Math.max(210, Math.round(Math.max(lblW, subW) + 26)) : Math.max(132, Math.round(lblW + 18)));
-                const bh = (isNear || !ready) ? 36 : 22;
+                const subW = ctx.measureText(subTxt).width;
+                const bw = Math.min(W - 16, Math.max(196, Math.round(Math.max(lblW, subW) + 24)));
+                const bh = 35;
                 const bx = Math.max(8, Math.min(W - bw - 8, Math.round(stTop.x - bw * 0.5)));
-                const rawBy = Math.max(62, Math.min(H - bh - 8, Math.round(stTop.y - bh - (isNear ? 14 : 6))));
+                const rawBy = Math.max(58, Math.min(H - bh - 8, Math.round(stTop.y - bh - 12)));
                 const by = resolveLabelOverlap(bx, rawBy, bw, bh);
 
-                ctx.fillStyle = isNear ? "rgba(8, 13, 26, 0.96)" : "rgba(10, 16, 30, 0.88)";
+                ctx.fillStyle = "rgba(8, 13, 26, 0.94)";
                 ctx.fillRect(bx, by, bw, bh);
                 ctx.fillStyle = stCol;
                 ctx.fillRect(bx, by, 4, bh);
-                ctx.strokeStyle = isNear && ready ? "#fde047" : stCol;
-                ctx.lineWidth = isNear ? 2.2 : 1.4;
+                ctx.strokeStyle = isFocus && ready ? "#fde047" : stCol;
+                ctx.lineWidth = isFocus ? 2.0 : 1.3;
                 ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
 
-                ctx.font = isNear ? "bold 13px Consolas, 'Courier New', monospace" : "bold 11px Consolas, 'Courier New', monospace";
+                ctx.font = "bold 12.5px Consolas, 'Courier New', monospace";
                 ctx.fillStyle = ready ? "#ffffff" : "#cbd5e1";
-                ctx.fillText(fitIntText(st.label, bw - 14), bx + bw * 0.5 + 2, by + ((isNear || !ready) ? 11.5 : 11));
-                if (isNear || !ready) {
-                    ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
-                    ctx.fillStyle = isNear && ready ? "#fde047" : stCol;
-                    ctx.fillText(fitIntText(subTxt, bw - 14), bx + bw * 0.5 + 2, by + 26);
-                    if (isNear && ready && Array.isArray(this.cheatButtons)) {
-                        this.cheatButtons.push({ id: "TRIGGER_STATION", x: bx, y: by, w: bw, h: bh, station: st });
-                    }
+                ctx.fillText(fitIntText(st.label, bw - 14), bx + bw * 0.5 + 2, by + 11.5);
+                ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
+                ctx.fillStyle = isFocus && ready ? "#fde047" : stCol;
+                ctx.fillText(fitIntText(subTxt, bw - 14), bx + bw * 0.5 + 2, by + 25.5);
+                if (isFocus && ready && Array.isArray(this.cheatButtons)) {
+                    this.cheatButtons.push({ id: "TRIGGER_STATION", x: bx, y: by, w: bw, h: bh, station: st });
                 }
             }
         }
 
-        // 3B. Indoor Bullet Tracers & Target Bullseye Floating Popups
+        // 2B. Proximity Hint for Physical 3D Smash-and-Grab Showcases & Cash Registers!
+        if (window.ShopInteriors && typeof window.ShopInteriors.getBreakables === "function") {
+            const brks = window.ShopInteriors.getBreakables(intr);
+            let bestBrk = null;
+            let bestBrkDist = 74;
+            for (let i = 0; i < brks.length; i++) {
+                const b = brks[i];
+                if (b.broken) continue;
+                const d = Math.hypot(px - b.cx, py - b.cy);
+                if (d < bestBrkDist) {
+                    bestBrkDist = d;
+                    bestBrk = b;
+                }
+            }
+            if (bestBrk) {
+                const bScr = this.interiorToScreen(intr, bestBrk.cx, bestBrk.cy, 2.26);
+                const hintTxt = bestBrk.kind === "GLASS_CASE"
+                    ? `💥 [ATTACK] SMASH DISPLAY CASE (+$${bestBrk.loot})`
+                    : `💵 [ATTACK] SHOOT OPEN REGISTER (+$${bestBrk.loot})`;
+                ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
+                const hw = Math.min(W - 20, Math.round(ctx.measureText(hintTxt).width + 18));
+                const hx = Math.max(10, Math.min(W - hw - 10, Math.round(bScr.x - hw * 0.5)));
+                const hy = resolveLabelOverlap(hx, Math.max(58, Math.round(bScr.y - 24)), hw, 20);
+                ctx.fillStyle = "rgba(45, 12, 18, 0.92)";
+                ctx.fillRect(hx, hy, hw, 20);
+                ctx.strokeStyle = "#fbbf24";
+                ctx.lineWidth = 1.4;
+                ctx.strokeRect(hx + 0.5, hy + 0.5, hw - 1, 19);
+                ctx.fillStyle = "#fde047";
+                ctx.fillText(fitIntText(hintTxt, hw - 12), hx + hw * 0.5, hy + 10);
+            }
+        }
+
+        // 3. Indoor Bullet Tracers & Target/Loot Floating Popups
         if (Array.isArray(game.interiorTracers)) {
             for (const tr of game.interiorTracers) {
-                const s1 = this.worldToScreen(tr.x1, tr.y1, 2.15);
-                const s2 = this.worldToScreen(tr.x2, tr.y2, 2.15);
+                const s1 = this.interiorToScreen(intr, tr.x1, tr.y1, 2.15);
+                const s2 = this.interiorToScreen(intr, tr.x2, tr.y2, 2.15);
                 ctx.save();
                 ctx.strokeStyle = tr.color || "#fde047";
                 ctx.lineWidth = 2.4;
@@ -16760,14 +17069,14 @@ class RetroRenderer {
                 ctx.stroke();
                 ctx.fillStyle = "#ffffff";
                 ctx.beginPath();
-                ctx.arc(s2.x, s2.y, 4.0, 0, Math.PI * 2);
+                ctx.arc(s2.x, s2.y, 3.8, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             }
         }
         if (Array.isArray(game.interiorPopups)) {
             for (const pop of game.interiorPopups) {
-                const pPos = this.worldToScreen(pop.x, pop.y, 2.38);
+                const pPos = this.interiorToScreen(intr, pop.x, pop.y, 2.38);
                 ctx.font = "bold 11px Consolas, 'Courier New', monospace";
                 const pw = ctx.measureText(pop.text).width + 14;
                 ctx.fillStyle = "rgba(7, 11, 22, 0.92)";
@@ -16780,98 +17089,122 @@ class RetroRenderer {
             }
         }
 
-        // 4. 3D-Projected Venue NPC Role Labels & Speech Bubbles (shown when near player or during hold-up so distant rooms stay clean!)
+        // 4. Venue NPC Role Badges & Dynamic Reactive Speech Bubbles (Proximity-gated, hides dead/fled NPCs!)
         if (Array.isArray(intr.npcs)) {
             for (let i = 0; i < intr.npcs.length; i++) {
                 const npc = intr.npcs[i];
-                if (!npc.label) continue;
-                const isDancing = !!(npc.dancing || npc.label === "DANCER" || npc.label === "CLUBBER");
-                const nx = npc.x + (isDancing ? Math.sin(this.time * 4.0 + i) * 7.5 : Math.sin(this.time * 1.4 + i * 2.1) * 1.4);
-                const ny = npc.y + (isDancing ? Math.cos(this.time * 4.0 + i) * 5.5 : Math.cos(this.time * 1.1 + i * 1.7) * 1.0);
+                if (!npc || npc._dead || npc._fled || !npc.label) continue;
+                const nx = npc._liveX !== undefined ? npc._liveX : npc.x;
+                const ny = npc._liveY !== undefined ? npc._liveY : npc.y;
                 const distNpc = Math.hypot(px - nx, py - ny);
-                const robbedLine = (npc._robbedTimer || 0) > 0 ? "🙌 DON'T SHOOT! TAKE WHATEVER YOU WANT!" : null;
-                if (distNpc > 165 && !robbedLine) continue;
+                const isHostile = (npc._hostileTimer || 0) > 0;
+                const isPanicked = (npc._panicTimer || 0) > 0 || (npc._robbedTimer || 0) > 0;
+                const alertLine = isHostile
+                    ? (npc._combatBark || "🔫 WRONG STORE TO ROB, PUNK!")
+                    : (isPanicked ? (npc._panicBark || "🙌 DON'T SHOOT! TAKE THE CASH!") : null);
+                if (distNpc > 148 && !alertLine) continue;
 
-                const npcZ = (npc.z || 2.055) + 0.175;
-                const nScr = this.worldToScreen(nx, ny, npcZ);
+                const npcZ = (npc.z || 2.055) + 0.165;
+                const nScr = this.interiorToScreen(intr, nx, ny, npcZ);
 
-                ctx.font = "bold 10.5px Consolas, monospace";
-                const tw = ctx.measureText(npc.label).width + 14;
+                ctx.font = "bold 10px Consolas, monospace";
+                const roleTxt = isHostile ? `⚠️ ${npc.label}` : npc.label;
+                const tw = ctx.measureText(roleTxt).width + 12;
                 const tx = Math.round(nScr.x - tw * 0.5);
-                const ty = resolveLabelOverlap(tx, Math.round(nScr.y - 22), tw, 17);
-                ctx.fillStyle = "rgba(8, 12, 24, 0.90)";
-                ctx.fillRect(tx, ty, tw, 17);
-                ctx.strokeStyle = "#fde047";
+                const ty = resolveLabelOverlap(tx, Math.round(nScr.y - 20), tw, 16);
+                ctx.fillStyle = isHostile ? "rgba(69, 10, 10, 0.92)" : "rgba(8, 12, 24, 0.88)";
+                ctx.fillRect(tx, ty, tw, 16);
+                ctx.strokeStyle = isHostile ? "#ef4444" : "#fde047";
                 ctx.lineWidth = 1.2;
-                ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, 16);
-                ctx.fillStyle = "#fde047";
-                ctx.fillText(npc.label, tx + tw * 0.5, ty + 8.5);
+                ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, 15);
+                ctx.fillStyle = isHostile ? "#fca5a5" : "#fde047";
+                ctx.fillText(roleTxt, tx + tw * 0.5, ty + 8);
 
-                // Proximity 1997 Arcade Speech Bubble when player approaches NPC or during an armed hold-up!
-                const speech = robbedLine || (distNpc < 110 ? npc.dialog : null);
+                const speech = alertLine || (distNpc < 98 ? npc.dialog : null);
                 if (speech) {
-                    ctx.font = "bold 11px Consolas, 'Courier New', monospace";
-                    const sw = Math.min(Math.min(420, W - 28), Math.round(ctx.measureText(speech).width + 18));
+                    ctx.font = "bold 10.5px Consolas, 'Courier New', monospace";
+                    const sw = Math.min(Math.min(410, W - 28), Math.round(ctx.measureText(speech).width + 18));
                     const sx = Math.max(14, Math.min(W - sw - 14, Math.round(nScr.x - sw * 0.5)));
-                    const sy = resolveLabelOverlap(sx, ty - 23, sw, 20);
-                    ctx.fillStyle = robbedLine ? "rgba(69, 10, 10, 0.96)" : "rgba(15, 23, 42, 0.95)";
-                    ctx.fillRect(sx, sy, sw, 20);
-                    ctx.strokeStyle = robbedLine ? "#ef4444" : (intr.accent || "#38bdf8");
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 19);
-                    ctx.fillStyle = robbedLine ? "#fecaca" : "#ffffff";
-                    ctx.fillText(fitIntText(speech, sw - 14), sx + sw * 0.5, sy + 10);
+                    const sy = resolveLabelOverlap(sx, ty - 22, sw, 19);
+                    ctx.fillStyle = (isHostile || isPanicked) ? "rgba(69, 10, 10, 0.95)" : "rgba(15, 23, 42, 0.94)";
+                    ctx.fillRect(sx, sy, sw, 19);
+                    ctx.strokeStyle = (isHostile || isPanicked) ? "#ef4444" : (intr.accent || "#38bdf8");
+                    ctx.lineWidth = 1.4;
+                    ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 18);
+                    ctx.fillStyle = (isHostile || isPanicked) ? "#fecaca" : "#ffffff";
+                    ctx.fillText(fitIntText(speech, sw - 14), sx + sw * 0.5, sy + 9.5);
                 }
             }
         }
 
-        // Companion Tag (Jason or Lucia standing watch near the entrance — only when recruited!)
+        // 5. Active Partner Companion Tag (follows dynamically inside the room!)
         const pose = (window.ShopInteriors && window.ShopInteriors.getEntrancePose)
             ? window.ShopInteriors.getEntrancePose(intr)
-            : { partnerX: rw * 0.5 - 64, partnerY: rh - 62, exitX: rw * 0.5, exitY: rh - 8 };
+            : { partnerX: rw * 0.5 - 64, partnerY: rh - 62, exitX: rw * 0.5, exitY: rh - 16 };
         if (game.jason && game.jason.recruited) {
             const isJasonPlayer = p && (p.pedType === "jason" || String(p.charId).toUpperCase() === "JASON");
             const partnerName = isJasonPlayer ? "LUCIA [PARTNER]" : "JASON [PARTNER]";
-            const jScr = this.worldToScreen(pose.partnerX, pose.partnerY, 2.22);
-            ctx.font = "bold 9px Consolas, monospace";
+            const jxLocal = game.interiorJasonX !== undefined ? game.interiorJasonX : pose.partnerX;
+            const jyLocal = game.interiorJasonY !== undefined ? game.interiorJasonY : pose.partnerY;
+            const jScr = this.interiorToScreen(intr, jxLocal, jyLocal, 2.21);
+            ctx.font = "bold 9.5px Consolas, monospace";
             const jTw = ctx.measureText(partnerName).width + 10;
             const jx = Math.round(jScr.x - jTw * 0.5);
-            const jy = resolveLabelOverlap(jx, Math.round(jScr.y - 18), jTw, 13);
+            const jy = resolveLabelOverlap(jx, Math.round(jScr.y - 17), jTw, 14);
             ctx.fillStyle = "rgba(8, 12, 24, 0.86)";
-            ctx.fillRect(jx, jy, jTw, 13);
+            ctx.fillRect(jx, jy, jTw, 14);
             ctx.fillStyle = "#38bdf8";
-            ctx.fillText(partnerName, jx + jTw * 0.5, jy + 6.5);
+            ctx.fillText(partnerName, jx + jTw * 0.5, jy + 7);
         }
 
-        // 5. 3D-Projected Active Player Tag
-        const pTopScr = this.worldToScreen(px, py, 2.24);
-        const pLabel = (p && p.charId ? p.charId : "lucia").toUpperCase();
-        ctx.font = "bold 10px Consolas, monospace";
-        const pTw = ctx.measureText(pLabel).width + 10;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
-        ctx.fillRect(pTopScr.x - pTw * 0.5, pTopScr.y - 18, pTw, 14);
-        ctx.strokeStyle = "#f472b6";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(pTopScr.x - pTw * 0.5, pTopScr.y - 18, pTw, 14);
-        ctx.fillStyle = "#f472b6";
-        ctx.fillText(pLabel, pTopScr.x, pTopScr.y - 11);
+        // 6. Live Online Multiplayer Remote Players Inside the Same Building Interior!
+        if (game.net && game.net.remotePlayers && game.net.remotePlayers.size > 0) {
+            for (const rp of game.net.remotePlayers.values()) {
+                if (!rp || rp.intrId !== intr.id || rp.ix === undefined || rp.iy === undefined) continue;
+                const rScr = this.interiorToScreen(intr, rp.ix, rp.iy, 2.22);
+                const rName = String(rp.name || "PLAYER").slice(0, 18);
+                ctx.font = "bold 10px Consolas, monospace";
+                const rwTag = ctx.measureText(rName).width + 12;
+                const rx = Math.round(rScr.x - rwTag * 0.5);
+                const ry = resolveLabelOverlap(rx, Math.round(rScr.y - 18), rwTag, 15);
+                ctx.fillStyle = "rgba(8, 14, 28, 0.90)";
+                ctx.fillRect(rx, ry, rwTag, 15);
+                ctx.strokeStyle = rp.color || "#38bdf8";
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(rx + 0.5, ry + 0.5, rwTag - 1, 14);
+                ctx.fillStyle = rp.color || "#38bdf8";
+                ctx.fillText(rName, rx + rwTag * 0.5, ry + 7.5);
+                if (rp.chatText && (rp.chatTimer || 0) > 0) {
+                    ctx.font = "bold 10.5px Consolas, monospace";
+                    const cw = Math.min(320, Math.round(ctx.measureText(rp.chatText).width + 16));
+                    const cx = Math.max(10, Math.min(W - cw - 10, Math.round(rScr.x - cw * 0.5)));
+                    const cy = resolveLabelOverlap(cx, ry - 20, cw, 18);
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.95)";
+                    ctx.fillRect(cx, cy, cw, 18);
+                    ctx.strokeStyle = rp.color || "#38bdf8";
+                    ctx.strokeRect(cx + 0.5, cy + 0.5, cw - 1, 17);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillText(fitIntText(rp.chatText, cw - 12), cx + cw * 0.5, cy + 9);
+                }
+            }
+        }
 
-        // 6. 3D-Projected Threshold [🚪 EXIT TO STREET] Button (anchored on actual building entrance wall)
-        const exScr = this.worldToScreen(pose.exitX, pose.exitY, 2.08);
+        // 7. Clean Threshold [EXIT] Badge Anchored on Real Street Doorway (NO "LUCIA" self-label clutter!)
+        const exScr = this.interiorToScreen(intr, pose.exitX, pose.exitY, 2.06);
         const nearExit = Math.hypot(px - pose.exitX, py - pose.exitY) < 88;
-        const exitTxt = nearExit ? "🚪 [ESC / WALK] EXIT TO STREET" : "🚪 EXIT TO STREET [ESC]";
-        const exitW = nearExit ? 196 : 166;
-        const exitH = 24;
+        const exitTxt = nearExit ? "🚪 [ESC / WALK] EXIT TO STREET" : "🚪 EXIT [ESC]";
+        const exitW = nearExit ? 196 : 112;
+        const exitH = 22;
         const exitX = Math.max(12, Math.min(W - exitW - 12, Math.round(exScr.x - exitW * 0.5)));
-        const exitY = Math.max(48, Math.min(H - 36, Math.round(exScr.y - exitH * 0.5)));
+        const exitY = Math.max(54, Math.min(H - 32, Math.round(exScr.y - exitH * 0.5)));
 
-        ctx.fillStyle = nearExit ? "rgba(180, 24, 112, 0.96)" : "rgba(15, 23, 42, 0.94)";
+        ctx.fillStyle = nearExit ? "rgba(180, 24, 112, 0.95)" : "rgba(10, 16, 30, 0.86)";
         ctx.fillRect(exitX, exitY, exitW, exitH);
         ctx.strokeStyle = nearExit ? "#fde047" : (intr.accent || "#38bdf8");
-        ctx.lineWidth = nearExit ? 2.0 : 1.6;
+        ctx.lineWidth = nearExit ? 1.8 : 1.3;
         ctx.strokeRect(exitX + 0.5, exitY + 0.5, exitW - 1, exitH - 1);
         ctx.font = "bold 10px Consolas, 'Courier New', monospace";
-        ctx.fillStyle = nearExit ? "#fde047" : "#f8fafc";
+        ctx.fillStyle = nearExit ? "#fde047" : "#e2e8f0";
         ctx.fillText(exitTxt, exitX + exitW * 0.5, exitY + exitH * 0.5);
 
         this.cheatButtons.push({
