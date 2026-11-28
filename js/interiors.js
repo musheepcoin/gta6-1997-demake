@@ -645,6 +645,7 @@
         const raw = [];
         if (t === "SHOP_GUN_SHOP") {
             raw.push({ id: "reg_main", kind: "REGISTER", x: 268, y: 130, w: 24, h: 20, loot: 220 });
+            raw.push({ id: "reg_lobby", kind: "REGISTER", x: 114, y: 472, w: 24, h: 20, loot: 180 });
             raw.push({ id: "case_1", kind: "GLASS_CASE", x: 298, y: 129, w: 60, h: 24, loot: 260 });
             raw.push({ id: "case_2", kind: "GLASS_CASE", x: 364, y: 129, w: 60, h: 24, loot: 260 });
             raw.push({ id: "case_3", kind: "GLASS_CASE", x: 430, y: 129, w: 60, h: 24, loot: 280 });

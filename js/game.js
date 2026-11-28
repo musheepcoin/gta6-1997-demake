@@ -12573,11 +12573,14 @@ class LeonidaGame {
                     for (let bi = 0; bi < brks.length; bi++) {
                         const brk = brks[bi];
                         if (!brk || brk.broken) continue;
-                        const hitRad = Math.max(18, Math.max(brk.w || 28, brk.h || 20) * 0.55);
-                        const uB = rLenB2 > 1 ? Math.max(0, Math.min(1, ((brk.x - this.interiorX) * rdxB + (brk.y - this.interiorY) * rdyB) / rLenB2)) : 0;
+                        const bcx = typeof brk.cx === "number" ? brk.cx : (brk.x + (brk.w || 28) * 0.5);
+                        const bcy = typeof brk.cy === "number" ? brk.cy : (brk.y + (brk.h || 20) * 0.5);
+                        const padX = (brk.w || 28) * 0.5 + 14;
+                        const padY = (brk.h || 20) * 0.5 + 14;
+                        const uB = rLenB2 > 1 ? Math.max(0, Math.min(1, ((bcx - this.interiorX) * rdxB + (bcy - this.interiorY) * rdyB) / rLenB2)) : 0;
                         const cxB = this.interiorX + uB * rdxB;
                         const cyB = this.interiorY + uB * rdyB;
-                        if (Math.hypot(brk.x - cxB, brk.y - cyB) <= hitRad) {
+                        if (Math.abs(bcx - cxB) <= padX && Math.abs(bcy - cyB) <= padY) {
                             brk.broken = true;
                             brk.brokenUntilMs = Date.now() + 90000;
                             smashedBreakable = true;
@@ -12590,8 +12593,8 @@ class LeonidaGame {
                             this.addCash(loot, brk.kind === "GLASS_CASE" ? "💎 SMASH & GRAB!" : "💵 REGISTER SMASHED!", true);
                             if (!this.interiorPopups) this.interiorPopups = [];
                             this.interiorPopups.push({
-                                x: brk.x,
-                                y: brk.y - 8,
+                                x: bcx,
+                                y: bcy - 8,
                                 text: brk.kind === "GLASS_CASE" ? `💎 SMASH & GRAB +$${loot}!` : `💵 REGISTER +$${loot}!`,
                                 color: "#38bdf8",
                                 life: 1.45
